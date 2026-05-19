@@ -1,5 +1,6 @@
 #pragma once
 
+// IWYU pragma: begin_exports
 #include "vk/descriptors.hpp"
 #include "vk/device.hpp"
 #include "vk/pipeline.hpp"
@@ -12,3 +13,4 @@
 #include "texture.hpp"
 
 #include "ui/text.hpp"
+// IWYU pragma: end_exports

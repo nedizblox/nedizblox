@@ -11,8 +11,6 @@ namespace gfx::vk {
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-    (void)(messageSeverity, messageType, pUserData); // unused args
-
 #ifndef NDEBUG
     core::logger::debug(std::format("Vulkan: {}", pCallbackData->pMessage));
 #endif
@@ -187,12 +185,9 @@ void Device::createLogicalDevice() {
     createInfo.enabledExtensionCount = static_cast<uint32_t>(base::DEVICE_EXTENSIONS.size());
     createInfo.ppEnabledExtensionNames = base::DEVICE_EXTENSIONS.data();
 
-    if (base::ENABLE_VALIDATION_LAYER) {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(base::VALIDATION_LAYERS.size());
-        createInfo.ppEnabledLayerNames = base::VALIDATION_LAYERS.data();
-    } else {
-        createInfo.enabledLayerCount = 0;
-    }
+    // enabling layers at the logical device level is deprecated
+    createInfo.enabledLayerCount = 0;
+    createInfo.ppEnabledLayerNames = nullptr;
 
     createInfo.pNext = &indexingFeatures;
 

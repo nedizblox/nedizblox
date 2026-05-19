@@ -3,7 +3,6 @@
 #include "utils/rbxl.hpp"
 
 #include <format>
-#include <stdexcept>
 
 namespace game {
 
