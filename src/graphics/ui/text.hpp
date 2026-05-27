@@ -3,8 +3,7 @@
 #include "../vk/buffer.hpp"
 #include "../vk/device.hpp"
 
-#include "../bindless_manager.hpp"
-#include "../texture.hpp"
+#include "../managers/bindless_manager.hpp"
 
 #include <glm/glm.hpp>
 
@@ -26,11 +25,11 @@ public:
 
     struct PushConstantObject {
         alignas(16) glm::mat4 proj{1.0f};
-        alignas(8) glm::vec2 scale{1.0f, 1.0f};
+        alignas(8) glm::vec2 scale{1.0f};
         alignas(4) uint32_t texIndex{0};
     };
 
-    Text(vk::Device& device, vk::Sampler& sampler, BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
+    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
     ~Text();
 
     Text(const Text&) = delete;
@@ -63,10 +62,11 @@ private:
 
     std::unordered_map<char, Character> m_characters;
     uint32_t m_fontTextureIndex;
+    float m_lineSpacing;
 
     void createVertexBuffer(uint32_t maxChars);
     void createIndexBuffer(uint32_t maxChars);
-    void loadFont(const std::string& fontPath, vk::Sampler& sampler, BindlessManager& bindlessManager);
+    void loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager);
 };
 
 } // namespace gfx::ui

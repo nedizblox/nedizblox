@@ -1,6 +1,9 @@
 #pragma once
 
+#include "../enums/enums.hpp"
+
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -9,6 +12,8 @@ namespace game::types {
 
 class Instance : public std::enable_shared_from_this<Instance> {
 public:
+    using ChildCallback = std::function<void(std::shared_ptr<Instance>)>;
+
     Instance(enums::InstanceType type, const std::string& name) : m_type(type), m_name(name) {}
     virtual ~Instance() = default;
 
@@ -34,21 +39,29 @@ public:
         m_parent = parent;
 
         if (m_parent != nullptr) {
-            m_parent->m_children.push_back(shared_from_this());
+            auto self = shared_from_this();
+            m_parent->m_children.push_back(self);
+
+            if (m_parent->m_childAddedCallback) {
+                m_parent->m_childAddedCallback(self);
+            }
         }
     }
 
     const std::vector<std::shared_ptr<Instance>>& getChildren() const { return m_children; }
 
-    std::shared_ptr<Instance> findFirstChild(const std::string& childName) {
+    template <typename T = Instance>
+    std::shared_ptr<T> findFirstChild(const std::string& childName) {
         for (auto& child : m_children) {
             if (child->getName() == childName) {
-                return child;
+                return std::dynamic_pointer_cast<T>(child);
             }
         }
 
         return nullptr;
     }
+
+    void onChildAdded(ChildCallback callback) { m_childAddedCallback = callback; }
 
 private:
     std::string m_name;
@@ -56,6 +69,8 @@ private:
 
     Instance* m_parent = nullptr;
     std::vector<std::shared_ptr<Instance>> m_children;
+
+    ChildCallback m_childAddedCallback = nullptr;
 };
 
 } // namespace game::types

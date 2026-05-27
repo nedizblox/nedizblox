@@ -6,7 +6,7 @@
 
 extern "C" {
 
-enum RbxlPartType { Ball, Block, Cylinder, Wedge, CornerWedge };
+enum RbxlPartType { Ball, Block, Cylinder, Wedge };
 
 struct RbxlPartData {
     const char* name;

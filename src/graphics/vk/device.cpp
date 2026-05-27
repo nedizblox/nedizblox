@@ -104,11 +104,13 @@ void Device::createInstance() {
 }
 
 void Device::setupDebugMessenger() {
-    VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populateDebugMessengerCreateInfo(createInfo);
+    if (base::ENABLE_VALIDATION_LAYER) {
+        VkDebugUtilsMessengerCreateInfoEXT createInfo;
+        populateDebugMessengerCreateInfo(createInfo);
 
-    if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
-        throw std::runtime_error("Vulkan: Failed to set up debug messenger");
+        if (CreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger) != VK_SUCCESS) {
+            throw std::runtime_error("Vulkan: Failed to setup debug messenger");
+        }
     }
 }
 

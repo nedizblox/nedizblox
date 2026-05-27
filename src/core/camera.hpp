@@ -38,13 +38,15 @@ private:
 class SphericalCamera {
 public:
     float sensitivity = 0.01f;
-    float zoomSpeed = 0.5f;
-    float maxRadius = 15.0f;
+    float zoomSpeed = 2.0f;
+    float maxRadius = 40.0f;
 
     glm::vec3 target{0.0f};
 
     glm::mat4 getProjection() const { return m_projection; }
     glm::mat4 getView() const { return m_view; }
+
+    float getPhi() const { return m_phi; }
 
     void update(float fov, float aspect, float near, float far, glm::vec2 mouseDelta, glm::vec2 scrollDelta);
 

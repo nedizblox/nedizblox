@@ -74,13 +74,15 @@ set(MAIN_SOURCES
     src/graphics/model.cpp
     src/graphics/texture.cpp
     src/graphics/cubemap.cpp
-    src/graphics/bindless_manager.cpp
+    src/graphics/managers/bindless_manager.cpp
+    src/graphics/managers/model_manager.cpp
     src/graphics/skybox.cpp
     src/graphics/ui/text.cpp
     src/audio/audio_manager.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp
-    src/game/script_manager.cpp
+    src/game/managers/script_manager.cpp
+    src/game/prefabs/rig.cpp
     src/game/game.cpp
     src/main.cpp
 )

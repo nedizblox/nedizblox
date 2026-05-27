@@ -1,5 +1,6 @@
 #include "game.hpp"
 
+#include "prefabs/rig.hpp"
 #include "utils/rbxl.hpp"
 
 #include <format>
@@ -17,11 +18,8 @@ Game::Game() {
         loadModels();
         loadTexts();
 
-        buildMap();
-    } catch (std::exception& e) {
-        core::logger::err(e.what());
-        throw;
-    }
+        m_camera = std::make_unique<core::SphericalCamera>();
+    } catch (std::exception& e) { throw; }
 }
 
 Game::~Game() {}
@@ -49,7 +47,7 @@ void Game::initDescriptors() {
               .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 10)
               .build();
 
-    m_bindlessManager = std::make_unique<gfx::BindlessManager>(*m_device, *m_setLayout, *m_pool);
+    m_bindlessManager = std::make_unique<gfx::mngrs::BindlessManager>(*m_device, *m_setLayout, *m_pool);
 }
 
 void Game::initPipelines() {
@@ -162,13 +160,14 @@ void Game::loadTextures() {
 }
 
 void Game::loadModels() {
+    m_modelManager = std::make_unique<gfx::mngrs::ModelManager>(*m_device);
+
     m_skybox = std::make_unique<gfx::Skybox>(*m_device);
 
-    m_models["cubeOpaque"] = gfx::Model::createModelFromFile(*m_device, "assets/models/cube.obj");
-    m_models["cubeTransparent"] = gfx::Model::createModelFromFile(*m_device, "assets/models/cube.obj");
+    m_modelManager->loadModel("cube", "assets/models/cube.obj");
+    m_modelManager->loadModel("sphere", "assets/models/sphere.obj");
 
-    m_models["sphereOpaque"] = gfx::Model::createModelFromFile(*m_device, "assets/models/sphere.obj");
-    m_models["sphereTransparent"] = gfx::Model::createModelFromFile(*m_device, "assets/models/sphere.obj");
+    m_modelManager->loadModel("head", "assets/models/head.obj");
 }
 
 void Game::loadTexts() {
@@ -187,24 +186,48 @@ void Game::collectInstances(const std::shared_ptr<types::Instance>& parent) {
             uint32_t studs = m_textures["studs"];
             uint32_t smooth = m_textures["smooth"];
 
+            std::string bucket = "";
+            uint32_t texture = (shape == enums::PartType::Block) ? studs : smooth;
+
             if (transparency <= 0.0f) {
-                if (shape == enums::PartType::Block) {
-                    m_instancesData["cubeOpaque"].push_back(
-                        {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, 1.0f), studs});
-                } else if (shape == enums::PartType::Ball) {
-                    m_instancesData["sphereOpaque"].push_back(
-                        {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, 1.0f), smooth});
+                switch (shape) {
+                case enums::PartType::Block:
+                    bucket = "cubeOpaque";
+                    break;
+                case enums::PartType::Ball:
+                    bucket = "sphereOpaque";
+                    break;
+                case enums::PartType::Head:
+                    bucket = "headOpaque";
+                    break;
+                default:
+                    bucket = "cubeOpaque";
+                    break;
                 }
             } else {
-                if (shape == enums::PartType::Block) {
-                    m_instancesData["cubeTransparent"].push_back(
-                        {part->getModelMatrix(),
-                         glm::vec4(glm::vec3(part->getColor()) / 255.0f, 1.0f - transparency), studs});
-                } else if (shape == enums::PartType::Ball) {
-                    m_instancesData["sphereTransparent"].push_back(
-                        {part->getModelMatrix(),
-                         glm::vec4(glm::vec3(part->getColor()) / 255.0f, 1.0f - transparency), smooth});
+                switch (shape) {
+                case enums::PartType::Block:
+                    bucket = "cubeTransparent";
+                    break;
+                case enums::PartType::Ball:
+                    bucket = "sphereTransparent";
+                    break;
+                case enums::PartType::Head:
+                    bucket = "headTransparent";
+                    break;
+                default:
+                    bucket = "cubeTransparent";
+                    break;
                 }
+            }
+
+            float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
+
+            auto& vec = m_instancesData[bucket];
+            vec.push_back({part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha), texture});
+
+            if (!part->getAnchored()) {
+                m_dynamicTargets.push_back({part, bucket, vec.size() - 1});
             }
         }
 
@@ -212,27 +235,19 @@ void Game::collectInstances(const std::shared_ptr<types::Instance>& parent) {
     }
 }
 
-void Game::sortInstances() {
-    for (auto& [name, instances] : m_instancesData) {
-        std::sort(
-            instances.begin(), instances.end(),
-            [this](const gfx::Model::InstanceData& a, const gfx::Model::InstanceData& b) {
-                glm::vec3 diffA = glm::vec3(a.model[3]) - m_camera.position;
-                glm::vec3 diffB = glm::vec3(b.model[3]) - m_camera.position;
+void Game::sortInstances(std::vector<gfx::Model::InstanceData>& instances) {
+    std::sort(instances.begin(), instances.end(), [this](const auto& a, const auto& b) {
+        glm::vec3 diffA = glm::vec3(a.model[3]) - m_camera->target;
+        glm::vec3 diffB = glm::vec3(b.model[3]) - m_camera->target;
 
-                return glm::dot(diffA, diffA) > glm::dot(diffB, diffB);
-            });
-    }
+        return glm::dot(diffA, diffA) > glm::dot(diffB, diffB);
+    });
 }
 
-void Game::clearInstances() {
-    for (auto& data : m_instancesData) {
-        data.second.clear();
-    }
-}
-
-void Game::buildMap() {
+void Game::buildMap(const std::string& rbxlPath) {
     m_workspace = std::make_shared<types::Instance>(enums::InstanceType::Workspace, "Workspace");
+    m_workspace->onChildAdded(
+        [this](std::shared_ptr<types::Instance> newChild) { m_hierarchyDirty = true; });
 
     m_physics = std::make_unique<physics::Physics>(-100.0f);
 
@@ -242,47 +257,77 @@ void Game::buildMap() {
     m_instancesData["sphereOpaque"].reserve(MAX_INSTANCES);
     m_instancesData["sphereTransparent"].reserve(MAX_INSTANCES);
 
-    auto parts = utils::rbxl::parseRbxl("assets/maps/crossroads.rbxl");
+    auto parts = utils::rbxl::parseRbxl(rbxlPath);
 
     for (auto& part : parts) {
-        m_physics->createRigidBody(part.get());
+        m_physics->createRigidBodyPart(part.get());
         part->setParent(m_workspace.get());
     }
+
+    m_rig = prefabs::Rig::create(*m_physics);
+    m_rig->setParent(m_workspace.get());
+    m_rig->setPivotPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 }
 
 void Game::run() {
     while (m_window->isOpen()) {
         m_window->update();
         m_scriptManager.update();
-        m_physics->step(m_window->getDeltaTime());
 
         if (m_window->isKeyPressed(GLFW_KEY_W)) {
-            m_camera.move(core::FreeCamera::CameraDirection::FORWARD, m_window->getDeltaTime());
+            m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
         }
         if (m_window->isKeyPressed(GLFW_KEY_S)) {
-            m_camera.move(core::FreeCamera::CameraDirection::BACKWARD, m_window->getDeltaTime());
+            m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
         }
         if (m_window->isKeyPressed(GLFW_KEY_A)) {
-            m_camera.move(core::FreeCamera::CameraDirection::LEFT, m_window->getDeltaTime());
+            m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
         }
         if (m_window->isKeyPressed(GLFW_KEY_D)) {
-            m_camera.move(core::FreeCamera::CameraDirection::RIGHT, m_window->getDeltaTime());
+            m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
+        }
+        if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
+            m_rig->jump();
+        }
+
+        m_physics->step(m_window->getDeltaTime());
+
+        m_rig->update(m_window->getDeltaTime());
+        m_camera->target = m_rig->findFirstChild<types::Part>("Head")->getPosition();
+
+        if (m_window->isKeyJustPressed(GLFW_KEY_F3)) {
+            m_debugScreenToggled = !m_debugScreenToggled;
         }
 
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
                                    ? m_window->getMouseRel()
                                    : glm::vec2(0.0f);
-        m_camera.update(glm::radians(80.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta);
+        m_camera->update(
+            glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta, m_window->getScrollDelta());
+        m_window->resetScrollDelta();
 
         if (VkCommandBuffer cmd = m_renderer->beginFrame()) {
-            glm::mat4 projection = m_camera.getProjection();
-            glm::mat4 view = m_camera.getView();
+            glm::mat4 projection = m_camera->getProjection();
+            glm::mat4 view = m_camera->getView();
 
             m_renderer->beginRenderPass(cmd);
 
-            clearInstances();
-            collectInstances(m_workspace);
-            sortInstances();
+            if (m_hierarchyDirty) {
+                for (auto& data : m_instancesData) {
+                    data.second.clear();
+                }
+                m_dynamicTargets.clear();
+
+                collectInstances(m_workspace);
+                m_hierarchyDirty = false;
+            }
+
+            for (const auto& target : m_dynamicTargets) {
+                m_instancesData[target.bucketName][target.index].model = target.part->getModelMatrix();
+            }
+
+            sortInstances(m_instancesData["cubeTransparent"]);
+            sortInstances(m_instancesData["sphereTransparent"]);
 
             m_pipelines["modelOpaque"]->bind(cmd);
             m_bindlessManager->bind(cmd, m_pipelines["modelOpaque"]->getPipelineLayout());
@@ -291,8 +336,7 @@ void Game::run() {
             modelPush.viewProj = projection * view;
             m_pipelines["modelOpaque"]->pushConstant(cmd, modelPush);
 
-            m_models["cubeOpaque"]->draw(cmd, m_instancesData["cubeOpaque"]);
-            m_models["sphereOpaque"]->draw(cmd, m_instancesData["sphereOpaque"]);
+            m_modelManager->drawOpaque(cmd, m_instancesData);
 
             m_pipelines["skybox"]->bind(cmd);
             m_bindlessManager->bind(cmd, m_pipelines["skybox"]->getPipelineLayout());
@@ -309,25 +353,27 @@ void Game::run() {
 
             m_pipelines["modelTransparent"]->pushConstant(cmd, modelPush);
 
-            m_models["cubeTransparent"]->draw(cmd, m_instancesData["cubeTransparent"]);
-            m_models["sphereTransparent"]->draw(cmd, m_instancesData["sphereTransparent"]);
+            m_modelManager->drawTransparent(cmd, m_instancesData);
 
             m_pipelines["text"]->bind(cmd);
             m_bindlessManager->bind(cmd, m_pipelines["text"]->getPipelineLayout());
 
-            gfx::ui::Text::PushConstantObject textPush{};
-            textPush.proj = glm::ortho(
-                0.0f, static_cast<float>(m_window->getWidth()), 0.0f,
-                static_cast<float>(m_window->getHeight()));
-            textPush.texIndex = m_texts["fps"]->getTextureIndex();
+            if (m_debugScreenToggled) {
+                gfx::ui::Text::PushConstantObject textPush{};
+                textPush.proj = glm::ortho(
+                    0.0f, static_cast<float>(m_window->getWidth()), 0.0f,
+                    static_cast<float>(m_window->getHeight()));
+                textPush.texIndex = m_texts["fps"]->getTextureIndex();
+                textPush.scale = glm::vec2(0.5f);
 
-            float deltaTime = m_window->getDeltaTime();
-            float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
+                float deltaTime = m_window->getDeltaTime();
+                float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
 
-            m_texts["fps"]->setText(std::format("FPS: {:.0f}", fps), glm::vec2(20.0f, 40.0f));
+                m_texts["fps"]->setText(std::format("FPS: {:.0f}\nTest", fps), glm::vec2(20.0f, 40.0f));
 
-            m_pipelines["text"]->pushConstant(cmd, textPush);
-            m_texts["fps"]->draw(cmd);
+                m_pipelines["text"]->pushConstant(cmd, textPush);
+                m_texts["fps"]->draw(cmd);
+            }
 
             m_renderer->endRenderPass(cmd);
             m_renderer->endFrame();

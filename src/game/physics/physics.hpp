@@ -1,4 +1,4 @@
-#pragma one
+#pragma once
 
 #include "../types/types.hpp"
 
@@ -14,7 +14,10 @@ public:
     Physics(const Physics&) = delete;
     Physics& operator=(const Physics&) = delete;
 
-    btRigidBody* createRigidBody(types::Part* part);
+    btDiscreteDynamicsWorld* getDynamicsWorld() const { return m_dynamicsWorld; }
+
+    btRigidBody* createRigidBodyPart(types::Part* part);
+    btRigidBody* createRigidBodyModel(types::Model* model, types::Part* rootPart);
 
     void step(float deltaTime);
 

@@ -7,6 +7,3 @@
 [submodule "extern/luau"]
 	path = extern/luau
 	url = https://github.com/luau-lang/luau.git
-[submodule "extern/rbx-dom"]
-	path = extern/rbx-dom
-	url = https://github.com/nedizblox/rbx-dom.git

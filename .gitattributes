@@ -4,4 +4,6 @@
 *.jpg binary
 *.wav binary
 
+*.obj binary
+
 *.rbxl binary

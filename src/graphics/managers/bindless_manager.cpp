@@ -1,6 +1,12 @@
 #include "bindless_manager.hpp"
 
-namespace gfx {
+#ifndef NDEBUG
+#include "core/logger.hpp"
+#endif
+
+#include <stdexcept>
+
+namespace gfx::mngrs {
 
 BindlessManager::BindlessManager(vk::Device& device, vk::DescriptorSetLayout& layout, vk::DescriptorPool& pool) :
     m_device(device), m_layout(layout), m_pool(pool) {
@@ -52,4 +58,4 @@ void BindlessManager::bind(VkCommandBuffer commandBuffer, VkPipelineLayout pipel
         commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, bind, 1, &m_descriptorSet, 0, nullptr);
 }
 
-} // namespace gfx
+} // namespace gfx::mngrs

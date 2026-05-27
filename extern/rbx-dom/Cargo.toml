@@ -1,0 +1,11 @@
+[package]
+name = "rbx-dom"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rbx_binary = "2.0.1"
+rbx_dom_weak = "4.0"

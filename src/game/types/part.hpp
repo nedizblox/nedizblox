@@ -1,10 +1,11 @@
 #pragma once
 
+#include "game/enums/enums.hpp"
+#include "instance.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
-
-#include "instance.hpp"
 
 namespace game::types {
 
@@ -69,7 +70,7 @@ private:
 
     bool m_anchored = false;
 
-    enums::PartType m_shape;
+    enums::PartType m_shape = enums::PartType::Block;
 };
 
 } // namespace game::types

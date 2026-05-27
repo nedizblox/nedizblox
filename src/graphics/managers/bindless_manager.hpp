@@ -1,15 +1,15 @@
 #pragma once
 
-#include "vk/descriptors.hpp"
-#include "vk/device.hpp"
+#include "../vk/descriptors.hpp"
+#include "../vk/device.hpp"
 
-#include "cubemap.hpp"
-#include "texture.hpp"
+#include "../cubemap.hpp"
+#include "../texture.hpp"
 
 #include <memory>
 #include <vector>
 
-namespace gfx {
+namespace gfx::mngrs {
 
 class BindlessManager {
 public:
@@ -38,4 +38,4 @@ private:
     std::vector<std::unique_ptr<Cubemap>> m_cubemaps;
 };
 
-} // namespace gfx
+} // namespace gfx::mngrs

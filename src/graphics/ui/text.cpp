@@ -8,7 +8,9 @@
 
 namespace gfx::ui {
 
-Text::Text(vk::Device& device, vk::Sampler& sampler, BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars) :
+Text::Text(
+    vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager,
+    const std::string& fontPath, uint32_t maxChars) :
     m_device(device) {
     createVertexBuffer(maxChars);
     createIndexBuffer(maxChars);
@@ -59,7 +61,7 @@ void Text::createIndexBuffer(uint32_t maxChars) {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_indexBuffer->getBuffer(), bufferSize);
 }
 
-void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, BindlessManager& bindlessManager) {
+void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) {
         throw std::runtime_error("FreeType: Failed to init library");
@@ -129,6 +131,7 @@ void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, BindlessM
         m_device, sampler, stagingBuffer, atlasWidth, atlasHeight, VK_FORMAT_R8_UNORM);
 
     m_fontTextureIndex = bindlessManager.addTexture(std::move(fontTexture));
+    m_lineSpacing = static_cast<float>(face->size->metrics.height >> 6);
 
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
@@ -142,6 +145,12 @@ void Text::setText(const std::string& text, const glm::vec2& position) {
     float y = position.y;
 
     for (char c : text) {
+        if (c == '\n') {
+            x = position.x;
+            y += m_lineSpacing;
+            continue;
+        }
+
         if (m_characters.find(c) == m_characters.end())
             continue;
         Character ch = m_characters[c];
