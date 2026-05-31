@@ -10,7 +10,7 @@ namespace gfx {
 
 class Cubemap {
 public:
-    Cubemap(vk::Device& device, vk::Sampler& sampler, const std::array<std::string, 6>& faces);
+    Cubemap(vk::Device& device, vk::Sampler& sampler, const std::array<std::string, 6>& faces, bool flipVertically = false);
     ~Cubemap();
 
     Cubemap(const Cubemap&) = delete;
@@ -28,7 +28,7 @@ private:
     VkImageView m_imageView;
     vk::Sampler& m_sampler;
 
-    void createImage(const std::array<std::string, 6>& faces);
+    void createImage(const std::array<std::string, 6>& faces, bool flipVertically);
     void createImageView();
 };
 

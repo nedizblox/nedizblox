@@ -29,7 +29,7 @@ public:
 
     ALuint loadSound(const std::string& wavPath, const SoundSettings& settings);
 
-    void moveListener(glm::vec3 position);
+    void moveListener(const glm::vec3& position);
 
     void playSound(ALuint id);
     void stopSound(ALuint id);

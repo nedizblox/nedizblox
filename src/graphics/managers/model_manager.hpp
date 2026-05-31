@@ -13,6 +13,9 @@ public:
     ModelManager(gfx::vk::Device& device);
     ~ModelManager();
 
+    ModelManager(const ModelManager&) = delete;
+    ModelManager& operator=(const ModelManager&) = delete;
+
     void loadModel(const std::string& name, const std::string& filePath);
 
     void drawOpaque(

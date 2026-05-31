@@ -1,9 +1,6 @@
 #include "game.hpp"
 
-#include "prefabs/rig.hpp"
 #include "utils/rbxl.hpp"
-
-#include <format>
 
 namespace game {
 
@@ -12,13 +9,13 @@ Game::Game() {
         initWindow();
         initVulkan();
         initDescriptors();
-        initPipelines();
-        loadSamplers();
+        initManagers();
+        initEngines();
         loadTextures();
         loadModels();
-        loadTexts();
+        loadFonts();
 
-        m_camera = std::make_unique<core::SphericalCamera>();
+        m_camera = std::make_unique<core::camera::SphericalCamera>();
     } catch (std::exception& e) { throw; }
 }
 
@@ -31,6 +28,7 @@ void Game::initWindow() {
 
 void Game::initVulkan() {
     m_device = std::make_unique<gfx::vk::Device>(*m_window);
+
     m_renderer = std::make_unique<gfx::vk::Renderer>(*m_device, *m_window);
 }
 
@@ -46,117 +44,47 @@ void Game::initDescriptors() {
               .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1000)
               .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 10)
               .build();
+}
 
+void Game::initManagers() {
     m_bindlessManager = std::make_unique<gfx::mngrs::BindlessManager>(*m_device, *m_setLayout, *m_pool);
+
+    m_assetManager = std::make_unique<mngrs::AssetManager>(*m_device, *m_bindlessManager);
+    m_assetManager->initSamplers();
+
+    m_instanceManager = std::make_unique<mngrs::InstanceManager>();
+
+    m_modelManager = std::make_unique<gfx::mngrs::ModelManager>(*m_device);
 }
 
-void Game::initPipelines() {
-    m_pipelines["skybox"] = gfx::vk::Pipeline::Builder(*m_device)
-                                .setVertShaderPath("shaders/skybox.vert.spv")
-                                .setFragShaderPath("shaders/skybox.frag.spv")
-                                .setConstantSize(sizeof(gfx::Skybox::PushConstantObject))
-                                .setDescriptorLayouts({m_setLayout->getDescriptorSetLayout()})
-                                .setRenderPass(m_renderer->getRenderPass())
-                                .setBindingDescriptions(gfx::Skybox::Vertex::getBindingDescriptions())
-                                .setAttributeDescriptions(gfx::Skybox::Vertex::getAttributeDescriptions())
-                                .enableDepthTest()
-                                .disableDepthWrite()
-                                .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
-                                .build();
+void Game::initEngines() {
+    m_renderEngine = std::make_unique<engines::RenderEngine>(*m_device, *m_renderer, *m_bindlessManager);
+    m_renderEngine->initPipelines(m_setLayout->getDescriptorSetLayout());
 
-    m_pipelines["modelOpaque"]
-        = gfx::vk::Pipeline::Builder(*m_device)
-              .setVertShaderPath("shaders/model.vert.spv")
-              .setFragShaderPath("shaders/model.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({m_setLayout->getDescriptorSetLayout()})
-              .setRenderPass(m_renderer->getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .setCullMode(VK_CULL_MODE_FRONT_BIT)
-              .enableDepthTest()
-              .build();
-
-    m_pipelines["modelTransparent"]
-        = gfx::vk::Pipeline::Builder(*m_device)
-              .setVertShaderPath("shaders/model.vert.spv")
-              .setFragShaderPath("shaders/model.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({m_setLayout->getDescriptorSetLayout()})
-              .setRenderPass(m_renderer->getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .setCullMode(VK_CULL_MODE_FRONT_BIT)
-              .enableDepthTest()
-              .disableDepthWrite()
-              .enableAlphaBlending()
-              .build();
-
-    m_pipelines["text"] = gfx::vk::Pipeline::Builder(*m_device)
-                              .setVertShaderPath("shaders/text.vert.spv")
-                              .setFragShaderPath("shaders/text.frag.spv")
-                              .setConstantSize(sizeof(gfx::ui::Text::PushConstantObject))
-                              .setDescriptorLayouts({m_setLayout->getDescriptorSetLayout()})
-                              .setRenderPass(m_renderer->getRenderPass())
-                              .setBindingDescriptions(gfx::ui::Text::Vertex::getBindingDescriptions())
-                              .setAttributeDescriptions(gfx::ui::Text::Vertex::getAttributeDescriptions())
-                              .enableAlphaBlending()
-                              .build();
-}
-
-void Game::loadSamplers() {
-    m_samplers["default"] = gfx::vk::Sampler::Builder(*m_device)
-                                .setAnisotropy(m_device->properties.limits.maxSamplerAnisotropy)
-                                .setMipmaps(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-                                .setMaxLod(7.0f)
-                                .build();
-
-    m_samplers["skybox"] = gfx::vk::Sampler::Builder(*m_device)
-                               .setAddressMode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                               .setAnisotropy(m_device->properties.limits.maxSamplerAnisotropy)
-                               .setMipmaps(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-                               .build();
-
-    m_samplers["text"] = gfx::vk::Sampler::Builder(*m_device)
-                             .setAddressMode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                             .setMaxLod(1.0f)
-                             .build();
+    m_scriptEngine = std::make_unique<engines::ScriptEngine>();
 }
 
 void Game::loadTextures() {
     std::vector<std::string> studsFaces = {
         "assets/textures/smooth.png", "assets/textures/smooth.png", "assets/textures/studs.png",
         "assets/textures/inlets.png", "assets/textures/smooth.png", "assets/textures/smooth.png"};
-
-    for (size_t i = 0; i < studsFaces.size(); i++) {
-        auto tex = std::make_unique<gfx::Texture>(*m_device, *m_samplers["default"], studsFaces[i]);
-        uint32_t idx = m_bindlessManager->addTexture(std::move(tex));
-
-        if (i == 0) {
-            m_textures["studs"] = idx;
-        }
-    }
+    m_assetManager->loadCubeFaces("studs", studsFaces);
 
     std::vector<std::string> smoothFaces = {
         "assets/textures/smooth.png", "assets/textures/smooth.png", "assets/textures/smooth.png",
         "assets/textures/smooth.png", "assets/textures/smooth.png", "assets/textures/smooth.png"};
+    m_assetManager->loadCubeFaces("smooth", smoothFaces);
 
-    for (size_t i = 0; i < smoothFaces.size(); i++) {
-        auto tex = std::make_unique<gfx::Texture>(*m_device, *m_samplers["default"], smoothFaces[i]);
-        uint32_t idx = m_bindlessManager->addTexture(std::move(tex));
+    std::vector<std::string> headFaces = {
+        "assets/textures/smooth.png", "assets/textures/smooth.png", "assets/textures/smooth.png",
+        "assets/textures/smooth.png", "assets/textures/face.png",   "assets/textures/smooth.png"};
+    m_assetManager->loadCubeFaces("headFace", headFaces, "repeat", true);
 
-        if (i == 0) {
-            m_textures["smooth"] = idx;
-        }
-    }
-
-    auto cub = std::make_unique<gfx::Cubemap>(
-        *m_device, *m_samplers["skybox"],
-        std::array<std::string, 6>(
-            {"assets/textures/skybox/rt.png", "assets/textures/skybox/lf.png", "assets/textures/skybox/up.png",
-             "assets/textures/skybox/dn.png", "assets/textures/skybox/ft.png", "assets/textures/skybox/bk.png"}));
-
-    m_cubemaps["skybox"] = m_bindlessManager->addCubemap(std::move(cub));
+    std::array<std::string, 6> skyboxFaces
+        = {"assets/textures/skybox/rt.png", "assets/textures/skybox/lf.png",
+           "assets/textures/skybox/up.png", "assets/textures/skybox/dn.png",
+           "assets/textures/skybox/ft.png", "assets/textures/skybox/bk.png"};
+    m_assetManager->loadCubemap("skybox", skyboxFaces, "skybox");
 }
 
 void Game::loadModels() {
@@ -170,92 +98,16 @@ void Game::loadModels() {
     m_modelManager->loadModel("head", "assets/models/head.obj");
 }
 
-void Game::loadTexts() {
-    m_texts["fps"] = std::make_unique<gfx::ui::Text>(
-        *m_device, *m_samplers["text"], *m_bindlessManager, "assets/fonts/GraphikLCWeb.ttf", 15);
-}
-
-void Game::collectInstances(const std::shared_ptr<types::Instance>& parent) {
-    for (auto& obj : parent->getChildren()) {
-        if (obj->getType() == enums::InstanceType::Part) {
-            auto part = std::static_pointer_cast<types::Part>(obj);
-
-            float transparency = part->getTransparency();
-            enums::PartType shape = part->getShape();
-
-            uint32_t studs = m_textures["studs"];
-            uint32_t smooth = m_textures["smooth"];
-
-            std::string bucket = "";
-            uint32_t texture = (shape == enums::PartType::Block) ? studs : smooth;
-
-            if (transparency <= 0.0f) {
-                switch (shape) {
-                case enums::PartType::Block:
-                    bucket = "cubeOpaque";
-                    break;
-                case enums::PartType::Ball:
-                    bucket = "sphereOpaque";
-                    break;
-                case enums::PartType::Head:
-                    bucket = "headOpaque";
-                    break;
-                default:
-                    bucket = "cubeOpaque";
-                    break;
-                }
-            } else {
-                switch (shape) {
-                case enums::PartType::Block:
-                    bucket = "cubeTransparent";
-                    break;
-                case enums::PartType::Ball:
-                    bucket = "sphereTransparent";
-                    break;
-                case enums::PartType::Head:
-                    bucket = "headTransparent";
-                    break;
-                default:
-                    bucket = "cubeTransparent";
-                    break;
-                }
-            }
-
-            float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
-
-            auto& vec = m_instancesData[bucket];
-            vec.push_back({part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha), texture});
-
-            if (!part->getAnchored()) {
-                m_dynamicTargets.push_back({part, bucket, vec.size() - 1});
-            }
-        }
-
-        collectInstances(obj);
-    }
-}
-
-void Game::sortInstances(std::vector<gfx::Model::InstanceData>& instances) {
-    std::sort(instances.begin(), instances.end(), [this](const auto& a, const auto& b) {
-        glm::vec3 diffA = glm::vec3(a.model[3]) - m_camera->target;
-        glm::vec3 diffB = glm::vec3(b.model[3]) - m_camera->target;
-
-        return glm::dot(diffA, diffA) > glm::dot(diffB, diffB);
-    });
-}
+void Game::loadFonts() { m_assetManager->loadFont("fps", "assets/fonts/RobotoMono.ttf", 30); }
 
 void Game::buildMap(const std::string& rbxlPath) {
+    m_instanceManager = std::make_unique<mngrs::InstanceManager>();
+
     m_workspace = std::make_shared<types::Instance>(enums::InstanceType::Workspace, "Workspace");
     m_workspace->onChildAdded(
-        [this](std::shared_ptr<types::Instance> newChild) { m_hierarchyDirty = true; });
+        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markDirty(); });
 
     m_physics = std::make_unique<physics::Physics>(-100.0f);
-
-    m_instancesData["cubeOpaque"].reserve(MAX_INSTANCES);
-    m_instancesData["cubeTransparent"].reserve(MAX_INSTANCES);
-
-    m_instancesData["sphereOpaque"].reserve(MAX_INSTANCES);
-    m_instancesData["sphereTransparent"].reserve(MAX_INSTANCES);
 
     auto parts = utils::rbxl::parseRbxl(rbxlPath);
 
@@ -272,7 +124,9 @@ void Game::buildMap(const std::string& rbxlPath) {
 void Game::run() {
     while (m_window->isOpen()) {
         m_window->update();
-        m_scriptManager.update();
+        m_scriptEngine->update();
+
+        float dt = m_window->getDeltaTime();
 
         if (m_window->isKeyPressed(GLFW_KEY_W)) {
             m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
@@ -290,9 +144,9 @@ void Game::run() {
             m_rig->jump();
         }
 
-        m_physics->step(m_window->getDeltaTime());
+        m_physics->step(dt);
 
-        m_rig->update(m_window->getDeltaTime());
+        m_rig->update(dt);
         m_camera->target = m_rig->findFirstChild<types::Part>("Head")->getPosition();
 
         if (m_window->isKeyJustPressed(GLFW_KEY_F3)) {
@@ -312,67 +166,29 @@ void Game::run() {
 
             m_renderer->beginRenderPass(cmd);
 
-            if (m_hierarchyDirty) {
-                for (auto& data : m_instancesData) {
-                    data.second.clear();
-                }
-                m_dynamicTargets.clear();
+            if (m_instanceManager->isDirty()) {
+                uint32_t studsId = m_assetManager->getTextureId("studs");
+                uint32_t smoothId = m_assetManager->getTextureId("smooth");
+                uint32_t headFaceId = m_assetManager->getTextureId("headFace");
 
-                collectInstances(m_workspace);
-                m_hierarchyDirty = false;
+                m_instanceManager->rebuildMap(m_workspace, studsId, smoothId, headFaceId);
             }
 
-            for (const auto& target : m_dynamicTargets) {
-                m_instancesData[target.bucketName][target.index].model = target.part->getModelMatrix();
-            }
+            m_instanceManager->updateDynamicTransforms();
 
-            sortInstances(m_instancesData["cubeTransparent"]);
-            sortInstances(m_instancesData["sphereTransparent"]);
+            m_instanceManager->sortTransparentInstances(m_camera->target);
 
-            m_pipelines["modelOpaque"]->bind(cmd);
-            m_bindlessManager->bind(cmd, m_pipelines["modelOpaque"]->getPipelineLayout());
+            const auto& instancesData = m_instanceManager->getInstancesData();
 
-            gfx::Model::PushConstantObject modelPush{};
-            modelPush.viewProj = projection * view;
-            m_pipelines["modelOpaque"]->pushConstant(cmd, modelPush);
+            m_renderEngine->renderModelsOpaque(cmd, *m_camera, *m_modelManager, instancesData);
 
-            m_modelManager->drawOpaque(cmd, m_instancesData);
+            m_renderEngine->renderSkybox(cmd, *m_camera, *m_skybox, m_assetManager->getCubemapId("skybox"));
 
-            m_pipelines["skybox"]->bind(cmd);
-            m_bindlessManager->bind(cmd, m_pipelines["skybox"]->getPipelineLayout());
-
-            gfx::Skybox::PushConstantObject skyboxPush{};
-            skyboxPush.viewProj = projection * glm::mat4(glm::mat3(view));
-            skyboxPush.cubIndex = m_cubemaps["skybox"];
-            m_pipelines["skybox"]->pushConstant(cmd, skyboxPush);
-
-            m_skybox->draw(cmd);
-
-            m_pipelines["modelTransparent"]->bind(cmd);
-            m_bindlessManager->bind(cmd, m_pipelines["modelTransparent"]->getPipelineLayout());
-
-            m_pipelines["modelTransparent"]->pushConstant(cmd, modelPush);
-
-            m_modelManager->drawTransparent(cmd, m_instancesData);
-
-            m_pipelines["text"]->bind(cmd);
-            m_bindlessManager->bind(cmd, m_pipelines["text"]->getPipelineLayout());
+            m_renderEngine->renderModelsTransparent(cmd, *m_camera, *m_modelManager, instancesData);
 
             if (m_debugScreenToggled) {
-                gfx::ui::Text::PushConstantObject textPush{};
-                textPush.proj = glm::ortho(
-                    0.0f, static_cast<float>(m_window->getWidth()), 0.0f,
-                    static_cast<float>(m_window->getHeight()));
-                textPush.texIndex = m_texts["fps"]->getTextureIndex();
-                textPush.scale = glm::vec2(0.5f);
-
-                float deltaTime = m_window->getDeltaTime();
-                float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
-
-                m_texts["fps"]->setText(std::format("FPS: {:.0f}\nTest", fps), glm::vec2(20.0f, 40.0f));
-
-                m_pipelines["text"]->pushConstant(cmd, textPush);
-                m_texts["fps"]->draw(cmd);
+                m_renderEngine->renderDebugUI(
+                    cmd, m_window->getWidth(), m_window->getHeight(), m_assetManager->getFont("fps"), dt);
             }
 
             m_renderer->endRenderPass(cmd);

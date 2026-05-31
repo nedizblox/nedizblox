@@ -10,17 +10,17 @@
 #include <unordered_map>
 #include <vector>
 
-namespace game {
+namespace game::engines {
 
-class ScriptManager {
+class ScriptEngine {
 public:
     using LuaCallback = std::function<int(lua_State*)>;
 
-    ScriptManager();
-    ~ScriptManager();
+    ScriptEngine();
+    ~ScriptEngine();
 
-    ScriptManager(const ScriptManager&) = delete;
-    ScriptManager& operator=(const ScriptManager&) = delete;
+    ScriptEngine(const ScriptEngine&) = delete;
+    ScriptEngine& operator=(const ScriptEngine&) = delete;
 
     const std::vector<std::string>& getLogBuffer() const { return m_logBuffer; }
 
@@ -84,4 +84,4 @@ private:
     void setupEnviroment();
 };
 
-} // namespace game
+} // namespace game::engines

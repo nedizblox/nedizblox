@@ -4,7 +4,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-namespace core {
+namespace core::camera {
 
 class FreeCamera {
 public:
@@ -59,4 +59,4 @@ private:
     glm::mat4 m_view{1.0f};
 };
 
-} // namespace core
+} // namespace core::camera

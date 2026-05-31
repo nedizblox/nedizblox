@@ -1,5 +1,7 @@
 #include "game/game.hpp"
 
+#include "core/msgbox.hpp"
+
 int main(int argc, char* argv[]) {
     try {
         game::Game gameMain;
@@ -7,12 +9,13 @@ int main(int argc, char* argv[]) {
         if (argc > 1) {
             gameMain.buildMap(argv[1]);
         } else {
-            gameMain.buildMap("assets/maps/Baseplate_test.rbxl");
+            gameMain.buildMap("assets/maps/crossroads.rbxl");
         }
 
         gameMain.run();
     } catch (std::exception& e) {
         core::logger::err(e.what());
+        core::msgbox::showError("Nedizblox error", e.what());
         return 1;
     }
 

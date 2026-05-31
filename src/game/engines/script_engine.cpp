@@ -1,21 +1,21 @@
-#include "script_manager.hpp"
+#include "script_engine.hpp"
 
 #include <Luau/Compiler.h>
 
 #include <format>
 
-namespace game {
+namespace game::engines {
 
-ScriptManager::ScriptManager() {
+ScriptEngine::ScriptEngine() {
     m_lua = luaL_newstate();
     luaL_openlibs(m_lua);
 
     setupEnviroment();
 }
 
-ScriptManager::~ScriptManager() { lua_close(m_lua); }
+ScriptEngine::~ScriptEngine() { lua_close(m_lua); }
 
-void ScriptManager::setupEnviroment() {
+void ScriptEngine::setupEnviroment() {
     createFunction("print", [this](lua_State* L) -> int {
         int n = lua_gettop(L);
         std::string line = "";
@@ -40,7 +40,7 @@ void ScriptManager::setupEnviroment() {
     });
 }
 
-void ScriptManager::update() {
+void ScriptEngine::update() {
     auto it = m_activeScripts.begin();
     while (it != m_activeScripts.end()) {
         int status = lua_resume(it->thread, m_lua, 0);
@@ -61,14 +61,14 @@ void ScriptManager::update() {
     }
 }
 
-void ScriptManager::clearLog() { m_logBuffer.clear(); }
+void ScriptEngine::clearLog() { m_logBuffer.clear(); }
 
-void ScriptManager::createTable(const std::string& name) {
+void ScriptEngine::createTable(const std::string& name) {
     lua_newtable(m_lua);
     lua_setglobal(m_lua, name.c_str());
 }
 
-void ScriptManager::createMetatable(const std::string& name, const std::unordered_map<std::string, LuaCallback>& methods) {
+void ScriptEngine::createMetatable(const std::string& name, const std::unordered_map<std::string, LuaCallback>& methods) {
     luaL_newmetatable(m_lua, name.c_str());
 
     for (const auto& method : methods) {
@@ -89,7 +89,7 @@ void ScriptManager::createMetatable(const std::string& name, const std::unordere
     lua_pop(m_lua, 1);
 }
 
-void ScriptManager::createFunction(const std::string& name, LuaCallback func) {
+void ScriptEngine::createFunction(const std::string& name, LuaCallback func) {
     void* userData = lua_newuserdata(m_lua, sizeof(LuaCallback));
     new (userData) LuaCallback(func);
 
@@ -107,7 +107,7 @@ void ScriptManager::createFunction(const std::string& name, LuaCallback func) {
     lua_setglobal(m_lua, name.c_str());
 }
 
-void ScriptManager::runString(const std::string& chunkName, const std::string& source) {
+void ScriptEngine::runString(const std::string& chunkName, const std::string& source) {
     std::string bytecode = Luau::compile(source);
 
     std::lock_guard<std::mutex> lock(m_luaMutex);
@@ -128,4 +128,4 @@ void ScriptManager::runString(const std::string& chunkName, const std::string& s
     lua_pop(m_lua, 1);
 }
 
-} // namespace game
+} // namespace game::engines

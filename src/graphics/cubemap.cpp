@@ -8,9 +8,9 @@
 
 namespace gfx {
 
-Cubemap::Cubemap(vk::Device& device, vk::Sampler& sampler, const std::array<std::string, 6>& faces) :
+Cubemap::Cubemap(vk::Device& device, vk::Sampler& sampler, const std::array<std::string, 6>& faces, bool flipVertically) :
     m_device(device), m_sampler(sampler) {
-    createImage(faces);
+    createImage(faces, flipVertically);
     createImageView();
 }
 
@@ -19,9 +19,11 @@ Cubemap::~Cubemap() {
     vmaDestroyImage(m_device.getAllocator(), m_image, m_allocation);
 }
 
-void Cubemap::createImage(const std::array<std::string, 6>& faces) {
+void Cubemap::createImage(const std::array<std::string, 6>& faces, bool flipVertically) {
     int width, height, channels;
     std::vector<stbi_uc*> images(6);
+
+    stbi_set_flip_vertically_on_load(flipVertically);
 
     for (size_t i = 0; i < 6; i++) {
         int w, h, c;

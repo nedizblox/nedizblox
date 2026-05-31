@@ -2,7 +2,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace core {
+namespace core::camera {
 
 void FreeCamera::move(CameraDirection direction, float deltaTime) {
     float velocity = movementSpeed * deltaTime;
@@ -61,4 +61,4 @@ void SphericalCamera::update(float fov, float aspect, float near, float far, glm
     m_view = glm::lookAt(eye, target, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-} // namespace core
+} // namespace core::camera

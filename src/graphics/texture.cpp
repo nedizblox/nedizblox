@@ -1,14 +1,13 @@
 #include "texture.hpp"
 
-#include <cstring>
 #include <stb/stb_image.h>
 #include <stdexcept>
 
 namespace gfx {
 
-Texture::Texture(vk::Device& device, vk::Sampler& sampler, const std::string& imagePath, VkFormat format) :
+Texture::Texture(vk::Device& device, vk::Sampler& sampler, const std::string& imagePath, bool flipVertically, VkFormat format) :
     m_device(device), m_sampler(sampler) {
-    createImage(imagePath, format);
+    createImage(imagePath, format, flipVertically);
     createImageView(format);
 }
 
@@ -23,8 +22,10 @@ Texture::~Texture() {
     vmaDestroyImage(m_device.getAllocator(), m_image, m_allocation);
 }
 
-void Texture::createImage(const std::string& imagePath, VkFormat format) {
+void Texture::createImage(const std::string& imagePath, VkFormat format, bool flipVertically) {
     int width, height, channels;
+
+    stbi_set_flip_vertically_on_load(flipVertically);
 
     stbi_uc* pixels = stbi_load(imagePath.c_str(), &width, &height, &channels, 4);
     if (!pixels) {

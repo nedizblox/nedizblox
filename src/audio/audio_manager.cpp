@@ -61,12 +61,14 @@ ALuint AudioManager::loadSound(const std::string& wavPath, const SoundSettings& 
     alSourcef(source, AL_PITCH, settings.pitch);
     alSourcef(source, AL_GAIN, settings.volume);
     alSourcefv(source, AL_POSITION, &settings.position[0]);
-    alSourcei(source, AL_LOOPING, static_cast<int>(settings.loop));
+    alSourcei(source, AL_LOOPING, settings.loop);
 
     return buffer;
 }
 
-void AudioManager::moveListener(glm::vec3 position) { alListenerfv(AL_POSITION, &position[0]); }
+void AudioManager::moveListener(const glm::vec3& position) {
+    alListenerfv(AL_POSITION, &position[0]);
+}
 
 void AudioManager::playSound(ALuint id) { alSourcePlay(id); }
 

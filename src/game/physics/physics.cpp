@@ -97,7 +97,7 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     shape = new btBoxShape(halfExtents);
     shape->setLocalScaling(btVector3(1.0f, 1.0f, 1.0f));
 
-    float mass = 100.0f;
+    float mass = 10.0f;
     btVector3 inertia(0.0f, 0.0f, 0.0f);
     shape->calculateLocalInertia(mass, inertia);
 

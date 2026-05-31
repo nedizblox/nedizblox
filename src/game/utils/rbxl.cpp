@@ -3,6 +3,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cstdlib>
+#include <stdexcept>
 
 extern "C" {
 
@@ -31,7 +32,7 @@ std::vector<std::shared_ptr<types::Part>> rbxl::parseRbxl(const std::string& fil
     size_t count = 0;
     RbxlPartData* raw = rbxlLoad(filePath.c_str(), &count);
     if (!raw) {
-        throw std::runtime_error("RBXL: Failed to open file");
+        throw std::runtime_error("RBXL: Failed to load file " + filePath);
     }
 
     out.reserve(count);

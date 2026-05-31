@@ -54,6 +54,11 @@ Sampler::Builder& Sampler::Builder::setMipmaps(VkSamplerMipmapMode mode, float l
     return *this;
 }
 
+Sampler::Builder& Sampler::Builder::setBorderColor(VkBorderColor color) {
+    m_createInfo.borderColor = color;
+    return *this;
+}
+
 Sampler::Builder& Sampler::Builder::setMaxLod(float lod) {
     m_createInfo.minLod = 0.0f;
     m_createInfo.maxLod = lod;

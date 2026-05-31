@@ -23,6 +23,8 @@ set(LUAU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LUAU_BUILD_CLI OFF CACHE BOOL "" FORCE)
 add_subdirectory(extern/luau)
 
+add_subdirectory(extern/boxer)
+
 include(FetchContent)
 FetchContent_Declare(
     Corrosion
@@ -63,6 +65,7 @@ endforeach()
 set(MAIN_SOURCES
     src/core/logger.cpp
     src/core/camera.cpp
+    src/core/msgbox.cpp
     src/window/window.cpp
     src/graphics/vk/device.cpp
     src/graphics/vk/swapchain.cpp
@@ -81,7 +84,10 @@ set(MAIN_SOURCES
     src/audio/audio_manager.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp
-    src/game/managers/script_manager.cpp
+    src/game/managers/instance_manager.cpp
+    src/game/managers/asset_manager.cpp
+    src/game/engines/render_engine.cpp
+    src/game/engines/script_engine.cpp
     src/game/prefabs/rig.cpp
     src/game/game.cpp
     src/main.cpp
@@ -96,6 +102,16 @@ set(EXTERN_SOURCES
 
 add_executable(nedizblox-client ${MAIN_SOURCES} ${EXTERN_SOURCES} ${SPIRV_BINARY_FILES})
 
+if(WIN32)
+    set_target_properties(nedizblox-client PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+
+    if(MSVC)
+        target_link_options(nedizblox-client PRIVATE "/ENTRY:mainCRTStartup")
+    endif()
+endif()
+
 target_link_libraries(nedizblox-client PRIVATE
     Vulkan::Vulkan
     glfw
@@ -103,6 +119,7 @@ target_link_libraries(nedizblox-client PRIVATE
     OpenAL::OpenAL
     ${BULLET_LIBRARIES}
     glm::glm
+    Boxer
 
     Luau.Compiler
     Luau.VM

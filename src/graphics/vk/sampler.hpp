@@ -16,6 +16,7 @@ public:
         Builder& setAddressMode(VkSamplerAddressMode mode);
         Builder& setAnisotropy(float maxAnisotropy);
         Builder& setMipmaps(VkSamplerMipmapMode mode, float lodBias = 0.0f);
+        Builder& setBorderColor(VkBorderColor color);
         Builder& setMaxLod(float lod);
 
         std::unique_ptr<Sampler> build() const;

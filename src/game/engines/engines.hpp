@@ -1,7 +1,7 @@
 #pragma once
 
 // IWYU pragma: begin_exports
-#include "instance_manager.hpp"
+#include "render_engine.hpp"
 
-#include "asset_manager.hpp"
+#include "script_engine.hpp"
 // IWYU pragma: end_exports

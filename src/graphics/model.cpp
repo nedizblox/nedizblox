@@ -127,6 +127,7 @@ std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescri
     attributeDescriptions.push_back({7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, color)});
 
     attributeDescriptions.push_back({8, 1, VK_FORMAT_R32_UINT, offsetof(InstanceData, texIndex)});
+    attributeDescriptions.push_back({9, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, texTile)});
 
     return attributeDescriptions;
 }

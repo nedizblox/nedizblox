@@ -141,14 +141,24 @@ void Rig::update(float deltaTime) {
         return;
 
     btVector3 currentVelocity = m_rigidBody->getLinearVelocity();
+    btTransform trans = m_rigidBody->getWorldTransform();
 
     if (glm::length(m_velocity) > 0.01f) {
-        m_rigidBody->setLinearVelocity(btVector3(m_velocity.x, currentVelocity.y(), m_velocity.z));
+        glm::vec3 finalVelocity = glm::normalize(m_velocity) * m_walkSpeed;
+        m_rigidBody->setLinearVelocity(btVector3(m_velocity.x, currentVelocity.y(), finalVelocity.z));
 
         float targetAngle = std::atan2(m_velocity.x, m_velocity.z);
+        btQuaternion targetRotation(btVector3(0.0f, 1.0f, 0.0f), targetAngle);
 
-        btTransform trans = m_rigidBody->getWorldTransform();
-        trans.setRotation(btQuaternion(btVector3(0.0f, 1.0f, 0.0f), targetAngle));
+        btQuaternion currentRotation = trans.getRotation();
+
+        float interpFactor = 10.0f * deltaTime;
+        if (interpFactor > 1.0f)
+            interpFactor = 1.0f;
+
+        btQuaternion newRotation = currentRotation.slerp(targetRotation, interpFactor);
+
+        trans.setRotation(newRotation);
         m_rigidBody->setWorldTransform(trans);
 
         m_rigidBody->activate(true);
@@ -156,7 +166,6 @@ void Rig::update(float deltaTime) {
         m_rigidBody->setLinearVelocity(btVector3(0.0f, currentVelocity.y(), 0.0f));
     }
 
-    btTransform trans = m_rigidBody->getWorldTransform();
     btVector3 origin = trans.getOrigin();
     types::Model::setPivotPosition(glm::vec3(origin.x(), origin.y(), origin.z()));
 

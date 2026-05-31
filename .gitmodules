@@ -7,3 +7,6 @@
 [submodule "extern/luau"]
 	path = extern/luau
 	url = https://github.com/luau-lang/luau.git
+[submodule "extern/boxer"]
+	path = extern/boxer
+	url = https://github.com/aaronmjacobs/Boxer.git
