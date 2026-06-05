@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
         gameMain.run();
     } catch (std::exception& e) {
         core::logger::err(e.what());
-        core::msgbox::showError("Nedizblox error", e.what());
+        core::msgbox::showError("Nedizblox", e.what());
         return 1;
     }
 

@@ -61,6 +61,19 @@ void RenderEngine::initPipelines(VkDescriptorSetLayout setLayout) {
                               .setAttributeDescriptions(gfx::ui::Text::Vertex::getAttributeDescriptions())
                               .enableAlphaBlending()
                               .build();
+
+    m_pipelines["billbText"]
+        = gfx::vk::Pipeline::Builder(m_device)
+              .setVertShaderPath("shaders/billb_text.vert.spv")
+              .setFragShaderPath("shaders/billb_text.frag.spv")
+              .setConstantSize(sizeof(gfx::billb::Text::PushConstantObject))
+              .setDescriptorLayouts({setLayout})
+              .setRenderPass(m_renderer.getRenderPass())
+              .setBindingDescriptions(gfx::billb::Text::Vertex::getBindingDescriptions())
+              .setAttributeDescriptions(gfx::billb::Text::Vertex::getAttributeDescriptions())
+              .enableDepthTest()
+              .disableDepthWrite()
+              .build();
 }
 
 void RenderEngine::renderModelsOpaque(
@@ -71,9 +84,9 @@ void RenderEngine::renderModelsOpaque(
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
-    gfx::Model::PushConstantObject modelPush{};
-    modelPush.viewProj = camera.getProjection() * camera.getView();
-    pipeline->pushConstant(commandBuffer, modelPush);
+    gfx::Model::PushConstantObject push{};
+    push.viewProj = camera.getProjection() * camera.getView();
+    pipeline->pushConstant(commandBuffer, push);
 
     modelManager.drawOpaque(commandBuffer, instancesData);
 }
@@ -85,10 +98,10 @@ void RenderEngine::renderSkybox(
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
-    gfx::Skybox::PushConstantObject skyboxPush{};
-    skyboxPush.viewProj = camera.getProjection() * glm::mat4(glm::mat3(camera.getView()));
-    skyboxPush.cubIndex = skyboxCubemapId;
-    pipeline->pushConstant(commandBuffer, skyboxPush);
+    gfx::Skybox::PushConstantObject push{};
+    push.viewProj = camera.getProjection() * glm::mat4(glm::mat3(camera.getView()));
+    push.cubIndex = skyboxCubemapId;
+    pipeline->pushConstant(commandBuffer, push);
 
     skybox.draw(commandBuffer);
 }
@@ -101,11 +114,33 @@ void RenderEngine::renderModelsTransparent(
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
-    gfx::Model::PushConstantObject modelPush{};
-    modelPush.viewProj = camera.getProjection() * camera.getView();
-    pipeline->pushConstant(commandBuffer, modelPush);
+    gfx::Model::PushConstantObject push{};
+    push.viewProj = camera.getProjection() * camera.getView();
+    pipeline->pushConstant(commandBuffer, push);
 
     modelManager.drawTransparent(commandBuffer, instancesData);
+}
+
+void RenderEngine::renderBillboardTexts(
+    VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
+    gfx::mngrs::BillboardManager& billboardManager,
+    const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData) {
+    auto& pipeline = m_pipelines["billboardText"];
+    pipeline->bind(commandBuffer);
+    m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
+
+    for (const auto& [name, instances] : instancesData) {
+        if (instances.empty())
+            continue;
+
+        gfx::billb::Text::PushConstantObject push{};
+        push.viewProj = camera.getProjection() * camera.getView();
+        push.scale = glm::vec2(0.005f);
+        push.texIndex = billboardManager.getTextureIndex(name);
+        
+        pipeline->pushConstant(commandBuffer, push);
+        billboardManager.drawText(commandBuffer, instances);
+    }
 }
 
 void RenderEngine::renderDebugUI(
@@ -114,15 +149,15 @@ void RenderEngine::renderDebugUI(
     pipeline->bind(cmd);
     m_bindlessManager.bind(cmd, pipeline->getPipelineLayout());
 
-    gfx::ui::Text::PushConstantObject textPush{};
-    textPush.proj = glm::ortho(0.0f, static_cast<float>(windowWidth), 0.0f, static_cast<float>(windowHeight));
-    textPush.texIndex = fpsFont.getTextureIndex();
-    textPush.scale = glm::vec2(0.5f);
+    gfx::ui::Text::PushConstantObject push{};
+    push.proj = glm::ortho(0.0f, static_cast<float>(windowWidth), 0.0f, static_cast<float>(windowHeight));
+    push.texIndex = fpsFont.getTextureIndex();
+    push.scale = glm::vec2(0.5f);
 
     float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
     fpsFont.setText(std::format("FPS: {:.0f}\nTest\nTest", fps), glm::vec2(20.0f, 40.0f));
 
-    pipeline->pushConstant(cmd, textPush);
+    pipeline->pushConstant(cmd, push);
     fpsFont.draw(cmd);
 }
 

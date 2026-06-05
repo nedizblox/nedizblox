@@ -8,6 +8,7 @@
 
 #include "managers/bindless_manager.hpp"
 #include "managers/model_manager.hpp"
+#include "managers/billboard_manager.hpp"
 
 #include "cubemap.hpp"
 #include "model.hpp"
@@ -15,4 +16,6 @@
 #include "texture.hpp"
 
 #include "ui/text.hpp"
+
+#include "billboards/text.hpp"
 // IWYU pragma: end_exports

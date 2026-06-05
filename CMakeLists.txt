@@ -42,6 +42,8 @@ set(SHADER_SOURCES
     shaders/model.frag
     shaders/text.vert
     shaders/text.frag
+    shaders/billb_text.vert
+    shaders/billb_text.frag
     shaders/skybox.vert
     shaders/skybox.frag
 )
@@ -77,10 +79,12 @@ set(MAIN_SOURCES
     src/graphics/model.cpp
     src/graphics/texture.cpp
     src/graphics/cubemap.cpp
-    src/graphics/managers/bindless_manager.cpp
-    src/graphics/managers/model_manager.cpp
     src/graphics/skybox.cpp
     src/graphics/ui/text.cpp
+    src/graphics/billboards/text.cpp
+    src/graphics/managers/bindless_manager.cpp
+    src/graphics/managers/model_manager.cpp
+    src/graphics/managers/billboard_manager.cpp
     src/audio/audio_manager.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp

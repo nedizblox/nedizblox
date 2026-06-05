@@ -33,6 +33,11 @@ public:
         gfx::mngrs::ModelManager& modelManager,
         const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
 
+    void renderBillboardTexts(
+        VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
+        gfx::mngrs::BillboardManager& billboardManager,
+        const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
+
     void renderDebugUI(VkCommandBuffer commandBuffer, uint32_t width, uint32_t height, gfx::ui::Text& fpsFont, float deltaTime);
 
 private:

@@ -70,7 +70,7 @@ void Model::createIndexBuffer(const std::vector<uint32_t>& indices) {
 }
 
 void Model::createInstanceBuffer() {
-    VkDeviceSize bufferSize = sizeof(glm::mat4) * MAX_INSTANCES;
+    VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,

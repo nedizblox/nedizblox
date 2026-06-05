@@ -11,22 +11,34 @@
 #include <string>
 #include <unordered_map>
 
-namespace gfx::ui {
+namespace gfx::billb {
 
 class Text {
 public:
     struct Vertex {
         glm::vec2 position;
-        glm::vec2 uv;
 
         static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
         static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
     };
 
     struct PushConstantObject {
-        alignas(16) glm::mat4 proj{1.0f};
+        alignas(16) glm::mat4 viewProj{1.0f};
         alignas(8) glm::vec2 scale{1.0f};
         alignas(4) uint32_t texIndex{0};
+    };
+
+    struct InstanceData {
+        glm::vec3 worldOrigin;
+        glm::vec2 offset;
+        glm::vec2 size;
+        glm::vec2 uvTopLeft;
+        glm::vec2 uvBottomRight;
+    };
+
+    struct InstanceContent {
+        std::string text;
+        glm::vec3 position;
     };
 
     Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
@@ -37,9 +49,7 @@ public:
 
     uint32_t getTextureIndex() const { return m_fontTextureIndex; }
 
-    void setText(const std::string& text, const glm::vec2& position);
-
-    void draw(VkCommandBuffer commandBuffer);
+    void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances);
 
 private:
     struct Character {
@@ -54,18 +64,20 @@ private:
     vk::Device& m_device;
 
     std::unique_ptr<vk::Buffer> m_vertexBuffer;
-    uint32_t m_vertexCount;
-    void* m_vertexData;
 
     std::unique_ptr<vk::Buffer> m_indexBuffer;
+
+    std::unique_ptr<vk::Buffer> m_instanceBuffer;
+    void* m_instanceData;
 
     std::unordered_map<char, Character> m_characters;
     uint32_t m_fontTextureIndex;
     float m_lineSpacing;
 
-    void createVertexBuffer(uint32_t maxChars);
+    void createVertexBuffer();
     void createIndexBuffer(uint32_t maxChars);
+    void createInstanceBuffer();
     void loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager);
 };
 
-} // namespace gfx::ui
+} // namespace gfx::billb

@@ -5,9 +5,11 @@
 
 namespace gfx {
 
-Texture::Texture(vk::Device& device, vk::Sampler& sampler, const std::string& imagePath, bool flipVertically, VkFormat format) :
+Texture::Texture(
+    vk::Device& device, vk::Sampler& sampler, const std::string& imagePath, bool flipVertically,
+    bool genMipMaps, VkFormat format) :
     m_device(device), m_sampler(sampler) {
-    createImage(imagePath, format, flipVertically);
+    createImage(imagePath, format, flipVertically, genMipMaps);
     createImageView(format);
 }
 
@@ -22,7 +24,7 @@ Texture::~Texture() {
     vmaDestroyImage(m_device.getAllocator(), m_image, m_allocation);
 }
 
-void Texture::createImage(const std::string& imagePath, VkFormat format, bool flipVertically) {
+void Texture::createImage(const std::string& imagePath, VkFormat format, bool flipVertically, bool genMipMaps) {
     int width, height, channels;
 
     stbi_set_flip_vertically_on_load(flipVertically);
@@ -32,7 +34,9 @@ void Texture::createImage(const std::string& imagePath, VkFormat format, bool fl
         throw std::runtime_error("STB: Failed to load image");
     }
 
-    m_mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+    if (genMipMaps) {
+        m_mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+    }
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -66,7 +70,12 @@ void Texture::createImage(const std::string& imagePath, VkFormat format, bool fl
     m_device.copyBufferToImage(
         stagingBuffer.getBuffer(), m_image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 
-    m_device.generateMipmaps(m_image, static_cast<int32_t>(width), static_cast<int32_t>(height), m_mipLevels);
+    if (genMipMaps) {
+        m_device.generateMipmaps(m_image, static_cast<int32_t>(width), static_cast<int32_t>(height), m_mipLevels);
+    } else {
+        m_device.transitionImageLayout(
+            m_image, format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
 }
 
 void Texture::createImage(vk::Buffer& buffer, uint32_t width, uint32_t height, VkFormat format) {

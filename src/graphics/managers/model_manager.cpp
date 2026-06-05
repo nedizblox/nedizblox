@@ -20,7 +20,7 @@ void ModelManager::loadModel(const std::string& name, const std::string& filePat
 void ModelManager::drawOpaque(
     VkCommandBuffer commandBuffer,
     const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
-    for (auto& [name, modelPair] : m_models) {
+    for (auto& [name, model] : m_models) {
         std::string bucketName = name + "Opaque";
         auto it = instancesData.find(bucketName);
 
@@ -29,7 +29,7 @@ void ModelManager::drawOpaque(
         }
 
         if (it != instancesData.end() && !it->second.empty()) {
-            modelPair.opaque->draw(commandBuffer, it->second);
+            model.opaque->draw(commandBuffer, it->second);
         }
     }
 }
@@ -37,7 +37,7 @@ void ModelManager::drawOpaque(
 void ModelManager::drawTransparent(
     VkCommandBuffer commandBuffer,
     const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
-    for (auto& [name, modelPair] : m_models) {
+    for (auto& [name, model] : m_models) {
         std::string bucketName = name + "Transparent";
         auto it = instancesData.find(bucketName);
 
@@ -46,7 +46,7 @@ void ModelManager::drawTransparent(
         }
 
         if (it != instancesData.end() && !it->second.empty()) {
-            modelPair.transparent->draw(commandBuffer, it->second);
+            model.transparent->draw(commandBuffer, it->second);
         }
     }
 }

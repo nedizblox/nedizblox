@@ -39,17 +39,20 @@ private:
 
     std::unique_ptr<mngrs::AssetManager> m_assetManager;
     std::unique_ptr<mngrs::InstanceManager> m_instanceManager;
-    std::unique_ptr<engines::RenderEngine> m_renderEngine;
-
     std::unique_ptr<gfx::mngrs::ModelManager> m_modelManager;
-    std::unique_ptr<gfx::Skybox> m_skybox;
-    std::unique_ptr<core::camera::SphericalCamera> m_camera;
-    std::unique_ptr<physics::Physics> m_physics;
+    std::unique_ptr<gfx::mngrs::BillboardManager> m_billboardManager;
+    std::unique_ptr<audio::AudioManager> m_audioManager;
 
+    std::unique_ptr<engines::RenderEngine> m_renderEngine;
+    std::unique_ptr<engines::ScriptEngine> m_scriptEngine;
+
+    std::unique_ptr<gfx::Skybox> m_skybox;
+
+    std::unique_ptr<core::camera::SphericalCamera> m_camera;
+
+    std::unique_ptr<physics::Physics> m_physics;
     std::shared_ptr<types::Instance> m_workspace;
     std::shared_ptr<prefabs::Rig> m_rig;
-    std::unique_ptr<engines::ScriptEngine> m_scriptEngine;
-    std::unique_ptr<audio::AudioManager> m_audioManager;
 
     bool m_debugScreenToggled = false;
 

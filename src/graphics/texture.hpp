@@ -12,7 +12,7 @@ class Texture {
 public:
     Texture(
         vk::Device& device, vk::Sampler& sampler, const std::string& imagePath,
-        bool flipVertically = false, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+        bool flipVertically = false, bool genMipMaps = true, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
     Texture(vk::Device& device, vk::Sampler& sampler, vk::Buffer& buffer, uint32_t width, uint32_t height, VkFormat format);
     ~Texture();
 
@@ -33,7 +33,7 @@ private:
 
     uint32_t m_mipLevels = 1;
 
-    void createImage(const std::string& imagePath, VkFormat format, bool flipVertically);
+    void createImage(const std::string& imagePath, VkFormat format, bool flipVertically, bool genMipMaps);
     void createImage(vk::Buffer& buffer, uint32_t width, uint32_t height, VkFormat format);
     void createImageView(VkFormat format);
 };

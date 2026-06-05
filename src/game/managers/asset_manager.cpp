@@ -29,13 +29,14 @@ void AssetManager::initSamplers() {
 }
 
 uint32_t AssetManager::loadTexture(
-    const std::string& name, const std::string& filePath, const std::string& samplerName, bool flipVertically) {
+    const std::string& name, const std::string& filePath, const std::string& samplerName,
+    bool flipVertically, bool genMipMaps) {
     if (m_textures.contains(name)) {
         return m_textures[name];
     }
 
     auto& sampler = getSampler(samplerName);
-    auto tex = std::make_unique<gfx::Texture>(m_device, sampler, filePath, flipVertically);
+    auto tex = std::make_unique<gfx::Texture>(m_device, sampler, filePath, flipVertically, genMipMaps);
 
     uint32_t index = m_bindlessManager.addTexture(std::move(tex));
     m_textures[name] = index;
@@ -61,7 +62,7 @@ uint32_t AssetManager::loadCubemap(
 
 uint32_t AssetManager::loadCubeFaces(
     const std::string& name, const std::vector<std::string>& facePaths,
-    const std::string& samplerName, bool flipVertically) {
+    const std::string& samplerName, bool flipVertically, bool genMipMaps) {
     if (m_textures.contains(name)) {
         return m_textures[name];
     }
@@ -70,7 +71,7 @@ uint32_t AssetManager::loadCubeFaces(
     uint32_t baseIndex = 0;
 
     for (size_t i = 0; i < facePaths.size(); i++) {
-        auto tex = std::make_unique<gfx::Texture>(m_device, sampler, facePaths[i], flipVertically);
+        auto tex = std::make_unique<gfx::Texture>(m_device, sampler, facePaths[i], flipVertically, genMipMaps);
         uint32_t registeredIndex = m_bindlessManager.addTexture(std::move(tex));
 
         if (i == 0) {
@@ -89,6 +90,16 @@ void AssetManager::loadFont(const std::string& name, const std::string& filePath
 
     auto& sampler = getSampler(samplerName);
     m_fonts[name] = std::make_unique<gfx::ui::Text>(m_device, sampler, m_bindlessManager, filePath, maxChars);
+}
+
+void AssetManager::loadBillbFont(
+    const std::string& name, const std::string& filePath, uint32_t maxChars, const std::string& samplerName) {
+    if (m_fonts.contains(name))
+        return;
+
+    auto& sampler = getSampler(samplerName);
+    m_billbFonts[name]
+        = std::make_unique<gfx::billb::Text>(m_device, sampler, m_bindlessManager, filePath, maxChars);
 }
 
 uint32_t AssetManager::getTextureId(const std::string& name) const {

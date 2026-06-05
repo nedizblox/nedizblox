@@ -55,6 +55,8 @@ void Game::initManagers() {
     m_instanceManager = std::make_unique<mngrs::InstanceManager>();
 
     m_modelManager = std::make_unique<gfx::mngrs::ModelManager>(*m_device);
+
+    m_billboardManager = std::make_unique<gfx::mngrs::BillboardManager>(*m_device, *m_bindlessManager);
 }
 
 void Game::initEngines() {
@@ -78,7 +80,7 @@ void Game::loadTextures() {
     std::vector<std::string> headFaces = {
         "assets/textures/smooth.png", "assets/textures/smooth.png", "assets/textures/smooth.png",
         "assets/textures/smooth.png", "assets/textures/face.png",   "assets/textures/smooth.png"};
-    m_assetManager->loadCubeFaces("headFace", headFaces, "repeat", true);
+    m_assetManager->loadCubeFaces("headFace", headFaces, "repeat", true, false);
 
     std::array<std::string, 6> skyboxFaces
         = {"assets/textures/skybox/rt.png", "assets/textures/skybox/lf.png",
@@ -98,7 +100,11 @@ void Game::loadModels() {
     m_modelManager->loadModel("head", "assets/models/head.obj");
 }
 
-void Game::loadFonts() { m_assetManager->loadFont("fps", "assets/fonts/RobotoMono.ttf", 30); }
+void Game::loadFonts() {
+    m_assetManager->loadFont("fps", "assets/fonts/RobotoMono.ttf", 30);
+
+    m_assetManager->loadBillbFont("nickname", "assets/fonts/RobotoMono.ttf", 30);
+}
 
 void Game::buildMap(const std::string& rbxlPath) {
     m_instanceManager = std::make_unique<mngrs::InstanceManager>();
@@ -185,6 +191,8 @@ void Game::run() {
             m_renderEngine->renderSkybox(cmd, *m_camera, *m_skybox, m_assetManager->getCubemapId("skybox"));
 
             m_renderEngine->renderModelsTransparent(cmd, *m_camera, *m_modelManager, instancesData);
+
+            m_renderEngine->renderBillboardTexts(cmd, *m_camera, *m_billboardManager, );
 
             if (m_debugScreenToggled) {
                 m_renderEngine->renderDebugUI(

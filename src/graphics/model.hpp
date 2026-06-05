@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-#define MAX_INSTANCES 10000
-
 namespace gfx {
 
 class Model {

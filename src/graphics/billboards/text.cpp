@@ -6,34 +6,40 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace gfx::ui {
+namespace gfx::billb {
 
 Text::Text(
     vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager,
     const std::string& fontPath, uint32_t maxChars) :
     m_device(device) {
-    createVertexBuffer(maxChars);
+    createVertexBuffer();
     createIndexBuffer(maxChars);
+    createInstanceBuffer();
     loadFont(fontPath, sampler, bindlessManager);
 }
 
 Text::~Text() {} // buffers will be automatically destroyed
 
-void Text::createVertexBuffer(uint32_t maxChars) {
-    VkDeviceSize bufferSize = sizeof(Vertex) * 4 * maxChars;
+void Text::createVertexBuffer() {
+    std::vector<glm::vec2> vertices = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
 
-    m_vertexBuffer = std::make_unique<vk::Buffer>(
+    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    vk::Buffer stagingBuffer(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+    stagingBuffer.uploadData(vertices.data(), bufferSize);
 
-    m_vertexData = m_vertexBuffer->map();
+    m_vertexBuffer = std::make_unique<vk::Buffer>(
+        m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VMA_MEMORY_USAGE_AUTO);
+
+    m_device.copyBuffer(stagingBuffer.getBuffer(), m_vertexBuffer->getBuffer(), bufferSize);
 }
 
 void Text::createIndexBuffer(uint32_t maxChars) {
-    uint32_t indexCount = maxChars * 6;
-
-    std::vector<uint32_t> indices;
-    indices.reserve(indexCount);
+    std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
+    uint32_t indexCount = static_cast<uint32_t>(indices.size());
 
     for (uint32_t i = 0; i < maxChars; i++) {
         uint32_t offset = i * 4;
@@ -59,6 +65,16 @@ void Text::createIndexBuffer(uint32_t maxChars) {
         VMA_MEMORY_USAGE_AUTO);
 
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_indexBuffer->getBuffer(), bufferSize);
+}
+
+void Text::createInstanceBuffer() {
+    VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
+
+    m_instanceBuffer = std::make_unique<vk::Buffer>(
+        m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
+
+    m_instanceData = m_instanceBuffer->map();
 }
 
 void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
@@ -137,62 +153,71 @@ void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::Bi
     FT_Done_FreeType(ft);
 }
 
-void Text::setText(const std::string& text, const glm::vec2& position) {
-    std::vector<Vertex> vertices;
-    vertices.reserve(text.length() * 4);
+void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances) {
+    std::vector<InstanceData> outInstances;
 
-    float x = position.x;
-    float y = position.y;
+    size_t totalChars = 0;
+    for (const auto& instance : instances)
+        totalChars += instance.text.length();
+    outInstances.reserve(totalChars);
 
-    for (char c : text) {
-        if (c == '\n') {
-            x = position.x;
-            y += m_lineSpacing;
-            continue;
+    for (const auto& instance : instances) {
+        float x = 0.0f;
+        float y = 0.0f;
+
+        for (char c : instance.text) {
+            if (c == '\n') {
+                x = 0.0f;
+                y += m_lineSpacing;
+                continue;
+            }
+
+            if (m_characters.find(c) == m_characters.end())
+                continue;
+            Character ch = m_characters[c];
+
+            float xpos = x + ch.bearing.x;
+            float ypos = y - ch.bearing.y;
+            float w = static_cast<float>(ch.size.x);
+            float h = static_cast<float>(ch.size.y);
+
+            InstanceData letterInstance{};
+            letterInstance.worldOrigin = instance.position;
+            letterInstance.offset = {xpos, ypos};
+            letterInstance.size = {w, h};
+            letterInstance.uvTopLeft = ch.uvTopLeft;
+            letterInstance.uvBottomRight = ch.uvBottomRight;
+
+            outInstances.push_back(letterInstance);
+
+            x += (ch.advance >> 6);
         }
-
-        if (m_characters.find(c) == m_characters.end())
-            continue;
-        Character ch = m_characters[c];
-
-        float xpos = x + ch.bearing.x;
-        float ypos = y - ch.bearing.y;
-
-        float w = static_cast<float>(ch.size.x);
-        float h = static_cast<float>(ch.size.y);
-
-        vertices.push_back({{xpos, ypos}, {ch.uvTopLeft.x, ch.uvTopLeft.y}});
-        vertices.push_back({{xpos + w, ypos}, {ch.uvBottomRight.x, ch.uvTopLeft.y}});
-        vertices.push_back({{xpos + w, ypos + h}, {ch.uvBottomRight.x, ch.uvBottomRight.y}});
-        vertices.push_back({{xpos, ypos + h}, {ch.uvTopLeft.x, ch.uvBottomRight.y}});
-
-        x += (ch.advance >> 6);
     }
 
-    m_vertexCount = static_cast<uint32_t>(vertices.size());
-
-    size_t dataSize = vertices.size() * sizeof(Vertex);
-    memcpy(m_vertexData, vertices.data(), dataSize);
-}
-
-void Text::draw(VkCommandBuffer commandBuffer) {
-    if (m_vertexCount == 0)
+    uint32_t letterCount = static_cast<uint32_t>(outInstances.size());
+    if (letterCount == 0)
         return;
 
-    VkBuffer buffers[] = {m_vertexBuffer->getBuffer()};
-    VkDeviceSize offsets[] = {0};
+    if (letterCount > 10000) {
+        letterCount = 10000;
+    }
 
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
+    memcpy(m_instanceData, outInstances.data(), sizeof(InstanceData) * letterCount);
+
+    VkBuffer buffers[] = {m_vertexBuffer->getBuffer(), m_instanceBuffer->getBuffer()};
+    VkDeviceSize offsets[] = {0, 0};
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 2, buffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-    uint32_t numIndices = (m_vertexCount / 4) * 6;
-    vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, 6, letterCount, 0, 0, 0);
 }
 
 std::vector<VkVertexInputBindingDescription> Text::Vertex::getBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 
     bindingDescriptions.push_back({0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
+    bindingDescriptions.push_back({1, sizeof(InstanceData), VK_VERTEX_INPUT_RATE_INSTANCE});
 
     return bindingDescriptions;
 }
@@ -201,9 +226,14 @@ std::vector<VkVertexInputAttributeDescription> Text::Vertex::getAttributeDescrip
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
     attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, position)});
-    attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)});
+
+    attributeDescriptions.push_back({1, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(InstanceData, worldOrigin)});
+    attributeDescriptions.push_back({2, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, offset)});
+    attributeDescriptions.push_back({3, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, size)});
+    attributeDescriptions.push_back({4, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, uvTopLeft)});
+    attributeDescriptions.push_back({5, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, uvBottomRight)});
 
     return attributeDescriptions;
 }
 
-} // namespace gfx::ui
+} // namespace gfx::billb

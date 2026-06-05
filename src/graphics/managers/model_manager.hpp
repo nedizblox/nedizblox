@@ -10,7 +10,7 @@ namespace gfx::mngrs {
 
 class ModelManager {
 public:
-    ModelManager(gfx::vk::Device& device);
+    ModelManager(vk::Device& device);
     ~ModelManager();
 
     ModelManager(const ModelManager&) = delete;
