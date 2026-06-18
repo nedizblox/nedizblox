@@ -40,8 +40,8 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION ${CMAKE_CURRENT_BINARY_
 set(SHADER_SOURCES
     shaders/model.vert
     shaders/model.frag
-    shaders/text.vert
-    shaders/text.frag
+    shaders/ui.vert
+    shaders/ui.frag
     shaders/billb_text.vert
     shaders/billb_text.frag
     shaders/skybox.vert
@@ -80,8 +80,8 @@ set(MAIN_SOURCES
     src/graphics/texture.cpp
     src/graphics/cubemap.cpp
     src/graphics/skybox.cpp
-    src/graphics/ui/text.cpp
-    src/graphics/billboards/text.cpp
+    src/graphics/user_interface.cpp
+    src/graphics/billboard.cpp
     src/graphics/managers/bindless_manager.cpp
     src/graphics/managers/model_manager.cpp
     src/graphics/managers/billboard_manager.cpp
@@ -100,6 +100,7 @@ set(MAIN_SOURCES
 set(EXTERN_SOURCES
     extern/stb/stb_image.cpp
     extern/vma/vk_mem_alloc.cpp
+    extern/nuklear/nuklear.cpp
     extern/tinyobj/tiny_obj_loader.cpp
     extern/dr/dr_wav.cpp
 )

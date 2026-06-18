@@ -6,7 +6,7 @@
 
 namespace win {
 
-Window::Window(int width, int height, const std::string& title) : m_width(width), m_height(height) {
+Window::Window(int width, int height, const std::string& title) : m_fbWidth(width), m_fbHeight(height) {
     if (!glfwInit()) {
         throw std::runtime_error("GLFW: Failed to initialize");
     }
@@ -18,7 +18,7 @@ Window::Window(int width, int height, const std::string& title) : m_width(width)
         glfwWindowHintString(GLFW_WAYLAND_APP_ID, "nedizblox_client");
     }
 
-    m_window = glfwCreateWindow(m_width, m_height, title.c_str(), nullptr, nullptr);
+    m_window = glfwCreateWindow(m_fbWidth, m_fbHeight, title.c_str(), nullptr, nullptr);
 
     if (!m_window) {
         glfwTerminate();
@@ -32,8 +32,8 @@ Window::Window(int width, int height, const std::string& title) : m_width(width)
     // center window
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     if (mode) {
-        int xpos = (mode->width - m_width) / 2;
-        int ypos = (mode->height - m_height) / 2;
+        int xpos = (mode->width - m_fbWidth) / 2;
+        int ypos = (mode->height - m_fbHeight) / 2;
 
         glfwSetWindowPos(m_window, xpos, ypos);
     }
@@ -45,7 +45,8 @@ Window::Window(int width, int height, const std::string& title) : m_width(width)
     glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
     glfwSetCursorPosCallback(m_window, mousePosCallback);
     glfwSetScrollCallback(m_window, scrollCallback);
-    glfwSetFramebufferSizeCallback(m_window, resizeCallback);
+    glfwSetWindowSizeCallback(m_window, winResizeCallback);
+    glfwSetFramebufferSizeCallback(m_window, fbResizeCallback);
 }
 
 Window::~Window() {
@@ -73,9 +74,11 @@ void Window::setIcon(const std::string& filePath) {
 }
 
 void Window::update() {
-    m_mouseRel = glm::vec2(0.0f);
-
+    m_mouseDelta = glm::vec2(0.0f);
+    m_scrollDelta = glm::vec2(0.0f);
     m_keysPrev = m_keys;
+
+    m_inputCodepoints.clear();
 
     float currentFrame = static_cast<float>(glfwGetTime());
     m_deltaTime = currentFrame - m_lastFrame;
@@ -90,8 +93,8 @@ void Window::update() {
 
 VkExtent2D Window::getExtent() const {
     VkExtent2D extent{};
-    extent.width = static_cast<uint32_t>(m_width);
-    extent.height = static_cast<uint32_t>(m_height);
+    extent.width = static_cast<uint32_t>(m_fbWidth);
+    extent.height = static_cast<uint32_t>(m_fbHeight);
 
     return extent;
 }
@@ -106,7 +109,11 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
     }
 }
 
-void Window::charCallback(GLFWwindow* window, unsigned int codepoint) {}
+void Window::charCallback(GLFWwindow* window, unsigned int codepoint) {
+    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+    self->m_inputCodepoints.push_back(codepoint);
+}
 
 void Window::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
@@ -127,7 +134,7 @@ void Window::mousePosCallback(GLFWwindow* window, double x, double y) {
         return;
     }
 
-    self->m_mouseRel = glm::vec2(x - self->m_mousePos.x, self->m_mousePos.y - y);
+    self->m_mouseDelta = glm::vec2(x - self->m_mousePos.x, self->m_mousePos.y - y);
 
     self->m_mousePos = glm::vec2(x, y);
 }
@@ -138,11 +145,18 @@ void Window::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) 
     self->m_scrollDelta = glm::vec2(xoffset, yoffset);
 }
 
-void Window::resizeCallback(GLFWwindow* window, int width, int height) {
+void Window::winResizeCallback(GLFWwindow* window, int width, int height) {
     Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
 
-    self->m_width = width;
-    self->m_height = height;
+    self->m_winWidth = width;
+    self->m_winHeight = height;
+}
+
+void Window::fbResizeCallback(GLFWwindow* window, int width, int height) {
+    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+    self->m_fbWidth = width;
+    self->m_fbHeight = height;
 
     self->m_resized = true;
 }

@@ -14,17 +14,17 @@ layout(location = 1) flat out uint fragTexIndex;
 layout(push_constant) uniform PushConstantObject {
     mat4 view;
     mat4 proj;
+    vec2 scale;
     uint texIndex;
 } push;
 
 void main() {
-    float worldScale = 0.005;
-    vec2 localSignPos = (offset + position * size) * worldScale;
+    vec2 localSignPos = (offset + position * size) * push.scale;
 
     vec3 cameraRight = vec3(push.view[0][0], push.view[1][0], push.view[2][0]);
     vec3 cameraUp = vec3(push.view[0][1], push.view[1][1], push.view[2][1]);
 
-    vec3 worldPos = worldOrigin + cameraRight * localSignPos.x + cameraUp * localSignPos.y;
+    vec3 worldPos = worldOrigin + cameraRight * localSignPos.x - cameraUp * localSignPos.y;
 
     fragUv = mix(uvTopLeft, uvBottomRight, position);
     fragTexIndex = push.texIndex;

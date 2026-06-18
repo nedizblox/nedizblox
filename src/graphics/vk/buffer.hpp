@@ -18,6 +18,7 @@ public:
     Buffer& operator=(const Buffer&) = delete;
 
     VkBuffer getBuffer() const { return m_buffer; }
+    VkDeviceSize getSize() const { return m_size; }
 
     void* map();
     void unmap();

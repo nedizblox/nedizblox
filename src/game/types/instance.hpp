@@ -27,6 +27,8 @@ public:
         if (m_parent == parent)
             return;
 
+        Instance* oldParent = m_parent;
+
         if (m_parent != nullptr) {
             auto& siblings = m_parent->m_children;
             siblings.erase(
@@ -38,12 +40,16 @@ public:
 
         m_parent = parent;
 
+        auto self = shared_from_this();
         if (m_parent != nullptr) {
-            auto self = shared_from_this();
             m_parent->m_children.push_back(self);
 
-            if (m_parent->m_childAddedCallback) {
-                m_parent->m_childAddedCallback(self);
+            for (auto& callback : m_childrenChangedCallbacks) {
+                callback(self);
+            }
+        } else if (oldParent != nullptr) {
+            for (auto& callback : oldParent->m_childrenChangedCallbacks) {
+                callback(self);
             }
         }
     }
@@ -61,7 +67,23 @@ public:
         return nullptr;
     }
 
-    void onChildAdded(ChildCallback callback) { m_childAddedCallback = callback; }
+    void onChildrenChanged(ChildCallback callback) {
+        m_childrenChangedCallbacks.push_back(callback);
+    }
+
+    void destroy() {
+        auto children = m_children;
+        for (auto& child : children) {
+            if (child) {
+                child->destroy();
+            }
+        }
+        m_children.clear();
+
+        if (m_parent != nullptr) {
+            setParent(nullptr);
+        }
+    }
 
 private:
     std::string m_name;
@@ -70,7 +92,7 @@ private:
     Instance* m_parent = nullptr;
     std::vector<std::shared_ptr<Instance>> m_children;
 
-    ChildCallback m_childAddedCallback = nullptr;
+    std::vector<ChildCallback> m_childrenChangedCallbacks;
 };
 
 } // namespace game::types

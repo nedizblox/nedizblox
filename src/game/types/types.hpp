@@ -10,4 +10,6 @@
 #include "model.hpp"
 
 #include "part.hpp"
+
+#include "billboard_text.hpp"
 // IWYU pragma: end_exports

@@ -13,7 +13,7 @@ Game::Game() {
         initEngines();
         loadTextures();
         loadModels();
-        loadFonts();
+        loadUis();
 
         m_camera = std::make_unique<core::camera::SphericalCamera>();
     } catch (std::exception& e) { throw; }
@@ -100,20 +100,37 @@ void Game::loadModels() {
     m_modelManager->loadModel("head", "assets/models/head.obj");
 }
 
-void Game::loadFonts() {
-    m_assetManager->loadFont("fps", "assets/fonts/RobotoMono.ttf", 30);
+void Game::loadUis() {
+    m_ui = std::make_unique<gfx::UserInterface>(
+        *m_device, *m_window, m_assetManager->getSampler("ui"), *m_bindlessManager);
 
-    m_assetManager->loadBillbFont("nickname", "assets/fonts/RobotoMono.ttf", 30);
+    m_ui->addUI(
+        {"Test", nk_rect(100, 100, 400, 450),
+         [](struct nk_context* ctx) {
+             nk_layout_row_dynamic(ctx, 30, 2);
+
+             if (nk_button_label(ctx, "Left Button")) {}
+             if (nk_button_label(ctx, "Right Button")) {}
+
+             nk_layout_row_dynamic(ctx, 30, 1);
+             static char buf[256] = {0};
+             
+             nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, buf, sizeof(buf) - 1, nk_filter_default);
+         },
+         NK_WINDOW_BORDER});
+
+    m_billboardManager->loadText(
+        "nickname", m_assetManager->getSampler("repeat"), "assets/fonts/RobotoMono.ttf", 30);
 }
 
 void Game::buildMap(const std::string& rbxlPath) {
     m_instanceManager = std::make_unique<mngrs::InstanceManager>();
 
-    m_workspace = std::make_shared<types::Instance>(enums::InstanceType::Workspace, "Workspace");
-    m_workspace->onChildAdded(
+    m_workspace = std::make_shared<types::Workspace>();
+    m_workspace->onChildrenChanged(
         [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markDirty(); });
 
-    m_physics = std::make_unique<physics::Physics>(-100.0f);
+    m_physics = std::make_unique<physics::Physics>(m_workspace->getGravity());
 
     auto parts = utils::rbxl::parseRbxl(rbxlPath);
 
@@ -124,30 +141,32 @@ void Game::buildMap(const std::string& rbxlPath) {
 
     m_rig = prefabs::Rig::create(*m_physics);
     m_rig->setParent(m_workspace.get());
-    m_rig->setPivotPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 }
 
 void Game::run() {
     while (m_window->isOpen()) {
         m_window->update();
+        m_ui->updateInput();
         m_scriptEngine->update();
 
         float dt = m_window->getDeltaTime();
 
-        if (m_window->isKeyPressed(GLFW_KEY_W)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
-        }
-        if (m_window->isKeyPressed(GLFW_KEY_S)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
-        }
-        if (m_window->isKeyPressed(GLFW_KEY_A)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
-        }
-        if (m_window->isKeyPressed(GLFW_KEY_D)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
-        }
-        if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
-            m_rig->jump();
+        if (!m_ui->hasFocus()) {
+            if (m_window->isKeyPressed(GLFW_KEY_W)) {
+                m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
+            }
+            if (m_window->isKeyPressed(GLFW_KEY_S)) {
+                m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
+            }
+            if (m_window->isKeyPressed(GLFW_KEY_A)) {
+                m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
+            }
+            if (m_window->isKeyPressed(GLFW_KEY_D)) {
+                m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
+            }
+            if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
+                m_rig->jump();
+            }
         }
 
         m_physics->step(dt);
@@ -155,16 +174,11 @@ void Game::run() {
         m_rig->update(dt);
         m_camera->target = m_rig->findFirstChild<types::Part>("Head")->getPosition();
 
-        if (m_window->isKeyJustPressed(GLFW_KEY_F3)) {
-            m_debugScreenToggled = !m_debugScreenToggled;
-        }
-
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
-                                   ? m_window->getMouseRel()
+                                   ? m_window->getMouseDelta()
                                    : glm::vec2(0.0f);
         m_camera->update(
             glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta, m_window->getScrollDelta());
-        m_window->resetScrollDelta();
 
         if (VkCommandBuffer cmd = m_renderer->beginFrame()) {
             glm::mat4 projection = m_camera->getProjection();
@@ -177,27 +191,28 @@ void Game::run() {
                 uint32_t smoothId = m_assetManager->getTextureId("smooth");
                 uint32_t headFaceId = m_assetManager->getTextureId("headFace");
 
-                m_instanceManager->rebuildMap(m_workspace, studsId, smoothId, headFaceId);
+                uint32_t nicknameId = m_billboardManager->getTextureIndex("nickname");
+
+                m_instanceManager->rebuildMap(m_workspace, studsId, smoothId, headFaceId, nicknameId);
             }
 
             m_instanceManager->updateDynamicTransforms();
 
             m_instanceManager->sortTransparentInstances(m_camera->target);
 
-            const auto& instancesData = m_instanceManager->getInstancesData();
+            const auto& modelInstancesData = m_instanceManager->getModelInstancesData();
 
-            m_renderEngine->renderModelsOpaque(cmd, *m_camera, *m_modelManager, instancesData);
+            m_renderEngine->renderModelsOpaque(cmd, *m_camera, *m_modelManager, modelInstancesData);
 
             m_renderEngine->renderSkybox(cmd, *m_camera, *m_skybox, m_assetManager->getCubemapId("skybox"));
 
-            m_renderEngine->renderModelsTransparent(cmd, *m_camera, *m_modelManager, instancesData);
+            m_renderEngine->renderModelsTransparent(cmd, *m_camera, *m_modelManager, modelInstancesData);
 
-            m_renderEngine->renderBillboardTexts(cmd, *m_camera, *m_billboardManager, );
+            const auto& billbTextInstancesContent = m_instanceManager->getBillbTextInstancesContent();
 
-            if (m_debugScreenToggled) {
-                m_renderEngine->renderDebugUI(
-                    cmd, m_window->getWidth(), m_window->getHeight(), m_assetManager->getFont("fps"), dt);
-            }
+            m_renderEngine->renderBillboardTexts(cmd, *m_camera, *m_billboardManager, billbTextInstancesContent);
+
+            m_renderEngine->renderUI(cmd, *m_window, *m_ui);
 
             m_renderer->endRenderPass(cmd);
             m_renderer->endFrame();

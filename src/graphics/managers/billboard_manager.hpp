@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../billboards/text.hpp"
+#include "../billboard.hpp"
 
 #include <memory>
 #include <string>
@@ -22,13 +22,13 @@ public:
 
     void drawText(
         VkCommandBuffer commandBuffer,
-        const std::vector<billb::Text::InstanceContent>& instancesData);
+        const std::vector<Billboard::InstanceContent>& instancesData);
 
 private:
     vk::Device& m_device;
     BindlessManager& m_bindlessManager;
 
-    std::unordered_map<std::string, std::unique_ptr<billb::Text>> m_texts;
+    std::unordered_map<std::string, std::unique_ptr<Billboard>> m_texts;
 };
 
 } // namespace gfx::mngrs

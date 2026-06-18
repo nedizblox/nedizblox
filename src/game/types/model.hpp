@@ -1,6 +1,7 @@
 #pragma once
 
 #include "instance.hpp"
+
 #include "part.hpp"
 
 namespace game::types {
@@ -11,8 +12,7 @@ public:
         Instance(enums::InstanceType::Model, name), m_pivot(1.0f) {}
 
     glm::mat4 getPivot() const { return m_pivot; }
-
-    void setPivot(const glm::mat4& pivot) {
+    virtual void setPivot(const glm::mat4& pivot) {
         glm::mat4 delta = pivot * glm::inverse(m_pivot);
 
         m_pivot = pivot;
@@ -20,6 +20,7 @@ public:
         updateChildrenTransforms(this, delta);
     }
 
+    glm::vec3 getPivotPosition() const { return getPivot()[3]; }
     virtual void setPivotPosition(const glm::vec3& position) {
         glm::mat4 rotation = m_pivot;
         rotation[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -29,7 +30,7 @@ public:
     }
 
 private:
-    glm::mat4 m_pivot;
+    glm::mat4 m_pivot{1.0f};
 
     void updateChildrenTransforms(Instance* parent, const glm::mat4& delta) {
         for (const auto& child : parent->getChildren()) {

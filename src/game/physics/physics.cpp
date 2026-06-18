@@ -12,7 +12,6 @@ Physics::Physics(float gravity) {
     m_solver = new btSequentialImpulseConstraintSolver();
 
     m_dynamicsWorld = new btDiscreteDynamicsWorld(m_dispatcher, m_overlappingPairCache, m_solver, m_collisionConfiguration);
-
     m_dynamicsWorld->setGravity(btVector3(0.0f, gravity, 0.0f));
 
     auto& info = m_dynamicsWorld->getSolverInfo();

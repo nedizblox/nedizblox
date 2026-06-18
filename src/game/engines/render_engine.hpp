@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/camera.hpp"
+
 #include "graphics/graphics.hpp"
 
 #include <memory>
@@ -36,9 +37,9 @@ public:
     void renderBillboardTexts(
         VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
         gfx::mngrs::BillboardManager& billboardManager,
-        const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
+        const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& instancesData);
 
-    void renderDebugUI(VkCommandBuffer commandBuffer, uint32_t width, uint32_t height, gfx::ui::Text& fpsFont, float deltaTime);
+    void renderUI(VkCommandBuffer commandBuffer, const win::Window& window, gfx::UserInterface& ui);
 
 private:
     gfx::vk::Device& m_device;

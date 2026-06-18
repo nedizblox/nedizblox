@@ -48,13 +48,13 @@ private:
 
     std::unique_ptr<gfx::Skybox> m_skybox;
 
+    std::unique_ptr<gfx::UserInterface> m_ui;
+
     std::unique_ptr<core::camera::SphericalCamera> m_camera;
 
     std::unique_ptr<physics::Physics> m_physics;
-    std::shared_ptr<types::Instance> m_workspace;
+    std::shared_ptr<types::Workspace> m_workspace;
     std::shared_ptr<prefabs::Rig> m_rig;
-
-    bool m_debugScreenToggled = false;
 
     void initWindow();
     void initVulkan();
@@ -63,7 +63,7 @@ private:
     void initEngines();
     void loadTextures();
     void loadModels();
-    void loadFonts();
+    void loadUis();
 };
 
 } // namespace game

@@ -58,7 +58,29 @@ void Rig::createBodyParts() {
         bone.part->setParent(this);
     }
 
+    m_nickname = std::make_shared<types::BillboardText>();
+    m_nickname->setText(getName());
+    m_nickname->setOffset(glm::vec3(0.0f, 2.3f, 0.0f));
+    m_nickname->setPosition(getPivotPosition());
+    m_nickname->setParent(this);
+
     syncParts();
+
+    setPivotPosition(m_spawnPosition);
+}
+
+void Rig::respawn() {
+    m_bones.clear();
+    m_nickname = nullptr;
+    delete m_rigidBody;
+
+    auto children = getChildren();
+    for (auto& child : children) {
+        child->destroy();
+    }
+
+    glm::vec3 currentPosition = getPivotPosition();
+    createBodyParts();
 }
 
 void Rig::syncParts() {
@@ -87,7 +109,10 @@ void Rig::setPivotPosition(const glm::vec3& position) {
 
 void Rig::move(MoveDirection direction, float phi) {
     glm::vec3 forward = glm::vec3(-glm::sin(phi), 0.0f, -glm::cos(phi));
-    glm::vec3 right = glm::vec3(glm::cos(phi), 0.0f, -glm::sin(phi));
+    forward = glm::normalize(forward);
+
+    glm::vec3 up(0.0f, 1.0f, 0.0f);
+    glm::vec3 right = glm::normalize(glm::cross(forward, up));
 
     glm::vec3 moveDir(0.0f);
     if (direction == MoveDirection::Forward)
@@ -100,7 +125,7 @@ void Rig::move(MoveDirection direction, float phi) {
         moveDir += right;
 
     if (glm::length(moveDir) > 0.0f) {
-        m_velocity += glm::normalize(moveDir) * m_walkSpeed;
+        m_velocity += glm::normalize(moveDir);
     }
 }
 
@@ -140,12 +165,25 @@ void Rig::update(float deltaTime) {
     if (!m_rigidBody)
         return;
 
+    uint32_t aliveBones = 0;
+    for (const auto& bone : m_bones) {
+        if (bone.part->getParent() == this) {
+            aliveBones++;
+        }
+    }
+
+    if (aliveBones == 0 && !m_bones.empty()) {
+        respawn();
+        return;
+    }
+
     btVector3 currentVelocity = m_rigidBody->getLinearVelocity();
     btTransform trans = m_rigidBody->getWorldTransform();
 
     if (glm::length(m_velocity) > 0.01f) {
         glm::vec3 finalVelocity = glm::normalize(m_velocity) * m_walkSpeed;
-        m_rigidBody->setLinearVelocity(btVector3(m_velocity.x, currentVelocity.y(), finalVelocity.z));
+        
+        m_rigidBody->setLinearVelocity(btVector3(finalVelocity.x, currentVelocity.y(), finalVelocity.z));
 
         float targetAngle = std::atan2(m_velocity.x, m_velocity.z);
         btQuaternion targetRotation(btVector3(0.0f, 1.0f, 0.0f), targetAngle);
@@ -170,6 +208,8 @@ void Rig::update(float deltaTime) {
     types::Model::setPivotPosition(glm::vec3(origin.x(), origin.y(), origin.z()));
 
     m_velocity = glm::vec3(0.0f);
+
+    m_nickname->setPosition(getPivotPosition());
 }
 
 } // namespace game::prefabs

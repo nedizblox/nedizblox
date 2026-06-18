@@ -15,7 +15,7 @@
 #include "skybox.hpp"
 #include "texture.hpp"
 
-#include "ui/text.hpp"
+#include "user_interface.hpp"
 
-#include "billboards/text.hpp"
+#include "billboard.hpp"
 // IWYU pragma: end_exports

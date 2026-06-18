@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../vk/buffer.hpp"
-#include "../vk/device.hpp"
+#include "vk/buffer.hpp"
+#include "vk/device.hpp"
 
-#include "../managers/bindless_manager.hpp"
+#include "managers/bindless_manager.hpp"
 
 #include <glm/glm.hpp>
 
@@ -11,9 +11,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace gfx::billb {
+namespace gfx {
 
-class Text {
+class Billboard {
 public:
     struct Vertex {
         glm::vec2 position;
@@ -23,8 +23,9 @@ public:
     };
 
     struct PushConstantObject {
-        alignas(16) glm::mat4 viewProj{1.0f};
-        alignas(8) glm::vec2 scale{1.0f};
+        alignas(16) glm::mat4 view{1.0f};
+        alignas(16) glm::mat4 proj{1.0f};
+        alignas(8) glm::vec2 scale{0.01f};
         alignas(4) uint32_t texIndex{0};
     };
 
@@ -41,11 +42,11 @@ public:
         glm::vec3 position;
     };
 
-    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
-    ~Text();
+    Billboard(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
+    ~Billboard();
 
-    Text(const Text&) = delete;
-    Text& operator=(const Text&) = delete;
+    Billboard(const Billboard&) = delete;
+    Billboard& operator=(const Billboard&) = delete;
 
     uint32_t getTextureIndex() const { return m_fontTextureIndex; }
 

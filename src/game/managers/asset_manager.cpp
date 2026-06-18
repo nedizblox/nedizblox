@@ -22,10 +22,8 @@ void AssetManager::initSamplers() {
                                .setMipmaps(VK_SAMPLER_MIPMAP_MODE_LINEAR)
                                .build();
 
-    m_samplers["text"] = gfx::vk::Sampler::Builder(m_device)
-                             .setAddressMode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                             .setMaxLod(1.0f)
-                             .build();
+    m_samplers["ui"]
+        = gfx::vk::Sampler::Builder(m_device).setAddressMode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE).build();
 }
 
 uint32_t AssetManager::loadTexture(
@@ -84,24 +82,6 @@ uint32_t AssetManager::loadCubeFaces(
     return baseIndex;
 }
 
-void AssetManager::loadFont(const std::string& name, const std::string& filePath, uint32_t maxChars, const std::string& samplerName) {
-    if (m_fonts.contains(name))
-        return;
-
-    auto& sampler = getSampler(samplerName);
-    m_fonts[name] = std::make_unique<gfx::ui::Text>(m_device, sampler, m_bindlessManager, filePath, maxChars);
-}
-
-void AssetManager::loadBillbFont(
-    const std::string& name, const std::string& filePath, uint32_t maxChars, const std::string& samplerName) {
-    if (m_fonts.contains(name))
-        return;
-
-    auto& sampler = getSampler(samplerName);
-    m_billbFonts[name]
-        = std::make_unique<gfx::billb::Text>(m_device, sampler, m_bindlessManager, filePath, maxChars);
-}
-
 uint32_t AssetManager::getTextureId(const std::string& name) const {
     auto it = m_textures.find(name);
     if (it == m_textures.end()) {
@@ -118,18 +98,10 @@ uint32_t AssetManager::getCubemapId(const std::string& name) const {
     return it->second;
 }
 
-gfx::vk::Sampler& AssetManager::getSampler(const std::string& name) {
+gfx::vk::Sampler& AssetManager::getSampler(const std::string& name) const {
     auto it = m_samplers.find(name);
     if (it == m_samplers.end()) {
         throw std::runtime_error("AssetManager: Sampler \"" + name + "\" not found");
-    }
-    return *it->second;
-}
-
-gfx::ui::Text& AssetManager::getFont(const std::string& name) {
-    auto it = m_fonts.find(name);
-    if (it == m_fonts.end()) {
-        throw std::runtime_error("AssetManager: Font \"" + name + "\" not found");
     }
     return *it->second;
 }

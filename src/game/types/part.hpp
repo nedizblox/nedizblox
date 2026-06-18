@@ -1,6 +1,5 @@
 #pragma once
 
-#include "game/enums/enums.hpp"
 #include "instance.hpp"
 
 #include <glm/glm.hpp>
@@ -60,7 +59,7 @@ public:
 
 private:
     glm::vec3 m_position{0.0f};
-    glm::quat m_orientation;
+    glm::quat m_orientation{0.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_size{4.0f, 1.0f, 2.0f};
 
     glm::mat4 m_modelMatrix{1.0f};

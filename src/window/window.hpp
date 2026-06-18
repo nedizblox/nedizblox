@@ -25,7 +25,6 @@ public:
     void setIcon(const std::string& filePath);
 
     void resetResizedState() { m_resized = false; }
-    void resetScrollDelta() { m_scrollDelta = glm::vec2(0.0f); }
 
     GLFWwindow* getWindow() const { return m_window; }
 
@@ -37,13 +36,22 @@ public:
     bool isKeyJustPressed(int key) const { return m_keys[key] && !m_keysPrev[key]; }
     bool isMouseButtonPressed(int button) const { return m_mouseButtons[button]; }
 
+    const std::vector<unsigned int>& getInputCodepoints() const { return m_inputCodepoints; }
+
     glm::vec2 getMousePos() const { return m_mousePos; }
-    glm::vec2 getMouseRel() const { return m_mouseRel; }
+    glm::vec2 getMousePosFb() const {
+        return glm::vec2(
+            m_mousePos.x * (static_cast<float>(m_fbWidth) / m_winWidth),
+            m_mousePos.y * (static_cast<float>(m_fbHeight) / m_winHeight));
+    }
+    glm::vec2 getMouseDelta() const { return m_mouseDelta; }
     glm::vec2 getScrollDelta() const { return m_scrollDelta; }
 
-    int getWidth() const { return m_width; }
-    int getHeight() const { return m_height; }
-    float getAspect() const { return static_cast<float>(m_width) / m_height; }
+    int getWidth() const { return m_fbWidth; }
+    int getHeight() const { return m_fbHeight; }
+    int getWinWidth() const { return m_winWidth; }
+    int getWinHeight() const { return m_winHeight; }
+    float getAspect() const { return static_cast<float>(m_fbWidth) / m_fbHeight; }
 
     float getCurrentTime() const { return glfwGetTime(); }
     float getDeltaTime() const { return m_deltaTime; }
@@ -51,22 +59,29 @@ public:
     VkExtent2D getExtent() const;
 
 private:
-    GLFWwindow* m_window;
-    int m_width;
-    int m_height;
+    GLFWwindow* m_window = nullptr;
+
+    int m_winWidth = 0;
+    int m_winHeight = 0;
+
+    int m_fbWidth = 0;
+    int m_fbHeight = 0;
+
     bool m_resized = false;
     bool m_minimized = false;
 
-    float m_lastFrame;
-    float m_deltaTime;
+    float m_lastFrame = 0.0f;
+    float m_deltaTime = 0.0f;
 
     std::array<bool, GLFW_KEY_LAST + 1> m_keys = {false};
     std::array<bool, GLFW_KEY_LAST + 1> m_keysPrev = {false};
     std::array<bool, GLFW_MOUSE_BUTTON_LAST + 1> m_mouseButtons = {false};
 
-    glm::vec2 m_mousePos;
-    glm::vec2 m_mouseRel;
-    glm::vec2 m_scrollDelta;
+    std::vector<unsigned int> m_inputCodepoints;
+
+    glm::vec2 m_mousePos{0.0f};
+    glm::vec2 m_mouseDelta{0.0f};
+    glm::vec2 m_scrollDelta{0.0f};
     bool m_firstMouse = true;
 
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -74,7 +89,8 @@ private:
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
     static void mousePosCallback(GLFWwindow* window, double x, double y);
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
-    static void resizeCallback(GLFWwindow* window, int width, int height);
+    static void winResizeCallback(GLFWwindow* window, int width, int height);
+    static void fbResizeCallback(GLFWwindow* window, int width, int height);
 };
 
 } // namespace win

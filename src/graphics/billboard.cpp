@@ -1,4 +1,4 @@
-#include "text.hpp"
+#include "billboard.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -6,9 +6,9 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace gfx::billb {
+namespace gfx {
 
-Text::Text(
+Billboard::Billboard(
     vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager,
     const std::string& fontPath, uint32_t maxChars) :
     m_device(device) {
@@ -18,15 +18,15 @@ Text::Text(
     loadFont(fontPath, sampler, bindlessManager);
 }
 
-Text::~Text() {} // buffers will be automatically destroyed
+Billboard::~Billboard() {} // buffers will be automatically destroyed
 
-void Text::createVertexBuffer() {
+void Billboard::createVertexBuffer() {
     std::vector<glm::vec2> vertices = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
     vk::Buffer stagingBuffer(
-        m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
+        m_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
     stagingBuffer.uploadData(vertices.data(), bufferSize);
 
@@ -37,7 +37,7 @@ void Text::createVertexBuffer() {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_vertexBuffer->getBuffer(), bufferSize);
 }
 
-void Text::createIndexBuffer(uint32_t maxChars) {
+void Billboard::createIndexBuffer(uint32_t maxChars) {
     std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
     uint32_t indexCount = static_cast<uint32_t>(indices.size());
 
@@ -67,7 +67,7 @@ void Text::createIndexBuffer(uint32_t maxChars) {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_indexBuffer->getBuffer(), bufferSize);
 }
 
-void Text::createInstanceBuffer() {
+void Billboard::createInstanceBuffer() {
     VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
@@ -77,7 +77,7 @@ void Text::createInstanceBuffer() {
     m_instanceData = m_instanceBuffer->map();
 }
 
-void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
+void Billboard::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) {
         throw std::runtime_error("FreeType: Failed to init library");
@@ -153,7 +153,10 @@ void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::Bi
     FT_Done_FreeType(ft);
 }
 
-void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances) {
+void Billboard::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances) {
+    if (instances.empty())
+        return;
+
     std::vector<InstanceData> outInstances;
 
     size_t totalChars = 0;
@@ -162,7 +165,14 @@ void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent
     outInstances.reserve(totalChars);
 
     for (const auto& instance : instances) {
-        float x = 0.0f;
+        float totalWidth = 0.0f;
+        for (char c : instance.text) {
+            if (m_characters.find(c) != m_characters.end()) {
+                totalWidth += (m_characters[c].advance >> 6);
+            }
+        }
+
+        float x = -(totalWidth * 0.5f);
         float y = 0.0f;
 
         for (char c : instance.text) {
@@ -213,7 +223,7 @@ void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent
     vkCmdDrawIndexed(commandBuffer, 6, letterCount, 0, 0, 0);
 }
 
-std::vector<VkVertexInputBindingDescription> Text::Vertex::getBindingDescriptions() {
+std::vector<VkVertexInputBindingDescription> Billboard::Vertex::getBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 
     bindingDescriptions.push_back({0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
@@ -222,7 +232,7 @@ std::vector<VkVertexInputBindingDescription> Text::Vertex::getBindingDescription
     return bindingDescriptions;
 }
 
-std::vector<VkVertexInputAttributeDescription> Text::Vertex::getAttributeDescriptions() {
+std::vector<VkVertexInputAttributeDescription> Billboard::Vertex::getAttributeDescriptions() {
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
     attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, position)});

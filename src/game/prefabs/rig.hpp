@@ -21,6 +21,9 @@ public:
     float getWalkSpeed() const { return m_walkSpeed; }
     void setWalkSpeed(float walkSpeed) { m_walkSpeed = walkSpeed; }
 
+    glm::vec3 getSpawnPosition() const { return m_spawnPosition; }
+    void setSpawnPosition(const glm::vec3& spawnPosition) { m_spawnPosition = spawnPosition; }
+
     void setPivotPosition(const glm::vec3& position) override;
 
     void move(MoveDirection direction, float phi);
@@ -41,12 +44,16 @@ private:
     glm::vec3 m_velocity{0.0f};
 
     float m_walkSpeed = 16.0f;
-    float m_jumpPower = 30.0f;
+    float m_jumpPower = 50.0f;
+
+    glm::vec3 m_spawnPosition{0.0f, 5.0f, 0.0f};
+
+    std::shared_ptr<types::BillboardText> m_nickname;
 
     btRigidBody* m_rigidBody = nullptr;
 
     void createBodyParts();
-
+    void respawn();
     void syncParts();
 };
 
