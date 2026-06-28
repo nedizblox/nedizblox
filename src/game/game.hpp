@@ -41,6 +41,7 @@ private:
     std::unique_ptr<mngrs::InstanceManager> m_instanceManager;
     std::unique_ptr<gfx::mngrs::ModelManager> m_modelManager;
     std::unique_ptr<gfx::mngrs::BillboardManager> m_billboardManager;
+    std::unique_ptr<gfx::mngrs::UiManager> m_uiManager;
     std::unique_ptr<audio::AudioManager> m_audioManager;
 
     std::unique_ptr<engines::RenderEngine> m_renderEngine;
@@ -48,13 +49,16 @@ private:
 
     std::unique_ptr<gfx::Skybox> m_skybox;
 
-    std::unique_ptr<gfx::UserInterface> m_ui;
-
     std::unique_ptr<core::camera::SphericalCamera> m_camera;
 
     std::unique_ptr<physics::Physics> m_physics;
     std::shared_ptr<types::Workspace> m_workspace;
+    std::shared_ptr<types::CoreGui> m_coreGui;
+    
     std::shared_ptr<prefabs::Rig> m_rig;
+    std::shared_ptr<prefabs::Rig> m_rig1;
+
+    std::shared_ptr<types::Text> m_fps;
 
     void initWindow();
     void initVulkan();

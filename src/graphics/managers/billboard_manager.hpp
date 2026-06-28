@@ -2,8 +2,6 @@
 
 #include "../billboard.hpp"
 
-#include <memory>
-#include <string>
 #include <unordered_map>
 
 namespace gfx::mngrs {
@@ -20,9 +18,7 @@ public:
 
     void loadText(const std::string& name, vk::Sampler& sampler, const std::string& fontPath, uint32_t maxChars);
 
-    void drawText(
-        VkCommandBuffer commandBuffer,
-        const std::vector<Billboard::InstanceContent>& instancesData);
+    void drawText(VkCommandBuffer commandBuffer, const std::vector<Billboard::InstanceContent>& instancesData);
 
 private:
     vk::Device& m_device;

@@ -30,6 +30,7 @@ public:
 
     struct PushConstantObject {
         alignas(16) glm::mat4 viewProj{1.0f};
+        alignas(16) glm::vec3 cameraPos{0.0f};
     };
 
     struct InstanceData {

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "vk/buffer.hpp"
-#include "vk/device.hpp"
+#include "../vk/buffer.hpp"
+#include "../vk/device.hpp"
 
-#include "managers/bindless_manager.hpp"
+#include "../managers/bindless_manager.hpp"
 
 #include <glm/glm.hpp>
 
@@ -11,9 +11,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace gfx {
+namespace gfx::ui {
 
-class Billboard {
+class Text {
 public:
     struct Vertex {
         glm::vec2 position;
@@ -23,13 +23,12 @@ public:
     };
 
     struct PushConstantObject {
-        alignas(16) glm::mat4 view{1.0f};
         alignas(16) glm::mat4 proj{1.0f};
         alignas(4) uint32_t texIndex{0};
     };
 
     struct InstanceData {
-        glm::vec3 origin;
+        glm::vec2 origin;
         glm::vec2 offset;
         glm::vec2 size;
         glm::vec2 uvTopLeft;
@@ -38,14 +37,15 @@ public:
 
     struct InstanceContent {
         std::string text;
-        glm::vec3 position;
+        glm::vec2 position;
+        glm::vec2 scale;
     };
 
-    Billboard(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
-    ~Billboard();
+    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
+    ~Text();
 
-    Billboard(const Billboard&) = delete;
-    Billboard& operator=(const Billboard&) = delete;
+    Text(const Text&) = delete;
+    Text& operator=(const Text&) = delete;
 
     uint32_t getTextureIndex() const { return m_fontTextureIndex; }
 
@@ -80,4 +80,4 @@ private:
     void loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager);
 };
 
-} // namespace gfx::billb
+} // namespace gfx::ui

@@ -69,20 +69,6 @@ void Rig::createBodyParts() {
     setPivotPosition(m_spawnPosition);
 }
 
-void Rig::respawn() {
-    m_bones.clear();
-    m_nickname = nullptr;
-    delete m_rigidBody;
-
-    auto children = getChildren();
-    for (auto& child : children) {
-        child->destroy();
-    }
-
-    glm::vec3 currentPosition = getPivotPosition();
-    createBodyParts();
-}
-
 void Rig::syncParts() {
     glm::mat4 pivot = getPivot();
     glm::quat modelOrientation = glm::toQuat(pivot);
@@ -165,18 +151,6 @@ void Rig::update(float deltaTime) {
     if (!m_rigidBody)
         return;
 
-    uint32_t aliveBones = 0;
-    for (const auto& bone : m_bones) {
-        if (bone.part->getParent() == this) {
-            aliveBones++;
-        }
-    }
-
-    if (aliveBones == 0 && !m_bones.empty()) {
-        respawn();
-        return;
-    }
-
     btVector3 currentVelocity = m_rigidBody->getLinearVelocity();
     btTransform trans = m_rigidBody->getWorldTransform();
 
@@ -210,6 +184,7 @@ void Rig::update(float deltaTime) {
     m_velocity = glm::vec3(0.0f);
 
     m_nickname->setPosition(getPivotPosition());
+    m_nickname->setText(getName());
 }
 
 } // namespace game::prefabs

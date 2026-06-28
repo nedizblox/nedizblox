@@ -53,7 +53,6 @@ private:
     btRigidBody* m_rigidBody = nullptr;
 
     void createBodyParts();
-    void respawn();
     void syncParts();
 };
 

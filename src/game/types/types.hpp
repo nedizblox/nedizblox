@@ -7,9 +7,13 @@
 
 #include "workspace.hpp"
 
+#include "core_gui.hpp"
+
 #include "model.hpp"
 
 #include "part.hpp"
 
 #include "billboard_text.hpp"
+
+#include "text.hpp"
 // IWYU pragma: end_exports

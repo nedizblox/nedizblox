@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec2 position;
 
-layout(location = 1) in vec3 worldOrigin;
+layout(location = 1) in vec3 origin;
 layout(location = 2) in vec2 offset;
 layout(location = 3) in vec2 size;
 layout(location = 4) in vec2 uvTopLeft;
@@ -14,17 +14,18 @@ layout(location = 1) flat out uint fragTexIndex;
 layout(push_constant) uniform PushConstantObject {
     mat4 view;
     mat4 proj;
-    vec2 scale;
     uint texIndex;
 } push;
 
+const vec2 SCALE = vec2(0.009);
+
 void main() {
-    vec2 localSignPos = (offset + position * size) * push.scale;
+    vec2 localSignPos = (offset + position * size) * SCALE;
 
     vec3 cameraRight = vec3(push.view[0][0], push.view[1][0], push.view[2][0]);
     vec3 cameraUp = vec3(push.view[0][1], push.view[1][1], push.view[2][1]);
 
-    vec3 worldPos = worldOrigin + cameraRight * localSignPos.x - cameraUp * localSignPos.y;
+    vec3 worldPos = origin + cameraRight * localSignPos.x - cameraUp * localSignPos.y;
 
     fragUv = mix(uvTopLeft, uvBottomRight, position);
     fragTexIndex = push.texIndex;

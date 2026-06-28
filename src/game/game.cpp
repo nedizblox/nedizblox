@@ -2,6 +2,8 @@
 
 #include "utils/rbxl.hpp"
 
+#include <format>
+
 namespace game {
 
 Game::Game() {
@@ -57,6 +59,8 @@ void Game::initManagers() {
     m_modelManager = std::make_unique<gfx::mngrs::ModelManager>(*m_device);
 
     m_billboardManager = std::make_unique<gfx::mngrs::BillboardManager>(*m_device, *m_bindlessManager);
+
+    m_uiManager = std::make_unique<gfx::mngrs::UiManager>(*m_device, *m_bindlessManager);
 }
 
 void Game::initEngines() {
@@ -101,26 +105,9 @@ void Game::loadModels() {
 }
 
 void Game::loadUis() {
-    m_ui = std::make_unique<gfx::UserInterface>(
-        *m_device, *m_window, m_assetManager->getSampler("ui"), *m_bindlessManager);
+    m_uiManager->loadText("nunito", m_assetManager->getSampler("ui"), "assets/fonts/Nunito.ttf", 16);
 
-    m_ui->addUI(
-        {"Test", nk_rect(100, 100, 400, 450),
-         [](struct nk_context* ctx) {
-             nk_layout_row_dynamic(ctx, 30, 2);
-
-             if (nk_button_label(ctx, "Left Button")) {}
-             if (nk_button_label(ctx, "Right Button")) {}
-
-             nk_layout_row_dynamic(ctx, 30, 1);
-             static char buf[256] = {0};
-             
-             nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, buf, sizeof(buf) - 1, nk_filter_default);
-         },
-         NK_WINDOW_BORDER});
-
-    m_billboardManager->loadText(
-        "nickname", m_assetManager->getSampler("repeat"), "assets/fonts/RobotoMono.ttf", 30);
+    m_billboardManager->loadText("nunito", m_assetManager->getSampler("repeat"), "assets/fonts/Nunito.ttf", 32);
 }
 
 void Game::buildMap(const std::string& rbxlPath) {
@@ -128,7 +115,11 @@ void Game::buildMap(const std::string& rbxlPath) {
 
     m_workspace = std::make_shared<types::Workspace>();
     m_workspace->onChildrenChanged(
-        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markDirty(); });
+        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markMapDirty(); });
+
+    m_coreGui = std::make_shared<types::CoreGui>();
+    m_coreGui->onChildrenChanged(
+        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markGuiDirty(); });
 
     m_physics = std::make_unique<physics::Physics>(m_workspace->getGravity());
 
@@ -141,38 +132,46 @@ void Game::buildMap(const std::string& rbxlPath) {
 
     m_rig = prefabs::Rig::create(*m_physics);
     m_rig->setParent(m_workspace.get());
+
+    m_rig1 = prefabs::Rig::create(*m_physics, "Igor");
+    m_rig1->setParent(m_workspace.get());
+
+    m_fps = std::make_shared<types::Text>();
+    m_fps->setParent(m_coreGui.get());
+    m_fps->setPosition(glm::vec2(50.0f, 30.0f));
 }
 
 void Game::run() {
     while (m_window->isOpen()) {
         m_window->update();
-        m_ui->updateInput();
         m_scriptEngine->update();
 
         float dt = m_window->getDeltaTime();
 
-        if (!m_ui->hasFocus()) {
-            if (m_window->isKeyPressed(GLFW_KEY_W)) {
-                m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
-            }
-            if (m_window->isKeyPressed(GLFW_KEY_S)) {
-                m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
-            }
-            if (m_window->isKeyPressed(GLFW_KEY_A)) {
-                m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
-            }
-            if (m_window->isKeyPressed(GLFW_KEY_D)) {
-                m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
-            }
-            if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
-                m_rig->jump();
-            }
+        if (m_window->isKeyPressed(GLFW_KEY_W)) {
+            m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
+        }
+        if (m_window->isKeyPressed(GLFW_KEY_S)) {
+            m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
+        }
+        if (m_window->isKeyPressed(GLFW_KEY_A)) {
+            m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
+        }
+        if (m_window->isKeyPressed(GLFW_KEY_D)) {
+            m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
+        }
+        if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
+            m_rig->jump();
         }
 
         m_physics->step(dt);
 
         m_rig->update(dt);
-        m_camera->target = m_rig->findFirstChild<types::Part>("Head")->getPosition();
+        m_rig1->update(dt);
+        auto head = m_rig->findFirstChild<types::Part>("Head");
+        if (head) {
+            m_camera->target = head->getPosition();
+        }
 
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
                                    ? m_window->getMouseDelta()
@@ -186,14 +185,14 @@ void Game::run() {
 
             m_renderer->beginRenderPass(cmd);
 
-            if (m_instanceManager->isDirty()) {
+            if (m_instanceManager->isMapDirty()) {
                 uint32_t studsId = m_assetManager->getTextureId("studs");
                 uint32_t smoothId = m_assetManager->getTextureId("smooth");
                 uint32_t headFaceId = m_assetManager->getTextureId("headFace");
 
-                uint32_t nicknameId = m_billboardManager->getTextureIndex("nickname");
-
-                m_instanceManager->rebuildMap(m_workspace, studsId, smoothId, headFaceId, nicknameId);
+                m_instanceManager->rebuildMap(m_workspace, studsId, smoothId, headFaceId);
+            } else if (m_instanceManager->isGuiDirty()) {
+                m_instanceManager->rebuildGui(m_coreGui);
             }
 
             m_instanceManager->updateDynamicTransforms();
@@ -212,7 +211,11 @@ void Game::run() {
 
             m_renderEngine->renderBillboardTexts(cmd, *m_camera, *m_billboardManager, billbTextInstancesContent);
 
-            m_renderEngine->renderUI(cmd, *m_window, *m_ui);
+            m_fps->setText(std::format("FPS: {:.0f}", dt > 0.0f ? 1.0f / dt : 0.0f));
+
+            const auto& textInstancesContent = m_instanceManager->getTextInstancesContent();
+
+            m_renderEngine->renderTexts(cmd, *m_window, *m_uiManager, textInstancesContent);
 
             m_renderer->endRenderPass(cmd);
             m_renderer->endFrame();

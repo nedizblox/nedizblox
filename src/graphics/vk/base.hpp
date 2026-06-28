@@ -21,9 +21,9 @@ struct QueueFamilyIndices {
 };
 
 #ifndef NDEBUG
-const bool ENABLE_VALIDATION_LAYER = true;
+inline bool ENABLE_VALIDATION_LAYER = true;
 #else
-const bool ENABLE_VALIDATION_LAYER = false;
+inline bool ENABLE_VALIDATION_LAYER = false;
 #endif
 
 const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_KHRONOS_validation"};

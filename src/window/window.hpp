@@ -4,7 +4,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <glm/ext.hpp>
+#include <glm/glm.hpp>
 
 #include <array>
 #include <string>
@@ -26,8 +26,6 @@ public:
 
     void resetResizedState() { m_resized = false; }
 
-    GLFWwindow* getWindow() const { return m_window; }
-
     bool isOpen() const { return !glfwWindowShouldClose(m_window); }
     bool isResized() const { return m_resized; }
     bool isMinimized() const { return m_minimized; }
@@ -47,16 +45,19 @@ public:
     glm::vec2 getMouseDelta() const { return m_mouseDelta; }
     glm::vec2 getScrollDelta() const { return m_scrollDelta; }
 
+    const char* getClipboardString() const { return glfwGetClipboardString(m_window); }
+    void setClipboardString(const char* text) {
+        glfwSetClipboardString(m_window, text);
+    }
+
     int getWidth() const { return m_fbWidth; }
     int getHeight() const { return m_fbHeight; }
-    int getWinWidth() const { return m_winWidth; }
-    int getWinHeight() const { return m_winHeight; }
     float getAspect() const { return static_cast<float>(m_fbWidth) / m_fbHeight; }
 
     float getCurrentTime() const { return glfwGetTime(); }
     float getDeltaTime() const { return m_deltaTime; }
 
-    VkExtent2D getExtent() const;
+    void createSurface(VkInstance instance, VkSurfaceKHR* surface);
 
 private:
     GLFWwindow* m_window = nullptr;

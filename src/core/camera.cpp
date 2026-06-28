@@ -53,12 +53,12 @@ void SphericalCamera::update(float fov, float aspect, float near, float far, glm
     front.y = m_radius * glm::sin(m_theta);
     front.z = m_radius * glm::cos(m_theta) * glm::cos(m_phi);
 
-    glm::vec3 eye = target + front;
+    m_position = target + front;
 
     m_projection = glm::perspective(fov, aspect, near, far);
     m_projection[1][1] *= -1; // inverse for vulkan
 
-    m_view = glm::lookAt(eye, target, glm::vec3(0.0f, 1.0f, 0.0f));
+    m_view = glm::lookAt(m_position, target, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 } // namespace core::camera

@@ -4,12 +4,12 @@
 
 namespace core::logger {
 
-void info(const std::string& msg);
-void warn(const std::string& msg);
-void err(const std::string& msg);
+void info(const std::string& msg, bool debug = false);
+void warn(const std::string& msg, bool debug = false);
+void err(const std::string& msg, bool debug = false);
 
 #ifndef NDEBUG
-void debug(const std::string& msg);
+void validationLayers(const std::string& msg);
 #endif
 
 } // namespace core::logger

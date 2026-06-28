@@ -1,5 +1,7 @@
 #include "render_engine.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace game::engines {
 
 RenderEngine::RenderEngine(gfx::vk::Device& device, gfx::vk::Renderer& renderer, gfx::mngrs::BindlessManager& bindlessManager) :
@@ -49,22 +51,21 @@ void RenderEngine::initPipelines(VkDescriptorSetLayout setLayout) {
               .enableAlphaBlending()
               .build();
 
-    m_pipelines["ui"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/ui.vert.spv")
-              .setFragShaderPath("shaders/ui.frag.spv")
-              .setConstantSize(sizeof(gfx::UserInterface::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::UserInterface::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::UserInterface::Vertex::getAttributeDescriptions())
-              .enableAlphaBlending()
-              .build();
+    m_pipelines["text"] = gfx::vk::Pipeline::Builder(m_device)
+                              .setVertShaderPath("shaders/text.vert.spv")
+                              .setFragShaderPath("shaders/text.frag.spv")
+                              .setConstantSize(sizeof(gfx::ui::Text::PushConstantObject))
+                              .setDescriptorLayouts({setLayout})
+                              .setRenderPass(m_renderer.getRenderPass())
+                              .setBindingDescriptions(gfx::ui::Text::Vertex::getBindingDescriptions())
+                              .setAttributeDescriptions(gfx::ui::Text::Vertex::getAttributeDescriptions())
+                              .enableAlphaBlending()
+                              .build();
 
-    m_pipelines["billbText"]
+    m_pipelines["billboard"]
         = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/billb_text.vert.spv")
-              .setFragShaderPath("shaders/billb_text.frag.spv")
+              .setVertShaderPath("shaders/billboard.vert.spv")
+              .setFragShaderPath("shaders/text.frag.spv")
               .setConstantSize(sizeof(gfx::Billboard::PushConstantObject))
               .setDescriptorLayouts({setLayout})
               .setRenderPass(m_renderer.getRenderPass())
@@ -86,6 +87,7 @@ void RenderEngine::renderModelsOpaque(
 
     gfx::Model::PushConstantObject push{};
     push.viewProj = camera.getProjection() * camera.getView();
+    push.cameraPos = camera.getPosition();
     pipeline->pushConstant(commandBuffer, push);
 
     modelManager.drawOpaque(commandBuffer, instancesData);
@@ -116,6 +118,7 @@ void RenderEngine::renderModelsTransparent(
 
     gfx::Model::PushConstantObject push{};
     push.viewProj = camera.getProjection() * camera.getView();
+    push.cameraPos = camera.getPosition();
     pipeline->pushConstant(commandBuffer, push);
 
     modelManager.drawTransparent(commandBuffer, instancesData);
@@ -125,7 +128,7 @@ void RenderEngine::renderBillboardTexts(
     VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
     gfx::mngrs::BillboardManager& billboardManager,
     const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& instancesData) {
-    auto& pipeline = m_pipelines["billbText"];
+    auto& pipeline = m_pipelines["billboard"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -143,18 +146,24 @@ void RenderEngine::renderBillboardTexts(
     }
 }
 
-void RenderEngine::renderUI(VkCommandBuffer commandBuffer, const win::Window& window, gfx::UserInterface& ui) {
-    auto& pipeline = m_pipelines["ui"];
+void RenderEngine::renderTexts(
+    VkCommandBuffer commandBuffer, win::Window& window, gfx::mngrs::UiManager& uiManager,
+    const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData) {
+    auto& pipeline = m_pipelines["text"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
-    gfx::UserInterface::PushConstantObject push{};
-    push.proj = glm::ortho(
-        0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()), -1.0f, 1.0f);
-    push.texIndex = ui.getFontTextureIndex();
-    pipeline->pushConstant(commandBuffer, push);
+    for (const auto& [name, instances] : instancesData) {
+        if (instances.empty())
+            continue;
 
-    ui.draw(commandBuffer);
+        gfx::ui::Text::PushConstantObject push{};
+        push.proj = glm::ortho(0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
+        push.texIndex = uiManager.getTextureIndex(name);
+
+        pipeline->pushConstant(commandBuffer, push);
+        uiManager.drawText(commandBuffer, instances);
+    }
 }
 
 } // namespace game::engines

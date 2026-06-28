@@ -12,7 +12,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
 #ifndef NDEBUG
-    core::logger::debug(std::format("Vulkan: {}", pCallbackData->pMessage));
+    core::logger::validationLayers(pCallbackData->pMessage);
 #endif
 
     return VK_FALSE;
@@ -67,7 +67,8 @@ Device::~Device() {
 
 void Device::createInstance() {
     if (base::ENABLE_VALIDATION_LAYER && !checkValidationLayerSupport()) {
-        throw std::runtime_error("Vulkan: Validation layers requested, but not available");
+        core::logger::warn("Vulkan: Validation layers requested, but not available. Skipping");
+        base::ENABLE_VALIDATION_LAYER = false;
     }
 
     VkApplicationInfo appInfo{};
@@ -82,7 +83,7 @@ void Device::createInstance() {
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> extensions = getRequiredExtensions();
+    auto extensions = getRequiredExtensions();
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
 
@@ -114,11 +115,7 @@ void Device::setupDebugMessenger() {
     }
 }
 
-void Device::createSurface() {
-    if (glfwCreateWindowSurface(m_instance, m_window.getWindow(), nullptr, &m_surface) != VK_SUCCESS) {
-        throw std::runtime_error("Vulkan: Failed to create window surface");
-    }
-}
+void Device::createSurface() { m_window.createSurface(m_instance, &m_surface); }
 
 void Device::pickPhysicalDevice() {
     uint32_t deviceCount = 0;

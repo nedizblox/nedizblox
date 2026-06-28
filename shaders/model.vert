@@ -15,32 +15,32 @@ layout(location = 2) out vec4 fragColor;
 layout(location = 3) out vec3 fragScale;
 layout(location = 4) flat out uint fragTexIndex;
 layout(location = 5) out vec2 fragTexTile;
+layout(location = 6) out vec3 fragCameraPos;
+layout(location = 7) out vec3 fragWorldPos;
+layout(location = 8) out vec3 fragWorldNormal;
 
 layout(push_constant) uniform PushConstantObject {
     mat4 viewProj;
+    vec3 cameraPos;
 } push;
 
 void main() {
     vec4 worldPos = model * vec4(position, 1.0);
-    vec3 worldNormal = normalize(mat3(model) * normal);
 
-    vec3 scale = vec3(
-        length(model[0].xyz),
-        length(model[1].xyz),
-        length(model[2].xyz)
-    );
+    mat3 normalMatrix = transpose(inverse(mat3(model)));
+    vec3 worldNormal = normalize(normalMatrix * normal);
 
-    vec3 lightDirection = normalize(vec3(1.0, 1.5, 2.0));
-    float ambientStren = 1.5;
-
-    float lightIntensity = ambientStren + max(dot(worldNormal, lightDirection), 0);
+    vec3 scale = vec3(length(model[0].xyz), length(model[1].xyz), length(model[2].xyz));
 
     fragPos = position * scale;
     fragNormal = normal;
-    fragColor = vec4(color.rgb * lightIntensity, color.a);
+    fragColor = color;
     fragScale = scale;
     fragTexIndex = texIndex;
     fragTexTile = texTile;
+    fragCameraPos = push.cameraPos;
+    fragWorldPos = worldPos.xyz;
+    fragWorldNormal = worldNormal;
 
     gl_Position = push.viewProj * worldPos;
 }

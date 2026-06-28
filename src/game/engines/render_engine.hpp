@@ -39,7 +39,9 @@ public:
         gfx::mngrs::BillboardManager& billboardManager,
         const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& instancesData);
 
-    void renderUI(VkCommandBuffer commandBuffer, const win::Window& window, gfx::UserInterface& ui);
+    void renderTexts(
+        VkCommandBuffer commandBuffer, win::Window& window, gfx::mngrs::UiManager& uiManager,
+        const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData);
 
 private:
     gfx::vk::Device& m_device;

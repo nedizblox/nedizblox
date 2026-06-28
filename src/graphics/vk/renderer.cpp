@@ -37,7 +37,10 @@ void Renderer::recreateSwapchain() {
 
     m_device.waitIdle();
 
-    VkExtent2D extent = m_window.getExtent();
+    VkExtent2D extent{};
+    extent.width = static_cast<uint32_t>(m_window.getWidth());
+    extent.height = static_cast<uint32_t>(m_window.getHeight());
+
     if (m_swapchain == nullptr) {
         m_swapchain = std::make_unique<Swapchain>(m_device, extent);
     } else {

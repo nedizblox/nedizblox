@@ -7,19 +7,36 @@ InstanceManager::InstanceManager() {}
 InstanceManager::~InstanceManager() {}
 
 void InstanceManager::rebuildMap(
-    const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId, uint32_t nicknameId) {
+    const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId) {
     for (auto& [name, vec] : m_modelInstancesData) {
         vec.clear();
     }
+    for (auto& [name, vec] : m_billbTextInstancesContent) {
+        vec.clear();
+    }
+
     m_partDynamicTargets.clear();
+    m_billbTextDynamicTargets.clear();
 
-    collectInstances(root, studsTexId, smoothTexId, faceTexId, nicknameId);
+    collectMapInstances(root, studsTexId, smoothTexId, faceTexId);
 
-    m_hierarchyDirty = false;
+    m_mapHierarchyDirty = false;
 }
 
-void InstanceManager::collectInstances(
-    const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId, uint32_t nicknameId) {
+void InstanceManager::rebuildGui(const std::shared_ptr<types::Instance>& root) {
+    for (auto& [name, vec] : m_textInstancesContent) {
+        vec.clear();
+    }
+
+    m_textDynamicTargets.clear();
+
+    collectGuiInstances(root);
+
+    m_guiHierarchyDirty = false;
+}
+
+void InstanceManager::collectMapInstances(
+    const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId) {
     if (!parent)
         return;
 
@@ -53,7 +70,7 @@ void InstanceManager::collectInstances(
                     bucket = "sphereOpaque";
                     break;
                 case enums::PartType::Head:
-                    bucket = "headTransparent";
+                    bucket = "headOpaque";
                     break;
                 default:
                     bucket = "cubeOpaque";
@@ -88,7 +105,7 @@ void InstanceManager::collectInstances(
         } else if (type == enums::InstanceType::BillboardText) {
             auto billbText = std::static_pointer_cast<types::BillboardText>(obj);
 
-            std::string bucket = "nickname";
+            std::string bucket = "nunito";
 
             auto& vec = m_billbTextInstancesContent[bucket];
             vec.push_back({billbText->getText(), billbText->getPosition()});
@@ -96,7 +113,28 @@ void InstanceManager::collectInstances(
             m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1});
         }
 
-        collectInstances(obj, studsTexId, smoothTexId, faceTexId, nicknameId);
+        collectMapInstances(obj, studsTexId, smoothTexId, faceTexId);
+    }
+}
+
+void InstanceManager::collectGuiInstances(const std::shared_ptr<types::Instance>& parent) {
+    if (!parent)
+        return;
+
+    for (const auto& obj : parent->getChildren()) {
+        auto type = obj->getType();
+        if (type == enums::InstanceType::Text) {
+            auto text = std::static_pointer_cast<types::Text>(obj);
+
+            std::string bucket = "nunito";
+
+            auto& vec = m_textInstancesContent[bucket];
+            vec.push_back({text->getText(), text->getPosition(), text->getScale()});
+
+            m_textDynamicTargets.push_back({text, bucket, vec.size() - 1});
+        }
+
+        collectGuiInstances(obj);
     }
 }
 
@@ -116,23 +154,30 @@ void InstanceManager::updateDynamicTransforms() {
     for (size_t i = 0; i < m_partDynamicTargets.size();) {
         const auto& target = m_partDynamicTargets[i];
 
-        glm::vec3 position = target.part->getPosition();
+        glm::vec3 position = target.obj->getPosition();
         if (position.y < -1000.0f) {
-            target.part->destroy();
+            target.obj->destroy();
 
-            m_hierarchyDirty = true;
+            m_mapHierarchyDirty = true;
 
             m_partDynamicTargets.erase(m_partDynamicTargets.begin() + i);
 
             continue;
         }
 
-        m_modelInstancesData[target.bucketName][target.index].model = target.part->getModelMatrix();
+        m_modelInstancesData[target.bucketName][target.index].model = target.obj->getModelMatrix();
         i++;
     }
 
     for (const auto& target : m_billbTextDynamicTargets) {
-        m_billbTextInstancesContent[target.bucketName][target.index].position = target.billb->getPosition() + target.billb->getOffset();
+        m_billbTextInstancesContent[target.bucketName][target.index].position
+            = target.obj->getPosition() + target.obj->getOffset();
+        m_billbTextInstancesContent[target.bucketName][target.index].text = target.obj->getText();
+    }
+
+    for (const auto& target : m_textDynamicTargets) {
+        m_textInstancesContent[target.bucketName][target.index].position = target.obj->getPosition();
+        m_textInstancesContent[target.bucketName][target.index].text = target.obj->getText();
     }
 }
 

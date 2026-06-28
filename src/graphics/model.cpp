@@ -91,6 +91,9 @@ void Model::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>&
     VkDeviceSize offsets[] = {0, 0};
 
     uint32_t instanceCount = static_cast<uint32_t>(instances.size());
+    if (instanceCount == 0)
+        return;
+
     memcpy(m_instanceData, instances.data(), sizeof(InstanceData) * instanceCount);
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 2, buffers, offsets);

@@ -46,6 +46,8 @@ public:
     glm::mat4 getProjection() const { return m_projection; }
     glm::mat4 getView() const { return m_view; }
 
+    glm::vec3 getPosition() const { return m_position; }
+
     float getPhi() const { return m_phi; }
 
     void update(float fov, float aspect, float near, float far, glm::vec2 mouseDelta, glm::vec2 scrollDelta);
@@ -54,6 +56,8 @@ private:
     float m_radius = 5.0f;
     float m_theta = 0.0f;
     float m_phi = 0.0f;
+
+    glm::vec3 m_position{0.0f};
 
     glm::mat4 m_projection{1.0f};
     glm::mat4 m_view{1.0f};

@@ -4,6 +4,10 @@
 
 #include <stdexcept>
 
+#ifndef NDEBUG
+#include "core/logger.hpp"
+#endif
+
 namespace win {
 
 Window::Window(int width, int height, const std::string& title) : m_fbWidth(width), m_fbHeight(height) {
@@ -18,15 +22,34 @@ Window::Window(int width, int height, const std::string& title) : m_fbWidth(widt
         glfwWindowHintString(GLFW_WAYLAND_APP_ID, "nedizblox_client");
     }
 
+    #ifndef NDEBUG
+    switch (glfwGetPlatform()) {
+        case GLFW_PLATFORM_WIN32:
+            core::logger::info("Using WSI platform Win32", true);
+            break;
+        case GLFW_PLATFORM_WAYLAND:
+            core::logger::info("Using WSI platform Wayland", true);
+            break;
+        case GLFW_PLATFORM_X11:
+            core::logger::info("Using WSI platform X11", true);
+            break;
+        case GLFW_PLATFORM_COCOA:
+            core::logger::info("Using WSI platform Cocoa", true);
+            break;
+        case GLFW_PLATFORM_NULL:
+            core::logger::info("Using WSI platform Null", true);
+            break;
+        default:
+            core::logger::warn("Failed to fetch WSI platform", true);
+            break;
+    }
+    #endif
+
     m_window = glfwCreateWindow(m_fbWidth, m_fbHeight, title.c_str(), nullptr, nullptr);
 
     if (!m_window) {
         glfwTerminate();
         throw std::runtime_error("GLFW: Failed to create window");
-    }
-
-    if (glfwRawMouseMotionSupported()) {
-        glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
 
     // center window
@@ -91,12 +114,10 @@ void Window::update() {
     m_minimized = (width == 0 || height == 0);
 }
 
-VkExtent2D Window::getExtent() const {
-    VkExtent2D extent{};
-    extent.width = static_cast<uint32_t>(m_fbWidth);
-    extent.height = static_cast<uint32_t>(m_fbHeight);
-
-    return extent;
+void Window::createSurface(VkInstance instance, VkSurfaceKHR* surface) {
+    if (glfwCreateWindowSurface(instance, m_window, nullptr, surface) != VK_SUCCESS) {
+        throw std::runtime_error("Vulkan: Failed to create window surface");
+    }
 }
 
 void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {

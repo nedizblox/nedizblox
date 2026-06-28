@@ -18,7 +18,8 @@ public:
     InstanceManager(const InstanceManager&) = delete;
     InstanceManager& operator=(const InstanceManager&) = delete;
 
-    void rebuildMap(const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId, uint32_t nicknameId);
+    void rebuildMap(const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId);
+    void rebuildGui(const std::shared_ptr<types::Instance>& root);
 
     void updateDynamicTransforms();
 
@@ -28,35 +29,45 @@ public:
         return m_modelInstancesData;
     }
 
-    const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& getBillbTextInstancesContent() const {
+    const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>&
+    getBillbTextInstancesContent() const {
         return m_billbTextInstancesContent;
     }
 
-    void markDirty() { m_hierarchyDirty = true; }
-    bool isDirty() const { return m_hierarchyDirty; }
+    const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>&
+    getTextInstancesContent() const {
+        return m_textInstancesContent;
+    }
+
+    void markMapDirty() { m_mapHierarchyDirty = true; }
+    bool isMapDirty() const { return m_mapHierarchyDirty; }
+
+    void markGuiDirty() { m_guiHierarchyDirty = true; }
+    bool isGuiDirty() const { return m_guiHierarchyDirty; }
 
 private:
-    struct PartDynamicTarget {
-        std::shared_ptr<types::Part> part;
-        std::string bucketName;
-        size_t index;
-    };
-
-    struct BillbTextDynamicTarget {
-        std::shared_ptr<types::BillboardText> billb;
+    template <typename T>
+    struct DynamicTarget {
+        std::shared_ptr<T> obj;
         std::string bucketName;
         size_t index;
     };
 
     std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>> m_modelInstancesData;
     std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>> m_billbTextInstancesContent;
+    std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>> m_textInstancesContent;
 
-    std::vector<PartDynamicTarget> m_partDynamicTargets;
-    std::vector<BillbTextDynamicTarget> m_billbTextDynamicTargets;
+    std::vector<DynamicTarget<types::Part>> m_partDynamicTargets;
+    std::vector<DynamicTarget<types::BillboardText>> m_billbTextDynamicTargets;
 
-    bool m_hierarchyDirty = true;
+    std::vector<DynamicTarget<types::Text>> m_textDynamicTargets;
 
-    void collectInstances(const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId, uint32_t nicknameId);
+    bool m_mapHierarchyDirty = true;
+    bool m_guiHierarchyDirty = true;
+
+    void collectMapInstances(const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId);
+    void collectGuiInstances(const std::shared_ptr<types::Instance>& parent);
+
     void sortInstances(const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances);
 };
 
