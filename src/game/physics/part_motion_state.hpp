@@ -10,7 +10,7 @@ class PartMotionState : public btMotionState {
 public:
     PartMotionState(const btTransform& startTrans, types::Part* part) : m_part(part) {}
 
-    virtual void getWorldTransform(btTransform& worldTrans) const override {
+    void getWorldTransform(btTransform& worldTrans) const override {
         btTransform t;
         t.setIdentity();
 
@@ -24,7 +24,7 @@ public:
         worldTrans = t;
     }
 
-    virtual void setWorldTransform(const btTransform& worldTrans) override {
+    void setWorldTransform(const btTransform& worldTrans) override {
         btVector3 pos = worldTrans.getOrigin();
         btQuaternion q = worldTrans.getRotation();
 

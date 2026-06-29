@@ -44,15 +44,6 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
         shape = new btBoxShape(halfExtents);
     } else if (type == enums::PartType::Ball) {
         shape = new btSphereShape(size.x / 2.0f);
-    } else if (type == enums::PartType::Capsule) {
-        float radius = size.x / 2.0f;
-        float cylinderHeight = size.y - (2.0f * radius);
-
-        if (cylinderHeight < 0.0f) {
-            cylinderHeight = 0.0f;
-        }
-
-        shape = new btCapsuleShape(radius, cylinderHeight);
     } else {
         shape = new btBoxShape(halfExtents);
     }
@@ -83,6 +74,18 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     body->setDeactivationTime(0.5f);
 
     m_dynamicsWorld->addRigidBody(body);
+
+    part->setRigidBody(body);
+
+    part->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
+        auto obj = std::static_pointer_cast<types::Part>(destroying);
+        auto rigidBody = obj->getRigidBody();
+
+        m_dynamicsWorld->removeRigidBody(rigidBody);
+
+        delete rigidBody->getMotionState();
+        delete rigidBody;
+    });
 
     return body;
 }
@@ -121,13 +124,26 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
 
     m_dynamicsWorld->addRigidBody(body);
 
+    rootPart->setRigidBody(body);
+
+    rootPart->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
+        auto obj = std::static_pointer_cast<types::Part>(destroying);
+        auto rigidBody = obj->getRigidBody();
+
+        m_dynamicsWorld->removeRigidBody(rigidBody);
+
+        delete rigidBody->getMotionState();
+        delete rigidBody;
+    });
+
     return body;
 }
 
 void Physics::step(float deltaTime) {
-    float dt = glm::min(deltaTime, 0.1f);
+    if (deltaTime > 0.1f)
+        deltaTime = 0.1f;
 
-    m_dynamicsWorld->stepSimulation(dt, 1, 1.0f / 60.0f);
+    m_dynamicsWorld->stepSimulation(deltaTime, 1, 1.0f / 60.0f);
 }
 
 } // namespace game::physics

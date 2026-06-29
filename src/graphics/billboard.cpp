@@ -202,8 +202,8 @@ void Billboard::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceCo
 
             InstanceData letterInstance{};
             letterInstance.origin = instance.position;
-            letterInstance.offset = {xpos, ypos};
-            letterInstance.size = {w, h};
+            letterInstance.offset = glm::vec2(xpos, ypos) * instance.scale;
+            letterInstance.size = glm::vec2(w, h) * instance.scale;
             letterInstance.uvTopLeft = ch.uvTopLeft;
             letterInstance.uvBottomRight = ch.uvBottomRight;
 

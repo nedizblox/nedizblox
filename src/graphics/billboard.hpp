@@ -39,6 +39,7 @@ public:
     struct InstanceContent {
         std::string text;
         glm::vec3 position;
+        glm::vec2 scale;
     };
 
     Billboard(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);

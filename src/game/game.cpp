@@ -130,10 +130,10 @@ void Game::buildMap(const std::string& rbxlPath) {
         part->setParent(m_workspace.get());
     }
 
-    m_rig = prefabs::Rig::create(*m_physics);
+    m_rig = std::make_shared<prefabs::Rig>(*m_physics);
     m_rig->setParent(m_workspace.get());
 
-    m_rig1 = prefabs::Rig::create(*m_physics, "Igor");
+    m_rig1 = std::make_shared<prefabs::Rig>(*m_physics, "Igor");
     m_rig1->setParent(m_workspace.get());
 
     m_fps = std::make_shared<types::Text>();
@@ -166,9 +166,10 @@ void Game::run() {
 
         m_physics->step(dt);
 
+        m_rig1->jump();
         m_rig->update(dt);
         m_rig1->update(dt);
-        auto head = m_rig->findFirstChild<types::Part>("Head");
+        auto head = m_rig->getHead();
         if (head) {
             m_camera->target = head->getPosition();
         }

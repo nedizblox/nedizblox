@@ -6,6 +6,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include <btBulletDynamicsCommon.h>
+
 namespace game::types {
 
 class Part : public Instance {
@@ -57,6 +59,9 @@ public:
     enums::PartType getShape() const { return m_shape; }
     void setShape(enums::PartType shape) { m_shape = shape; }
 
+    btRigidBody* getRigidBody() const { return m_rigidBody; }
+    void setRigidBody(btRigidBody* rigidBody) { m_rigidBody = rigidBody; }
+
 private:
     glm::vec3 m_position{0.0f};
     glm::quat m_orientation{0.0f, 0.0f, 0.0f, 0.0f};
@@ -70,6 +75,8 @@ private:
     bool m_anchored = false;
 
     enums::PartType m_shape = enums::PartType::Block;
+
+    btRigidBody* m_rigidBody = nullptr;
 };
 
 } // namespace game::types

@@ -3,12 +3,7 @@
 #include <array>
 #include <cstring>
 #include <limits>
-#include <set>
 #include <stdexcept>
-
-#ifndef NDEBUG
-#include <core/logger.hpp>
-#endif
 
 namespace gfx::vk {
 
@@ -311,13 +306,11 @@ VkSurfaceFormatKHR Swapchain::chooseSwapSurfaceFormat(const std::vector<VkSurfac
 }
 
 VkPresentModeKHR Swapchain::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) const {
-    /*
     for (const auto& availablePresentMode : availablePresentModes) {
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
     }
-    */
 
     return VK_PRESENT_MODE_FIFO_KHR;
 }

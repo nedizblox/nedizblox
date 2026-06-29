@@ -108,7 +108,7 @@ void InstanceManager::collectMapInstances(
             std::string bucket = "nunito";
 
             auto& vec = m_billbTextInstancesContent[bucket];
-            vec.push_back({billbText->getText(), billbText->getPosition()});
+            vec.push_back({billbText->getText(), billbText->getPosition(), billbText->getScale()});
 
             m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1});
         }
@@ -170,14 +170,17 @@ void InstanceManager::updateDynamicTransforms() {
     }
 
     for (const auto& target : m_billbTextDynamicTargets) {
-        m_billbTextInstancesContent[target.bucketName][target.index].position
-            = target.obj->getPosition() + target.obj->getOffset();
-        m_billbTextInstancesContent[target.bucketName][target.index].text = target.obj->getText();
+        auto& content = m_billbTextInstancesContent[target.bucketName][target.index];
+        content.position = target.obj->getPosition() + target.obj->getOffset();
+        content.scale = target.obj->getScale();
+        content.text = target.obj->getText();
     }
 
     for (const auto& target : m_textDynamicTargets) {
-        m_textInstancesContent[target.bucketName][target.index].position = target.obj->getPosition();
-        m_textInstancesContent[target.bucketName][target.index].text = target.obj->getText();
+        auto& content = m_textInstancesContent[target.bucketName][target.index];
+        content.position = target.obj->getPosition();
+        content.scale = target.obj->getScale();
+        content.text = target.obj->getText();
     }
 }
 

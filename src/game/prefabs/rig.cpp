@@ -2,22 +2,21 @@
 
 namespace game::prefabs {
 
-std::shared_ptr<Rig> Rig::create(physics::Physics& physics, const std::string& name) {
-    auto rig = std::shared_ptr<Rig>(new Rig(physics, name));
-    rig->createBodyParts();
-    return rig;
+Rig::Rig(physics::Physics& physics, const std::string& name) :
+    m_physics(physics), types::Model(name) {
+    createBodyParts();
 }
 
 void Rig::createBodyParts() {
-    auto head = std::make_shared<types::Part>("Head");
+    m_head = std::make_shared<types::Part>("Head");
     auto torso = std::make_shared<types::Part>("Torso");
-    auto rootPart = std::make_shared<types::Part>("HumanoidRootPart");
+    auto rootPart = std::make_shared<types::Part>("RootPart");
     auto leftArm = std::make_shared<types::Part>("LeftArm");
     auto rightArm = std::make_shared<types::Part>("RightArm");
     auto leftLeg = std::make_shared<types::Part>("LeftLeg");
     auto rightLeg = std::make_shared<types::Part>("RightLeg");
 
-    head->setSize(glm::vec3(1.0f, 1.0f, 1.0f));
+    m_head->setSize(glm::vec3(1.0f, 1.0f, 1.0f));
     torso->setSize(glm::vec3(2.0f, 2.0f, 1.0f));
     rootPart->setSize(glm::vec3(2.0f, 6.0f, 1.0f));
     leftArm->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
@@ -25,7 +24,7 @@ void Rig::createBodyParts() {
     leftLeg->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
     rightLeg->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
 
-    head->setColor(glm::u8vec3(255, 255, 0));
+    m_head->setColor(glm::u8vec3(255, 255, 0));
     torso->setColor(glm::u8vec3(0, 13, 255));
     leftArm->setColor(glm::u8vec3(255, 255, 0));
     rightArm->setColor(glm::u8vec3(255, 255, 0));
@@ -34,18 +33,16 @@ void Rig::createBodyParts() {
 
     rootPart->setTransparency(1.0f);
 
-    head->setShape(enums::PartType::Head);
-    rootPart->setShape(enums::PartType::Capsule);
+    m_head->setShape(enums::PartType::Head);
 
     m_rigidBody = m_physics.createRigidBodyModel(this, rootPart.get());
     m_rigidBody->setAngularFactor(btVector3(0.0f, 0.0f, 0.0f));
     m_rigidBody->setActivationState(DISABLE_DEACTIVATION);
-    m_rigidBody->setFriction(0.0f);
-    m_rigidBody->setAnisotropicFriction(btVector3(0, 0, 0), btCollisionObject::CF_ANISOTROPIC_FRICTION_DISABLED);
+    m_rigidBody->setFriction(0.1f);
 
     glm::quat identityRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    m_bones.push_back({head, glm::vec3(0.0f, 1.5f, 0.0f), identityRot});
+    m_bones.push_back({m_head, glm::vec3(0.0f, 1.5f, 0.0f), identityRot});
     m_bones.push_back({torso, glm::vec3(0.0f, 0.0f, 0.0f), identityRot});
     m_bones.push_back({leftArm, glm::vec3(-1.5f, 0.0f, 0.0f), identityRot});
     m_bones.push_back({rightArm, glm::vec3(1.5f, 0.0f, 0.0f), identityRot});
@@ -62,7 +59,7 @@ void Rig::createBodyParts() {
     m_nickname->setText(getName());
     m_nickname->setOffset(glm::vec3(0.0f, 2.3f, 0.0f));
     m_nickname->setPosition(getPivotPosition());
-    m_nickname->setParent(this);
+    m_nickname->setParent(m_head.get());
 
     syncParts();
 
@@ -94,8 +91,7 @@ void Rig::setPivotPosition(const glm::vec3& position) {
 }
 
 void Rig::move(MoveDirection direction, float phi) {
-    glm::vec3 forward = glm::vec3(-glm::sin(phi), 0.0f, -glm::cos(phi));
-    forward = glm::normalize(forward);
+    glm::vec3 forward = glm::normalize(glm::vec3(-glm::sin(phi), 0.0f, -glm::cos(phi)));
 
     glm::vec3 up(0.0f, 1.0f, 0.0f);
     glm::vec3 right = glm::normalize(glm::cross(forward, up));

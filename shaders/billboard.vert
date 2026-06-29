@@ -17,10 +17,8 @@ layout(push_constant) uniform PushConstantObject {
     uint texIndex;
 } push;
 
-const vec2 SCALE = vec2(0.009);
-
 void main() {
-    vec2 localSignPos = (offset + position * size) * SCALE;
+    vec2 localSignPos = (offset + position * size);
 
     vec3 cameraRight = vec3(push.view[0][0], push.view[1][0], push.view[2][0]);
     vec3 cameraUp = vec3(push.view[0][1], push.view[1][1], push.view[2][1]);

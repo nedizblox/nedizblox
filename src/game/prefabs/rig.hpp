@@ -16,7 +16,9 @@ public:
 
     enum class MoveDirection { Forward, Backward, Left, Right };
 
-    static std::shared_ptr<Rig> create(physics::Physics& physics, const std::string& name = "Rig");
+    Rig(physics::Physics& physics, const std::string& name = "Rig");
+
+    std::shared_ptr<types::Part> getHead() const { return m_head; }
 
     float getWalkSpeed() const { return m_walkSpeed; }
     void setWalkSpeed(float walkSpeed) { m_walkSpeed = walkSpeed; }
@@ -34,12 +36,11 @@ public:
     void update(float deltaTime);
 
 private:
-    Rig(physics::Physics& physics, const std::string& name = "Rig") :
-        m_physics(physics), types::Model(name) {}
-
     physics::Physics& m_physics;
 
     std::vector<Bone> m_bones;
+
+    std::shared_ptr<types::Part> m_head;
 
     glm::vec3 m_velocity{0.0f};
 

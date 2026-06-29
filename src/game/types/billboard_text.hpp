@@ -16,12 +16,16 @@ public:
     glm::vec3 getOffset() const { return m_offset; }
     void setOffset(const glm::vec3& offset) { m_offset = offset; }
 
+    glm::vec2 getScale() const { return m_scale; }
+    void setScale(const glm::vec2& scale) { m_scale = scale; }
+
     std::string getText() const { return m_text; }
     void setText(const std::string& text) { m_text = text; }
 
 private:
     glm::vec3 m_position{0.0f};
     glm::vec3 m_offset{0.0f};
+    glm::vec2 m_scale{0.009f};
 
     std::string m_text = "Billboard Text";
 };

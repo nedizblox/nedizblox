@@ -12,7 +12,7 @@ namespace game::types {
 
 class Instance : public std::enable_shared_from_this<Instance> {
 public:
-    using ChildCallback = std::function<void(std::shared_ptr<Instance>)>;
+    using Callback = std::function<void(std::shared_ptr<Instance>)>;
 
     Instance(enums::InstanceType type, const std::string& name) : m_type(type), m_name(name) {}
     virtual ~Instance() = default;
@@ -67,17 +67,26 @@ public:
         return nullptr;
     }
 
-    void onChildrenChanged(ChildCallback callback) {
+    void onChildrenChanged(Callback callback) {
         m_childrenChangedCallbacks.push_back(callback);
     }
 
+    void onDestroy(Callback callback) {
+        m_destroyCallbacks.push_back(callback);
+    }
+
     void destroy() {
-        auto children = m_children;
-        for (auto& child : children) {
+        auto self = shared_from_this();
+        for (auto& callback : m_destroyCallbacks) {
+            callback(self);
+        }
+
+        for (auto& child : m_children) {
             if (child) {
                 child->destroy();
             }
         }
+
         m_children.clear();
 
         if (m_parent != nullptr) {
@@ -92,7 +101,8 @@ private:
     Instance* m_parent = nullptr;
     std::vector<std::shared_ptr<Instance>> m_children;
 
-    std::vector<ChildCallback> m_childrenChangedCallbacks;
+    std::vector<Callback> m_childrenChangedCallbacks;
+    std::vector<Callback> m_destroyCallbacks;
 };
 
 } // namespace game::types
