@@ -85,6 +85,8 @@ set(MAIN_SOURCES
     src/graphics/managers/model_manager.cpp
     src/graphics/managers/billboard_manager.cpp
     src/graphics/managers/ui_manager.cpp
+    src/audio/sound.cpp
+    src/audio/music.cpp
     src/audio/audio_manager.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp
@@ -99,6 +101,7 @@ set(MAIN_SOURCES
 
 set(EXTERN_SOURCES
     extern/stb/stb_image.cpp
+    extern/stb/stb_vorbis.cpp
     extern/vma/vk_mem_alloc.cpp
     extern/tinyobj/tiny_obj_loader.cpp
     extern/dr/dr_wav.cpp

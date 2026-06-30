@@ -3,43 +3,41 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
-#include <glm/glm.hpp>
+#include "sound.hpp"
+#include "music.hpp"
 
 #include <string>
-#include <vector>
+#include <unordered_map>
+#include <memory>
+
+#include "core/camera.hpp"
 
 namespace audio {
 
 class AudioManager {
 public:
-    struct SoundSettings {
-        float pitch{1.0f};
-        float volume{1.0f};
-
-        bool loop{false};
-
-        glm::vec3 position{};
-    };
-
     AudioManager();
     ~AudioManager();
 
     AudioManager(const AudioManager&) = delete;
     AudioManager& operator=(const AudioManager&) = delete;
 
-    ALuint loadSound(const std::string& wavPath, const SoundSettings& settings);
+    void addSound(const std::string& name, std::unique_ptr<Sound> sound);
+    void addMusic(const std::string& name, std::unique_ptr<Music> sound);
 
-    void moveListener(const glm::vec3& position);
+    void moveListener(const core::camera::SphericalCamera& camera);
 
-    void playSound(ALuint id);
-    void stopSound(ALuint id);
+    const std::unique_ptr<Sound>& getSound(const std::string& name) { return m_sounds[name]; }
+    const std::unique_ptr<Music>& getMusic(const std::string& name) { return m_music[name]; }
+
+    void update();
 
 private:
     ALCdevice* m_device;
     ALCcontext* m_context;
 
-    std::vector<ALuint> m_buffers;
-    std::vector<ALuint> m_sources;
+    std::unordered_map<std::string, std::unique_ptr<Sound>> m_sounds;
+    std::unordered_map<std::string, std::unique_ptr<Music>> m_music;
 };
 
 } // namespace audio

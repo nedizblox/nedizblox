@@ -56,7 +56,6 @@ private:
     std::shared_ptr<types::CoreGui> m_coreGui;
     
     std::shared_ptr<prefabs::Rig> m_rig;
-    std::shared_ptr<prefabs::Rig> m_rig1;
 
     std::shared_ptr<types::Text> m_fps;
 

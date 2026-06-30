@@ -61,6 +61,8 @@ void Game::initManagers() {
     m_billboardManager = std::make_unique<gfx::mngrs::BillboardManager>(*m_device, *m_bindlessManager);
 
     m_uiManager = std::make_unique<gfx::mngrs::UiManager>(*m_device, *m_bindlessManager);
+
+    m_audioManager = std::make_unique<audio::AudioManager>();
 }
 
 void Game::initEngines() {
@@ -133,18 +135,23 @@ void Game::buildMap(const std::string& rbxlPath) {
     m_rig = std::make_shared<prefabs::Rig>(*m_physics);
     m_rig->setParent(m_workspace.get());
 
-    m_rig1 = std::make_shared<prefabs::Rig>(*m_physics, "Igor");
-    m_rig1->setParent(m_workspace.get());
-
     m_fps = std::make_shared<types::Text>();
     m_fps->setParent(m_coreGui.get());
     m_fps->setPosition(glm::vec2(50.0f, 30.0f));
+
+    auto sound = std::make_unique<audio::Sound>();
+    sound->load("assets/sounds/halloween_lightning.wav");
+    sound->setPosition(glm::vec3(0.0f));
+    sound->setLooping(true);
+    sound->play();
+    m_audioManager->addSound("light", std::move(sound));
 }
 
 void Game::run() {
     while (m_window->isOpen()) {
         m_window->update();
         m_scriptEngine->update();
+        m_audioManager->update();
 
         float dt = m_window->getDeltaTime();
 
@@ -166,13 +173,13 @@ void Game::run() {
 
         m_physics->step(dt);
 
-        m_rig1->jump();
         m_rig->update(dt);
-        m_rig1->update(dt);
         auto head = m_rig->getHead();
         if (head) {
             m_camera->target = head->getPosition();
         }
+
+        m_audioManager->moveListener(*m_camera);
 
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
                                    ? m_window->getMouseDelta()
@@ -198,7 +205,7 @@ void Game::run() {
 
             m_instanceManager->updateDynamicTransforms();
 
-            m_instanceManager->sortTransparentInstances(m_camera->target);
+            m_instanceManager->sortTransparentInstances(m_camera->getPosition());
 
             const auto& modelInstancesData = m_instanceManager->getModelInstancesData();
 

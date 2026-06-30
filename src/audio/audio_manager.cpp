@@ -1,7 +1,5 @@
 #include "audio_manager.hpp"
 
-#include "dr/dr_wav.h"
-
 #include <stdexcept>
 
 namespace audio {
@@ -21,57 +19,34 @@ AudioManager::AudioManager() {
 }
 
 AudioManager::~AudioManager() {
-    alDeleteSources(static_cast<ALsizei>(m_sources.size()), m_sources.data());
-    alDeleteBuffers(static_cast<ALsizei>(m_buffers.size()), m_buffers.data());
-
     alcDestroyContext(m_context);
     alcCloseDevice(m_device);
 }
 
-ALuint AudioManager::loadSound(const std::string& wavPath, const SoundSettings& settings) {
-    unsigned int channels;
-    unsigned int sampleRate;
-    drwav_uint64 frameCount;
-
-    short* sampleData = drwav_open_file_and_read_pcm_frames_s16(
-        wavPath.c_str(), &channels, &sampleRate, &frameCount, nullptr);
-    if (!sampleData) {
-        throw std::runtime_error("WAV: Failed to open file at path " + wavPath);
-    }
-
-    ALenum format;
-    if (channels == 1) {
-        format = AL_FORMAT_MONO16;
-    } else {
-        format = AL_FORMAT_STEREO16;
-    }
-
-    ALuint buffer;
-    alGenBuffers(1, &buffer);
-    alBufferData(buffer, format, sampleData, frameCount * channels * sizeof(short), sampleRate);
-
-    m_buffers.push_back(buffer);
-
-    drwav_free(sampleData, nullptr);
-
-    ALuint source;
-    alGenSources(1, &source);
-
-    alSourcei(source, AL_BUFFER, buffer);
-    alSourcef(source, AL_PITCH, settings.pitch);
-    alSourcef(source, AL_GAIN, settings.volume);
-    alSourcefv(source, AL_POSITION, &settings.position[0]);
-    alSourcei(source, AL_LOOPING, settings.loop);
-
-    return buffer;
+void AudioManager::addSound(const std::string& name, std::unique_ptr<Sound> sound) {
+    m_sounds[name] = std::move(sound);
 }
 
-void AudioManager::moveListener(const glm::vec3& position) {
-    alListenerfv(AL_POSITION, &position[0]);
+void AudioManager::addMusic(const std::string& name, std::unique_ptr<Music> music) {
+    m_music[name] = std::move(music);
 }
 
-void AudioManager::playSound(ALuint id) { alSourcePlay(id); }
+void AudioManager::moveListener(const core::camera::SphericalCamera& camera) {
+    glm::vec3 position = camera.getPosition();
 
-void AudioManager::stopSound(ALuint id) { alSourceStop(id); }
+    alListenerfv(AL_POSITION, &position.x);
+
+    glm::vec3 at = glm::normalize(camera.target - position);
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    float orientation[6] = {at.x, at.y, at.z, up.x, up.y, up.z};
+    alListenerfv(AL_ORIENTATION, orientation);
+}
+
+void AudioManager::update() {
+    for (auto& [name, music] : m_music) {
+        music->update();
+    }
+}
 
 } // namespace audio
