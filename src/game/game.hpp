@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/audio.hpp"
+#include "network/network.hpp"
 #include "core/core.hpp"
 #include "graphics/graphics.hpp"
 
@@ -18,7 +19,7 @@ namespace game {
 
 class Game {
 public:
-    Game();
+    Game(const std::string& server, uint16_t port, const std::string& nickname);
     ~Game();
 
     Game(const Game&) = delete;
@@ -47,6 +48,9 @@ private:
     std::unique_ptr<engines::RenderEngine> m_renderEngine;
     std::unique_ptr<engines::ScriptEngine> m_scriptEngine;
 
+    boost::asio::io_context m_ioContext;
+    std::unique_ptr<net::Client> m_client;
+
     std::unique_ptr<gfx::Skybox> m_skybox;
 
     std::unique_ptr<core::camera::SphericalCamera> m_camera;
@@ -55,7 +59,8 @@ private:
     std::shared_ptr<types::Workspace> m_workspace;
     std::shared_ptr<types::CoreGui> m_coreGui;
     
-    std::shared_ptr<prefabs::Rig> m_rig;
+    std::shared_ptr<prefabs::Rig> m_localRig;
+    std::unordered_map<uint32_t, std::shared_ptr<prefabs::Rig>> m_netRigs;
 
     std::shared_ptr<types::Text> m_fps;
 
@@ -67,6 +72,13 @@ private:
     void loadTextures();
     void loadModels();
     void loadUis();
+
+    void createServices();
+    void createLocalRig(const std::string& nickname);
+
+    void createDebugUi();
+
+    void createClient(const std::string& server, uint16_t port, const std::string& nickname);
 };
 
 } // namespace game

@@ -1,19 +1,39 @@
 #include "game/game.hpp"
 
-#include "core/msgbox.hpp"
+#include "core/core.hpp"
+
+#include <charconv>
+#include <stdexcept>
 
 int main(int argc, char* argv[]) {
-    try {
-        game::Game gameMain;
+    auto args = core::argsparser::parseArguments(argc, argv);
 
-        if (argc > 1) {
-            gameMain.buildMap(argv[1]);
+    try {
+        std::unique_ptr<game::Game> game;
+        
+        if (args.contains("address") && args.contains("port") && args.contains("nickname")) {
+            std::string address = args["address"];
+            std::string portStr = args["port"];
+            std::string nickname = args["nickname"];
+
+            uint16_t port = 0;
+
+            auto [ptr, ec] = std::from_chars(portStr.data(), portStr.data() + portStr.size(), port);
+
+            if (ec == std::errc::result_out_of_range) {
+                throw std::runtime_error("Port is too big or invalid, maximum is 65535");
+            } else if (ec != std::errc()) {
+                throw std::runtime_error("Port must be a valid number");
+            }
+
+            game = std::make_unique<game::Game>(address, port, nickname);
+            game->buildMap("assets/maps/crossroads.rbxl");
         } else {
-            gameMain.buildMap("assets/maps/crossroads.rbxl");
+            throw std::runtime_error("Please specify the server address, port and your nickname using the --address, --port and --nickname argument");
         }
 
-        gameMain.run();
-    } catch (std::exception& e) {
+        game->run();
+    } catch (const std::exception& e) {
         core::logger::err(e.what());
         core::msgbox::showError("Nedizblox", e.what());
         return 1;

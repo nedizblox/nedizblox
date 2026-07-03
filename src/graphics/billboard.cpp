@@ -131,7 +131,7 @@ void Billboard::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngr
         for (uint32_t row = 0; row < bitmap.rows; ++row) {
             uint32_t stagingOffset = (currentY + row + padding) * atlasWidth + (currentX + padding);
             uint32_t srcOffset = row * bitmap.pitch;
-            memcpy(pData + stagingOffset, bitmap.buffer + srcOffset, bitmap.width);
+            std::memcpy(pData + stagingOffset, bitmap.buffer + srcOffset, bitmap.width);
         }
 
         glm::vec2 uvTopLeft
@@ -217,7 +217,7 @@ void Billboard::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceCo
     if (letterCount == 0)
         return;
 
-    memcpy(m_instanceData, outInstances.data(), sizeof(InstanceData) * letterCount);
+    std::memcpy(m_instanceData, outInstances.data(), sizeof(InstanceData) * letterCount);
 
     VkBuffer buffers[] = {m_vertexBuffer->getBuffer(), m_instanceBuffer->getBuffer()};
     VkDeviceSize offsets[] = {0, 0};

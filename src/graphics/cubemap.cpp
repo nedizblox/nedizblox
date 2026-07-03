@@ -70,7 +70,7 @@ void Cubemap::createImage(const std::array<std::string, 6>& faces, bool flipVert
 
     void* data = stagingBuffer.map();
     for (size_t i = 0; i < 6; i++) {
-        memcpy(static_cast<uint8_t*>(data) + (i * layerSize), images[i], static_cast<size_t>(layerSize));
+        std::memcpy(static_cast<uint8_t*>(data) + (i * layerSize), images[i], static_cast<size_t>(layerSize));
         stbi_image_free(images[i]);
     }
     stagingBuffer.unmap();

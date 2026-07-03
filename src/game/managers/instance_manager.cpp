@@ -46,6 +46,8 @@ void InstanceManager::collectMapInstances(
             auto part = std::static_pointer_cast<types::Part>(obj);
 
             float transparency = part->getTransparency();
+            if (transparency == 1.0f) continue;
+
             enums::PartType shape = part->getShape();
 
             uint32_t texture = 0;

@@ -30,7 +30,7 @@ public:
         }
 
         void* mappedData = map();
-        memcpy(mappedData, data, static_cast<size_t>(size));
+        std::memcpy(mappedData, data, static_cast<size_t>(size));
         unmap();
     }
 

@@ -9,6 +9,7 @@ find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
 find_package(Freetype REQUIRED)
 find_package(OpenAL REQUIRED)
 find_package(Bullet REQUIRED)
+find_package(Boost REQUIRED)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -65,6 +66,7 @@ endforeach()
 
 set(MAIN_SOURCES
     src/core/logger.cpp
+    src/core/args_parser.cpp
     src/core/camera.cpp
     src/core/msgbox.cpp
     src/window/window.cpp
@@ -88,6 +90,7 @@ set(MAIN_SOURCES
     src/audio/sound.cpp
     src/audio/music.cpp
     src/audio/audio_manager.cpp
+    src/network/client.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp
     src/game/managers/instance_manager.cpp
@@ -124,6 +127,7 @@ target_link_libraries(nedizblox-client PRIVATE
     glfw
     Freetype::Freetype
     OpenAL::OpenAL
+    ${Boost_LIBRARIES}
     ${BULLET_LIBRARIES}
     glm::glm
     Boxer
@@ -134,6 +138,6 @@ target_link_libraries(nedizblox-client PRIVATE
     rbx_dom
 )
 
-target_compile_definitions(nedizblox-client PUBLIC GLM_ENABLE_EXPERIMENTAL)
+target_compile_definitions(nedizblox-client PUBLIC GLM_ENABLE_EXPERIMENTAL BOOST_ASIO_HEADER_ONLY)
 
-target_include_directories(nedizblox-client PRIVATE extern src ${BULLET_INCLUDE_DIRS})
+target_include_directories(nedizblox-client PRIVATE extern src ${BULLET_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})

@@ -94,7 +94,7 @@ void Model::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>&
     if (instanceCount == 0)
         return;
 
-    memcpy(m_instanceData, instances.data(), sizeof(InstanceData) * instanceCount);
+    std::memcpy(m_instanceData, instances.data(), sizeof(InstanceData) * instanceCount);
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 2, buffers, offsets);
     if (m_hasIndexBuffer) {

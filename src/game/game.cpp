@@ -6,8 +6,10 @@
 
 namespace game {
 
-Game::Game() {
+Game::Game(const std::string& server, uint16_t port, const std::string& nickname) {
     try {
+        createClient(server, port, nickname);
+
         initWindow();
         initVulkan();
         initDescriptors();
@@ -17,8 +19,13 @@ Game::Game() {
         loadModels();
         loadUis();
 
+        createServices();
+        createLocalRig(nickname);
+
+        createDebugUi();
+
         m_camera = std::make_unique<core::camera::SphericalCamera>();
-    } catch (std::exception& e) { throw; }
+    } catch (const std::exception& e) { throw; }
 }
 
 Game::~Game() {}
@@ -62,7 +69,7 @@ void Game::initManagers() {
 
     m_uiManager = std::make_unique<gfx::mngrs::UiManager>(*m_device, *m_bindlessManager);
 
-    m_audioManager = std::make_unique<audio::AudioManager>();
+    // m_audioManager = std::make_unique<audio::AudioManager>();
 }
 
 void Game::initEngines() {
@@ -113,8 +120,15 @@ void Game::loadUis() {
 }
 
 void Game::buildMap(const std::string& rbxlPath) {
-    m_instanceManager = std::make_unique<mngrs::InstanceManager>();
+    auto parts = utils::rbxl::parseRbxl(rbxlPath);
 
+    for (auto& part : parts) {
+        m_physics->createRigidBodyPart(part.get());
+        part->setParent(m_workspace.get());
+    }
+}
+
+void Game::createServices() {
     m_workspace = std::make_shared<types::Workspace>();
     m_workspace->onChildrenChanged(
         [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markMapDirty(); });
@@ -124,68 +138,137 @@ void Game::buildMap(const std::string& rbxlPath) {
         [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markGuiDirty(); });
 
     m_physics = std::make_unique<physics::Physics>(m_workspace->getGravity());
+}
 
-    auto parts = utils::rbxl::parseRbxl(rbxlPath);
+void Game::createLocalRig(const std::string& nickname) {
+    m_localRig = std::make_shared<prefabs::Rig>(*m_physics, nickname);
+    m_localRig->setParent(m_workspace.get());
+}
 
-    for (auto& part : parts) {
-        m_physics->createRigidBodyPart(part.get());
-        part->setParent(m_workspace.get());
-    }
-
-    m_rig = std::make_shared<prefabs::Rig>(*m_physics);
-    m_rig->setParent(m_workspace.get());
-
+void Game::createDebugUi() {
     m_fps = std::make_shared<types::Text>();
     m_fps->setParent(m_coreGui.get());
     m_fps->setPosition(glm::vec2(50.0f, 30.0f));
+}
 
-    auto sound = std::make_unique<audio::Sound>();
-    sound->load("assets/sounds/halloween_lightning.wav");
-    sound->setPosition(glm::vec3(0.0f));
-    sound->setLooping(true);
-    sound->play();
-    m_audioManager->addSound("light", std::move(sound));
+void Game::createClient(const std::string& server, uint16_t port, const std::string& nickname) {
+    m_client = std::make_unique<net::Client>(m_ioContext, server, port, port + 1, nickname);
+
+    m_client->setOldPlayersCallback([this](uint32_t playerId, const std::string& nickname, const glm::vec3& position) {
+        if (playerId == m_client->getPlayerId())
+            return;
+
+        std::shared_ptr<prefabs::Rig> rig = std::make_shared<prefabs::Rig>(*m_physics, nickname);
+        rig->setParent(m_workspace.get());
+        rig->setPivotPosition(position);
+
+        m_netRigs[playerId] = std::move(rig);
+        m_instanceManager->markMapDirty();
+    });
+
+    m_client->setPlayerJoinedCallback([this](uint32_t playerId, const std::string& nickname) {
+        if (playerId == m_client->getPlayerId())
+            return;
+
+        std::shared_ptr<prefabs::Rig> rig = std::make_shared<prefabs::Rig>(*m_physics, nickname);
+        rig->setParent(m_workspace.get());
+        m_netRigs[playerId] = std::move(rig);
+        m_instanceManager->markMapDirty();
+    });
+
+    m_client->setPlayerLeftCallback([this](uint32_t playerId) {
+        auto it = m_netRigs.find(playerId);
+
+        if (it != m_netRigs.end() && it->second) {
+            auto& rig = it->second;
+            rig->destroy();
+            m_netRigs.erase(playerId);
+
+            m_instanceManager->markMapDirty();
+        }
+    });
+
+    m_client->setPlayerUpdateCallback([this](const net::packets::RigMoveBroadcastPacket& packet) {
+        auto it = m_netRigs.find(packet.playerId);
+
+        if (it != m_netRigs.end() && it->second) {
+            auto& rig = it->second;
+            rig->move(static_cast<prefabs::Rig::MoveDirection>(packet.direction), packet.cameraPhi);
+            if (packet.jump) {
+                rig->jump();
+            }
+            rig->setPivotPosition(packet.position);
+        }
+    });
 }
 
 void Game::run() {
+    m_client->start();
+
     while (m_window->isOpen()) {
         m_window->update();
         m_scriptEngine->update();
-        m_audioManager->update();
+        // m_audioManager->update();
 
         float dt = m_window->getDeltaTime();
 
+        net::packets::RigMovePacket packet{};
         if (m_window->isKeyPressed(GLFW_KEY_W)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
+            m_localRig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
+            packet.direction = net::packets::RigMoveDirection::Forward;
+            packet.cameraPhi = m_camera->getPhi();
+            packet.position = m_localRig->getPivotPosition();
+            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_S)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
+            m_localRig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
+            packet.direction = net::packets::RigMoveDirection::Backward;
+            packet.cameraPhi = m_camera->getPhi();
+            packet.position = m_localRig->getPivotPosition();
+            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_A)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
+            m_localRig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
+            packet.direction = net::packets::RigMoveDirection::Left;
+            packet.cameraPhi = m_camera->getPhi();
+            packet.position = m_localRig->getPivotPosition();
+            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_D)) {
-            m_rig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
+            m_localRig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
+            packet.direction = net::packets::RigMoveDirection::Right;
+            packet.cameraPhi = m_camera->getPhi();
+            packet.position = m_localRig->getPivotPosition();
+            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
-            m_rig->jump();
+            m_localRig->jump();
+            packet.jump = true;
+            packet.position = m_localRig->getPivotPosition();
+            m_client->sendMovement(packet);
         }
 
         m_physics->step(dt);
 
-        m_rig->update(dt);
-        auto head = m_rig->getHead();
+        m_localRig->update(dt);
+        auto head = m_localRig->getHead();
         if (head) {
             m_camera->target = head->getPosition();
         }
 
-        m_audioManager->moveListener(*m_camera);
+        for (auto& [name, rig] : m_netRigs) {
+            if (rig)
+                rig->update(dt);
+        }
+
+        // m_audioManager->moveListener(*m_camera);
 
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
-                                   ? m_window->getMouseDelta()
-                                   : glm::vec2(0.0f);
+                                    ? m_window->getMouseDelta()
+                                    : glm::vec2(0.0f);
         m_camera->update(
-            glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta, m_window->getScrollDelta());
+            glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta,
+            m_window->getScrollDelta());
 
         if (VkCommandBuffer cmd = m_renderer->beginFrame()) {
             glm::mat4 projection = m_camera->getProjection();

@@ -14,7 +14,12 @@ public:
         glm::quat localOrientation;
     };
 
-    enum class MoveDirection { Forward, Backward, Left, Right };
+    enum class MoveDirection {
+        Forward = 0,
+        Backward = 1,
+        Left = 2,
+        Right = 3
+    };
 
     Rig(physics::Physics& physics, const std::string& name = "Rig");
 
