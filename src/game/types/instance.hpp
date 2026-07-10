@@ -67,13 +67,11 @@ public:
         return nullptr;
     }
 
-    void onChildrenChanged(Callback callback) {
-        m_childrenChangedCallbacks.push_back(callback);
-    }
+    void onChildrenChanged(Callback callback) { m_childrenChangedCallbacks.push_back(callback); }
 
-    void onDestroy(Callback callback) {
-        m_destroyCallbacks.push_back(callback);
-    }
+    void onPropertyChanged(Callback callback) { m_propertyChangedCallbacks.push_back(callback); }
+
+    void onDestroy(Callback callback) { m_destroyCallbacks.push_back(callback); }
 
     void destroy() {
         auto self = shared_from_this();
@@ -94,6 +92,14 @@ public:
         }
     }
 
+protected:
+    void propertyChanged() {
+        auto self = shared_from_this();
+        for (auto& callback : m_propertyChangedCallbacks) {
+            callback(self);
+        }
+    }
+
 private:
     std::string m_name;
     enums::InstanceType m_type;
@@ -102,6 +108,7 @@ private:
     std::vector<std::shared_ptr<Instance>> m_children;
 
     std::vector<Callback> m_childrenChangedCallbacks;
+    std::vector<Callback> m_propertyChangedCallbacks;
     std::vector<Callback> m_destroyCallbacks;
 };
 

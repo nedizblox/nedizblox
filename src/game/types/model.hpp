@@ -18,6 +18,8 @@ public:
         m_pivot = pivot;
 
         updateChildrenTransforms(this, delta);
+
+        propertyChanged();
     }
 
     glm::vec3 getPivotPosition() const { return getPivot()[3]; }

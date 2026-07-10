@@ -13,15 +13,6 @@ Physics::Physics(float gravity) {
 
     m_dynamicsWorld = new btDiscreteDynamicsWorld(m_dispatcher, m_overlappingPairCache, m_solver, m_collisionConfiguration);
     m_dynamicsWorld->setGravity(btVector3(0.0f, gravity, 0.0f));
-
-    auto& info = m_dynamicsWorld->getSolverInfo();
-    info.m_numIterations = 4;
-    info.m_splitImpulse = 1;
-    info.m_splitImpulsePenetrationThreshold = -0.02f;
-    info.m_solverMode &= ~SOLVER_USE_2_FRICTION_DIRECTIONS;
-    info.m_solverMode |= SOLVER_ENABLE_FRICTION_DIRECTION_CACHING;
-    info.m_linearSlop = 0.05f;
-    info.m_warmstartingFactor = 0.85f;
 }
 
 Physics::~Physics() {
@@ -70,18 +61,33 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     btRigidBody::btRigidBodyConstructionInfo ci(mass, motionState, shape, inertia);
     btRigidBody* body = new btRigidBody(ci);
 
-    body->setSleepingThresholds(0.8f, 1.0f);
-    body->setDeactivationTime(0.5f);
+    body->setSleepingThresholds(0.6f, 0.8f);
+    body->setDeactivationTime(0.2f);
 
     m_dynamicsWorld->addRigidBody(body);
 
     part->setRigidBody(body);
+
+    {
+        std::lock_guard<std::mutex> lock(m_bodiesMutex);
+        m_bodies[part->getNetworkId()] = body;
+    }
 
     part->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
         auto obj = std::static_pointer_cast<types::Part>(destroying);
         auto rigidBody = obj->getRigidBody();
 
         m_dynamicsWorld->removeRigidBody(rigidBody);
+
+        {
+            std::lock_guard<std::mutex> lock(m_bodiesMutex);
+            m_bodies.erase(obj->getNetworkId());
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+            m_networkTargets.erase(obj->getNetworkId());
+        }
 
         delete rigidBody->getMotionState();
         delete rigidBody;
@@ -119,18 +125,33 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     btRigidBody::btRigidBodyConstructionInfo ci(mass, motionState, shape, inertia);
     btRigidBody* body = new btRigidBody(ci);
 
-    body->setAngularFactor(btVector3(0.0f, 1.0f, 0.0f));
-    body->setActivationState(DISABLE_DEACTIVATION);
+    body->setSleepingThresholds(0.6f, 0.8f);
+    body->setDeactivationTime(0.2f);
 
     m_dynamicsWorld->addRigidBody(body);
 
     rootPart->setRigidBody(body);
+
+    {
+        std::lock_guard<std::mutex> lock(m_bodiesMutex);
+        m_bodies[rootPart->getNetworkId()] = body;
+    }
 
     rootPart->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
         auto obj = std::static_pointer_cast<types::Part>(destroying);
         auto rigidBody = obj->getRigidBody();
 
         m_dynamicsWorld->removeRigidBody(rigidBody);
+
+        {
+            std::lock_guard<std::mutex> lock(m_bodiesMutex);
+            m_bodies.erase(obj->getNetworkId());
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+            m_networkTargets.erase(obj->getNetworkId());
+        }
 
         delete rigidBody->getMotionState();
         delete rigidBody;
@@ -139,11 +160,137 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     return body;
 }
 
+net::packets::PhysicalObjectState Physics::captureNetworkState(uint32_t networkId, btRigidBody* body) const {
+    net::packets::PhysicalObjectState state{};
+    state.networkId = networkId;
+
+    const btTransform& transform = body->getWorldTransform();
+    const btVector3& origin = transform.getOrigin();
+    btQuaternion rotation = transform.getRotation();
+
+    state.position = glm::vec3(origin.x(), origin.y(), origin.z());
+    state.rotation = glm::quat(rotation.w(), rotation.x(), rotation.y(), rotation.z());
+
+    const btVector3& linearVelocity = body->getLinearVelocity();
+    const btVector3& angularVelocity = body->getAngularVelocity();
+
+    state.linearVelocity = glm::vec3(linearVelocity.x(), linearVelocity.y(), linearVelocity.z());
+    state.angularVelocity = glm::vec3(angularVelocity.x(), angularVelocity.y(), angularVelocity.z());
+
+    return state;
+}
+
+std::vector<uint32_t> Physics::getBodyCollisions(btRigidBody* body) {
+    std::vector<uint32_t> collidedNetworkIds;
+    if (!body)
+        return collidedNetworkIds;
+
+    int numManifolds = m_dynamicsWorld->getDispatcher()->getNumManifolds();
+    for (int i = 0; i < numManifolds; i++) {
+        btPersistentManifold* contactManifold
+            = m_dynamicsWorld->getDispatcher()->getManifoldByIndexInternal(i);
+        if (contactManifold->getNumContacts() == 0)
+            continue;
+
+        const btCollisionObject* objA = contactManifold->getBody0();
+        const btCollisionObject* objB = contactManifold->getBody1();
+
+        if (objA == body || objB == body) {
+            const btCollisionObject* collidedObj = (objA == body) ? objB : objA;
+            const btRigidBody* collidedBody = btRigidBody::upcast(collidedObj);
+
+            if (collidedBody) {
+                for (const auto& [id, body] : m_bodies) {
+                    if (body == collidedBody) {
+                        collidedNetworkIds.push_back(id);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return collidedNetworkIds;
+}
+
+void Physics::applyNetworkState(const net::packets::PhysicalObjectState& state) {
+    std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+    m_networkTargets[state.networkId] = state;
+}
+
+void Physics::stepNetworkInterpolation(float dt) {
+    std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+
+    if (m_networkTargets.empty())
+        return;
+
+    float alpha = 1.0f - glm::exp(-kNetworkInterpolationSpeed * dt);
+
+    for (auto& [id, target] : m_networkTargets) {
+        auto it = m_bodies.find(id);
+        if (it == m_bodies.end() || !it->second)
+            continue;
+
+        btRigidBody* body = it->second;
+
+        if (body->getCollisionFlags() & btCollisionObject::CF_KINEMATIC_OBJECT) {
+            const btTransform& transform = body->getWorldTransform();
+            const btVector3& currentOrigin = transform.getOrigin();
+            btQuaternion currentRotation = transform.getRotation();
+
+            glm::vec3 currentPosition(currentOrigin.x(), currentOrigin.y(), currentOrigin.z());
+            glm::quat currentQuat(
+                currentRotation.w(), currentRotation.x(), currentRotation.y(), currentRotation.z());
+
+            glm::vec3 newPosition = glm::mix(currentPosition, target.position, alpha);
+            glm::quat newRotation = glm::slerp(currentQuat, target.rotation, alpha);
+
+            btTransform newTransform;
+            newTransform.setOrigin(btVector3(newPosition.x, newPosition.y, newPosition.z));
+            newTransform.setRotation(
+                btQuaternion(newRotation.x, newRotation.y, newRotation.z, newRotation.w));
+
+            body->setWorldTransform(newTransform);
+            if (body->getMotionState()) {
+                body->getMotionState()->setWorldTransform(newTransform);
+            }
+        }
+
+        if (!(body->getCollisionFlags() & btCollisionObject::CF_KINEMATIC_OBJECT)) {
+            body->activate(true);
+        }
+    }
+}
+
+void Physics::setBodyNetworkMode(btRigidBody* body, bool isLocalOwner) {
+    if (!body)
+        return;
+
+    int flags = body->getCollisionFlags();
+    bool currentlyKinematic = (flags & btCollisionObject::CF_KINEMATIC_OBJECT) != 0;
+    bool wantKinematic = !isLocalOwner;
+
+    if (currentlyKinematic != wantKinematic) {
+        if (isLocalOwner) {
+            body->setCollisionFlags(flags & ~btCollisionObject::CF_KINEMATIC_OBJECT);
+            body->setActivationState(ACTIVE_TAG);
+        } else {
+            body->setCollisionFlags(flags | btCollisionObject::CF_KINEMATIC_OBJECT);
+            body->setActivationState(DISABLE_SIMULATION);
+        }
+
+        if (m_dynamicsWorld && body->getBroadphaseHandle()) {
+            m_dynamicsWorld->getBroadphase()->getOverlappingPairCache()->cleanProxyFromPairs(
+                body->getBroadphaseHandle(), m_dynamicsWorld->getDispatcher());
+        }
+    }
+}
+
 void Physics::step(float deltaTime) {
     if (deltaTime > 0.1f)
         deltaTime = 0.1f;
 
-    m_dynamicsWorld->stepSimulation(deltaTime, 1, 1.0f / 60.0f);
+    m_dynamicsWorld->stepSimulation(deltaTime, 5, 1.0f / 60.0f);
 }
 
 } // namespace game::physics

@@ -128,14 +128,28 @@ bool Rig::isGrounded() {
     btTransform trans = m_rigidBody->getWorldTransform();
     btVector3 start = trans.getOrigin();
 
-    btVector3 end = start + btVector3(0.0f, -3.1f, 0.0f);
+    btSphereShape castShape(0.8f);
 
-    btCollisionWorld::ClosestRayResultCallback rayCallback(start, end);
+    btTransform castStart = trans;
+    btTransform castEnd = trans;
 
-    m_physics.getDynamicsWorld()->rayTest(start, end, rayCallback);
+    castEnd.setOrigin(start + btVector3(0.0f, -2.4f, 0.0f));
 
-    if (rayCallback.hasHit()) {
-        if (rayCallback.m_collisionObject != m_rigidBody) {
+    btCollisionWorld::ClosestConvexResultCallback convexCallback(start, castEnd.getOrigin());
+
+    if (m_rigidBody->getBroadphaseProxy()) {
+        convexCallback.m_collisionFilterGroup = m_rigidBody->getBroadphaseProxy()->m_collisionFilterGroup;
+        convexCallback.m_collisionFilterMask = m_rigidBody->getBroadphaseProxy()->m_collisionFilterMask;
+    }
+
+    m_physics.getDynamicsWorld()->convexSweepTest(&castShape, castStart, castEnd, convexCallback);
+
+    if (convexCallback.hasHit()) {
+        if (convexCallback.m_hitCollisionObject != m_rigidBody) {
+            if (convexCallback.m_hitNormalWorld.y() < 0.5f) {
+                return false;
+            }
+
             return true;
         }
     }
@@ -152,7 +166,7 @@ void Rig::update(float deltaTime) {
 
     if (glm::length(m_velocity) > 0.01f) {
         glm::vec3 finalVelocity = glm::normalize(m_velocity) * m_walkSpeed;
-        
+
         m_rigidBody->setLinearVelocity(btVector3(finalVelocity.x, currentVelocity.y(), finalVelocity.z));
 
         float targetAngle = std::atan2(m_velocity.x, m_velocity.z);
@@ -172,6 +186,8 @@ void Rig::update(float deltaTime) {
         m_rigidBody->activate(true);
     } else {
         m_rigidBody->setLinearVelocity(btVector3(0.0f, currentVelocity.y(), 0.0f));
+
+        m_rigidBody->activate(true);
     }
 
     btVector3 origin = trans.getOrigin();

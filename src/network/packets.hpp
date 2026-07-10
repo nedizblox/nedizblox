@@ -1,18 +1,13 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <cstdint>
 
 namespace net::packets {
 
-enum class RigMoveDirection : uint8_t {
-    Forward = 0,
-    Backward = 1,
-    Left = 2,
-    Right = 3,
-    None = 4
-};
+enum class PartShape : uint8_t { Ball = 0, Block = 1 };
 
 #pragma pack(push, 1)
 
@@ -53,26 +48,38 @@ struct TcpMessageHeader {
     uint32_t size = 0;
 };
 
+struct MapPartInfo {
+    uint32_t networkId = 0;
+    glm::vec3 position{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 size{4.0f, 1.0f, 2.0f};
+    glm::u8vec3 color{160, 165, 169};
+    float transparency = 0.0f;
+    bool anchored = false;
+    PartShape shape = PartShape::Block;
+};
+
+struct InitialMapPacket {
+    uint32_t partCount = 0;
+};
+
 // UDP
 
 struct ClientUdpConnectPacket {
     uint32_t playerId = 0;
 };
 
-struct RigMovePacket {
-    uint32_t playerId = 0;
-    RigMoveDirection direction = RigMoveDirection::None;
-    bool jump = false;
-    float cameraPhi = 0.0f;
+struct PhysicalObjectState {
+    uint32_t networkId = 0;
     glm::vec3 position{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 linearVelocity{0.0f};
+    glm::vec3 angularVelocity{0.0f};
 };
 
-struct RigMoveBroadcastPacket {
-    uint32_t playerId = 0;
-    RigMoveDirection direction = RigMoveDirection::None;
-    bool jump = false;
-    float cameraPhi = 0.0f;
-    glm::vec3 position{0.0f};
+struct PhysicsStepPacket {
+    uint32_t senderPlayerId = 0;
+    uint32_t objectCount = 0;
 };
 
 #pragma pack(pop)

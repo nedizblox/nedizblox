@@ -28,7 +28,13 @@ Game::Game(const std::string& server, uint16_t port, const std::string& nickname
     } catch (const std::exception& e) { throw; }
 }
 
-Game::~Game() {}
+Game::~Game() {
+    if (m_client) {
+        m_client->stop();
+    }
+
+    m_networkParts.clear();
+}
 
 void Game::initWindow() {
     m_window = std::make_unique<win::Window>(1250, 800, "Nedizblox");
@@ -152,7 +158,32 @@ void Game::createDebugUi() {
 }
 
 void Game::createClient(const std::string& server, uint16_t port, const std::string& nickname) {
-    m_client = std::make_unique<net::Client>(m_ioContext, server, port, port + 1, nickname);
+    m_client = std::make_unique<net::Client>(server, port, port + 1, nickname);
+
+    m_client->setMapCallback([this](const std::vector<net::packets::MapPartInfo>& parts) {
+        for (const auto& info : parts) {
+            auto part = std::make_shared<types::Part>();
+            part->setNetworkId(info.networkId);
+            part->setPosition(info.position);
+            part->setOrientation(info.rotation);
+            part->setSize(info.size);
+            part->setColor(info.color);
+            part->setTransparency(info.transparency);
+            part->setAnchored(info.anchored);
+            part->setShape(static_cast<enums::PartType>(info.shape));
+
+            btRigidBody* rigidBody = m_physics->createRigidBodyPart(part.get());
+            m_physics->setBodyNetworkMode(rigidBody, false);
+
+            part->setRigidBody(rigidBody);
+
+            part->setParent(m_workspace.get());
+
+            m_networkParts[info.networkId] = std::move(part);
+        }
+
+        m_instanceManager->markMapDirty();
+    });
 
     m_client->setOldPlayersCallback([this](uint32_t playerId, const std::string& nickname, const glm::vec3& position) {
         if (playerId == m_client->getPlayerId())
@@ -162,7 +193,7 @@ void Game::createClient(const std::string& server, uint16_t port, const std::str
         rig->setParent(m_workspace.get());
         rig->setPivotPosition(position);
 
-        m_netRigs[playerId] = std::move(rig);
+        m_networkRigs[playerId] = std::move(rig);
         m_instanceManager->markMapDirty();
     });
 
@@ -172,34 +203,78 @@ void Game::createClient(const std::string& server, uint16_t port, const std::str
 
         std::shared_ptr<prefabs::Rig> rig = std::make_shared<prefabs::Rig>(*m_physics, nickname);
         rig->setParent(m_workspace.get());
-        m_netRigs[playerId] = std::move(rig);
+        m_networkRigs[playerId] = std::move(rig);
         m_instanceManager->markMapDirty();
     });
 
     m_client->setPlayerLeftCallback([this](uint32_t playerId) {
-        auto it = m_netRigs.find(playerId);
+        auto it = m_networkRigs.find(playerId);
 
-        if (it != m_netRigs.end() && it->second) {
+        if (it != m_networkRigs.end() && it->second) {
             auto& rig = it->second;
             rig->destroy();
-            m_netRigs.erase(playerId);
+            m_networkRigs.erase(playerId);
 
             m_instanceManager->markMapDirty();
         }
     });
 
-    m_client->setPlayerUpdateCallback([this](const net::packets::RigMoveBroadcastPacket& packet) {
-        auto it = m_netRigs.find(packet.playerId);
+    m_client->setPhysicsUpdateCallback(
+        [this](uint32_t senderPlayerId, const std::vector<net::packets::PhysicalObjectState>& objects) {
+            for (const auto& object : objects) {
+                btRigidBody* body = nullptr;
 
-        if (it != m_netRigs.end() && it->second) {
-            auto& rig = it->second;
-            rig->move(static_cast<prefabs::Rig::MoveDirection>(packet.direction), packet.cameraPhi);
-            if (packet.jump) {
-                rig->jump();
+                if (auto rigIt = m_networkRigs.find(object.networkId);
+                    rigIt != m_networkRigs.end() && rigIt->second) {
+                    body = rigIt->second->getRigidBody();
+                } else if (
+                    auto partIt = m_networkParts.find(object.networkId);
+                    partIt != m_networkParts.end() && partIt->second) {
+                    body = partIt->second->getRigidBody();
+                }
+
+                if (body)
+                    m_physics->applyNetworkState(object);
             }
-            rig->setPivotPosition(packet.position);
+        });
+}
+
+void Game::sendLocalPhysicsState() {
+    btRigidBody* playerBody = m_localRig->getRigidBody();
+
+    if (playerBody) {
+        std::vector<uint32_t> touchedIds = m_physics->getBodyCollisions(playerBody);
+        for (uint32_t netId : touchedIds) {
+            auto it = m_networkParts.find(netId);
+            if (it != m_networkParts.end() && it->second && !it->second->getAnchored()) {
+                btRigidBody* b = it->second->getRigidBody();
+                m_physics->setBodyNetworkMode(b, true);
+            }
         }
-    });
+    }
+
+    constexpr float kReleaseDistanceSq = 15.0f * 15.0f;
+
+    for (const auto& [networkId, part] : m_networkParts) {
+        if (!part || part->getAnchored())
+            continue;
+
+        btRigidBody* body = part->getRigidBody();
+        if (!body)
+            continue;
+
+        bool isKinematic = (body->getCollisionFlags() & btCollisionObject::CF_KINEMATIC_OBJECT) != 0;
+
+        if (!isKinematic && !body->isActive()) {
+            btVector3 btPos = body->getWorldTransform().getOrigin();
+            float distSq = glm::distance2(
+                m_localRig->getPivotPosition(), glm::vec3(btPos.x(), btPos.y(), btPos.z()));
+
+            if (distSq > kReleaseDistanceSq) {
+                m_physics->setBodyNetworkMode(body, false);
+            }
+        }
+    }
 }
 
 void Game::run() {
@@ -212,43 +287,26 @@ void Game::run() {
 
         float dt = m_window->getDeltaTime();
 
-        net::packets::RigMovePacket packet{};
         if (m_window->isKeyPressed(GLFW_KEY_W)) {
             m_localRig->move(prefabs::Rig::MoveDirection::Forward, m_camera->getPhi());
-            packet.direction = net::packets::RigMoveDirection::Forward;
-            packet.cameraPhi = m_camera->getPhi();
-            packet.position = m_localRig->getPivotPosition();
-            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_S)) {
             m_localRig->move(prefabs::Rig::MoveDirection::Backward, m_camera->getPhi());
-            packet.direction = net::packets::RigMoveDirection::Backward;
-            packet.cameraPhi = m_camera->getPhi();
-            packet.position = m_localRig->getPivotPosition();
-            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_A)) {
             m_localRig->move(prefabs::Rig::MoveDirection::Left, m_camera->getPhi());
-            packet.direction = net::packets::RigMoveDirection::Left;
-            packet.cameraPhi = m_camera->getPhi();
-            packet.position = m_localRig->getPivotPosition();
-            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_D)) {
             m_localRig->move(prefabs::Rig::MoveDirection::Right, m_camera->getPhi());
-            packet.direction = net::packets::RigMoveDirection::Right;
-            packet.cameraPhi = m_camera->getPhi();
-            packet.position = m_localRig->getPivotPosition();
-            m_client->sendMovement(packet);
         }
         if (m_window->isKeyPressed(GLFW_KEY_SPACE)) {
             m_localRig->jump();
-            packet.jump = true;
-            packet.position = m_localRig->getPivotPosition();
-            m_client->sendMovement(packet);
         }
 
+        sendLocalPhysicsState();
+
         m_physics->step(dt);
+        m_physics->stepNetworkInterpolation(dt);
 
         m_localRig->update(dt);
         auto head = m_localRig->getHead();
@@ -256,7 +314,7 @@ void Game::run() {
             m_camera->target = head->getPosition();
         }
 
-        for (auto& [name, rig] : m_netRigs) {
+        for (auto& [name, rig] : m_networkRigs) {
             if (rig)
                 rig->update(dt);
         }
@@ -264,11 +322,10 @@ void Game::run() {
         // m_audioManager->moveListener(*m_camera);
 
         glm::vec2 mouseDelta = m_window->isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)
-                                    ? m_window->getMouseDelta()
-                                    : glm::vec2(0.0f);
+                                   ? m_window->getMouseDelta()
+                                   : glm::vec2(0.0f);
         m_camera->update(
-            glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta,
-            m_window->getScrollDelta());
+            glm::radians(85.0f), m_window->getAspect(), 0.1f, 1000.0f, mouseDelta, m_window->getScrollDelta());
 
         if (VkCommandBuffer cmd = m_renderer->beginFrame()) {
             glm::mat4 projection = m_camera->getProjection();

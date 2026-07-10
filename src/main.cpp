@@ -27,7 +27,6 @@ int main(int argc, char* argv[]) {
             }
 
             game = std::make_unique<game::Game>(address, port, nickname);
-            game->buildMap("assets/maps/crossroads.rbxl");
         } else {
             throw std::runtime_error("Please specify the server address, port and your nickname using the --address, --port and --nickname argument");
         }

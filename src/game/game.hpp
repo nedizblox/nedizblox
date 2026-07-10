@@ -1,9 +1,9 @@
 #pragma once
 
 #include "audio/audio.hpp"
-#include "network/network.hpp"
 #include "core/core.hpp"
 #include "graphics/graphics.hpp"
+#include "network/network.hpp"
 
 #include "prefabs/prefabs.hpp"
 #include "types/types.hpp"
@@ -25,7 +25,7 @@ public:
     Game(const Game&) = delete;
     Game& operator=(const Game&) = delete;
 
-    void buildMap(const std::string& rbxlPath);
+    void buildMap(const std::string& rbxlPath); // for map redacting
 
     void run();
 
@@ -48,7 +48,6 @@ private:
     std::unique_ptr<engines::RenderEngine> m_renderEngine;
     std::unique_ptr<engines::ScriptEngine> m_scriptEngine;
 
-    boost::asio::io_context m_ioContext;
     std::unique_ptr<net::Client> m_client;
 
     std::unique_ptr<gfx::Skybox> m_skybox;
@@ -58,9 +57,11 @@ private:
     std::unique_ptr<physics::Physics> m_physics;
     std::shared_ptr<types::Workspace> m_workspace;
     std::shared_ptr<types::CoreGui> m_coreGui;
-    
+
     std::shared_ptr<prefabs::Rig> m_localRig;
-    std::unordered_map<uint32_t, std::shared_ptr<prefabs::Rig>> m_netRigs;
+    std::unordered_map<uint32_t, std::shared_ptr<prefabs::Rig>> m_networkRigs;
+
+    std::unordered_map<uint32_t, std::shared_ptr<types::Part>> m_networkParts;
 
     std::shared_ptr<types::Text> m_fps;
 
@@ -79,6 +80,8 @@ private:
     void createDebugUi();
 
     void createClient(const std::string& server, uint16_t port, const std::string& nickname);
+
+    void sendLocalPhysicsState();
 };
 
 } // namespace game

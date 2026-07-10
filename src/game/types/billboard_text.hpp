@@ -8,19 +8,32 @@ namespace game::types {
 
 class BillboardText : public Instance {
 public:
-    BillboardText(const std::string& name = "BillboardText") : Instance(enums::InstanceType::BillboardText, name) {}
+    BillboardText(const std::string& name = "BillboardText") :
+        Instance(enums::InstanceType::BillboardText, name) {}
 
     glm::vec3 getPosition() const { return m_position; }
-    void setPosition(const glm::vec3& position) { m_position = position; }
+    void setPosition(const glm::vec3& position) {
+        m_position = position;
+        propertyChanged();
+    }
 
     glm::vec3 getOffset() const { return m_offset; }
-    void setOffset(const glm::vec3& offset) { m_offset = offset; }
+    void setOffset(const glm::vec3& offset) {
+        m_offset = offset;
+        propertyChanged();
+    }
 
     glm::vec2 getScale() const { return m_scale; }
-    void setScale(const glm::vec2& scale) { m_scale = scale; }
+    void setScale(const glm::vec2& scale) {
+        m_scale = scale;
+        propertyChanged();
+    }
 
     std::string getText() const { return m_text; }
-    void setText(const std::string& text) { m_text = text; }
+    void setText(const std::string& text) {
+        m_text = text;
+        propertyChanged();
+    }
 
 private:
     glm::vec3 m_position{0.0f};

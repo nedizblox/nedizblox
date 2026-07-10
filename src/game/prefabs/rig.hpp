@@ -25,6 +25,8 @@ public:
 
     std::shared_ptr<types::Part> getHead() const { return m_head; }
 
+    btRigidBody* getRigidBody() const { return m_rigidBody; }
+
     float getWalkSpeed() const { return m_walkSpeed; }
     void setWalkSpeed(float walkSpeed) { m_walkSpeed = walkSpeed; }
 

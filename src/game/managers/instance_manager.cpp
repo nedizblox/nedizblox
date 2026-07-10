@@ -1,5 +1,7 @@
 #include "instance_manager.hpp"
 
+#include <algorithm>
+
 namespace game::mngrs {
 
 InstanceManager::InstanceManager() {}
@@ -46,7 +48,8 @@ void InstanceManager::collectMapInstances(
             auto part = std::static_pointer_cast<types::Part>(obj);
 
             float transparency = part->getTransparency();
-            if (transparency == 1.0f) continue;
+            if (transparency == 1.0f)
+                continue;
 
             enums::PartType shape = part->getShape();
 
@@ -101,9 +104,48 @@ void InstanceManager::collectMapInstances(
             vec.push_back(
                 {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha), texture, texTile});
 
+            size_t instanceIndex = vec.size() - 1;
+
             if (!part->getAnchored()) {
-                m_partDynamicTargets.push_back({part, bucket, vec.size() - 1});
+                m_partDynamicTargets.push_back({part, bucket, instanceIndex});
             }
+
+            part->onPropertyChanged([this, bucket, instanceIndex](std::shared_ptr<types::Instance> updated) {
+                auto part = std::static_pointer_cast<types::Part>(updated);
+
+                if (part->getAnchored() && m_modelInstancesData.contains(bucket)
+                    && instanceIndex < m_modelInstancesData[bucket].size()) {
+                    float transparency = part->getTransparency();
+                    float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
+
+                    auto& renderData = m_modelInstancesData[bucket][instanceIndex];
+                    renderData.model = part->getModelMatrix();
+                    renderData.color = glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha);
+                }
+
+                if (part->getAnchored()) {
+                    auto it = std::find_if(
+                        m_partDynamicTargets.begin(), m_partDynamicTargets.end(),
+                        [&part](const auto& target) { return target.obj == part; });
+
+                    if (it != m_partDynamicTargets.end()) {
+                        m_partDynamicTargets.erase(it);
+                    }
+
+                    if (m_modelInstancesData.contains(bucket)
+                        && instanceIndex < m_modelInstancesData[bucket].size()) {
+                        m_modelInstancesData[bucket][instanceIndex].model = part->getModelMatrix();
+                    }
+                } else {
+                    auto it = std::find_if(
+                        m_partDynamicTargets.begin(), m_partDynamicTargets.end(),
+                        [&part](const auto& target) { return target.obj == part; });
+
+                    if (it == m_partDynamicTargets.end()) {
+                        m_partDynamicTargets.push_back({part, bucket, instanceIndex});
+                    }
+                }
+            });
         } else if (type == enums::InstanceType::BillboardText) {
             auto billbText = std::static_pointer_cast<types::BillboardText>(obj);
 
@@ -167,7 +209,13 @@ void InstanceManager::updateDynamicTransforms() {
             continue;
         }
 
-        m_modelInstancesData[target.bucketName][target.index].model = target.obj->getModelMatrix();
+        float transparency = target.obj->getTransparency();
+        float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
+
+        auto& instances = m_modelInstancesData[target.bucketName][target.index];
+        instances.model = target.obj->getModelMatrix();
+        instances.color = glm::vec4(glm::vec3(target.obj->getColor()) / 255.0f, alpha);
+
         i++;
     }
 

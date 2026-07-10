@@ -20,18 +20,21 @@ public:
     void setPosition(const glm::vec3& position) {
         m_position = position;
         updateModelMatrix();
+        propertyChanged();
     }
 
     glm::quat getOrientation() const { return m_orientation; }
     void setOrientation(const glm::quat& orientation) {
         m_orientation = orientation;
         updateModelMatrix();
+        propertyChanged();
     }
 
     glm::vec3 getSize() const { return m_size; }
     void setSize(const glm::vec3& size) {
         m_size = size;
         updateModelMatrix();
+        propertyChanged();
     }
 
     glm::mat4 getModelMatrix() const { return m_modelMatrix; }
@@ -46,21 +49,34 @@ public:
     }
 
     glm::u8vec3 getColor() const { return m_color; }
-    void setColor(const glm::u8vec3& color) { m_color = color; }
+    void setColor(const glm::u8vec3& color) {
+        m_color = color;
+        propertyChanged();
+    }
 
     float getTransparency() const { return m_transparency; }
     void setTransparency(float transparency) {
         m_transparency = std::clamp(transparency, 0.0f, 1.0f);
+        propertyChanged();
     }
 
     bool getAnchored() const { return m_anchored; }
-    void setAnchored(bool anchored) { m_anchored = anchored; }
+    void setAnchored(bool anchored) {
+        m_anchored = anchored;
+        propertyChanged();
+    }
 
     enums::PartType getShape() const { return m_shape; }
-    void setShape(enums::PartType shape) { m_shape = shape; }
+    void setShape(enums::PartType shape) {
+        m_shape = shape;
+        propertyChanged();
+    }
 
     btRigidBody* getRigidBody() const { return m_rigidBody; }
     void setRigidBody(btRigidBody* rigidBody) { m_rigidBody = rigidBody; }
+
+    uint32_t getNetworkId() const { return m_networkId; }
+    void setNetworkId(uint32_t networkId) { m_networkId = networkId; }
 
 private:
     glm::vec3 m_position{0.0f};
@@ -77,6 +93,7 @@ private:
     enums::PartType m_shape = enums::PartType::Block;
 
     btRigidBody* m_rigidBody = nullptr;
+    uint32_t m_networkId = 0;
 };
 
 } // namespace game::types
