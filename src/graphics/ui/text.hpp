@@ -16,7 +16,7 @@ namespace gfx::ui {
 class Text {
 public:
     struct Vertex {
-        glm::vec2 position;
+        glm::vec2 position{};
 
         static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
         static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();

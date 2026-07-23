@@ -4,12 +4,13 @@
 
 namespace game::mngrs {
 
-InstanceManager::InstanceManager() {}
+InstanceManager::InstanceManager(AssetManager& assetManager) : m_assetManager(assetManager) {}
 
 InstanceManager::~InstanceManager() {}
 
 void InstanceManager::rebuildMap(
-    const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId) {
+    const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t inletsTexId,
+    uint32_t smoothTexId, uint32_t glueTexId) {
     for (auto& [name, vec] : m_modelInstancesData) {
         vec.clear();
     }
@@ -20,7 +21,7 @@ void InstanceManager::rebuildMap(
     m_partDynamicTargets.clear();
     m_billbTextDynamicTargets.clear();
 
-    collectMapInstances(root, studsTexId, smoothTexId, faceTexId);
+    collectMapInstances(root, studsTexId, inletsTexId, smoothTexId, glueTexId);
 
     m_mapHierarchyDirty = false;
 }
@@ -38,7 +39,8 @@ void InstanceManager::rebuildGui(const std::shared_ptr<types::Instance>& root) {
 }
 
 void InstanceManager::collectMapInstances(
-    const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId) {
+    const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t inletsTexId,
+    uint32_t smoothTexId, uint32_t glueTexId) {
     if (!parent)
         return;
 
@@ -53,17 +55,64 @@ void InstanceManager::collectMapInstances(
 
             enums::PartType shape = part->getShape();
 
-            uint32_t texture = 0;
+            auto getTex = [&](enums::SurfaceType surface) -> uint32_t {
+                switch (surface) {
+                case enums::SurfaceType::Studs:
+                    return studsTexId;
+                case enums::SurfaceType::Inlets:
+                    return inletsTexId;
+                case enums::SurfaceType::Smooth:
+                    return smoothTexId;
+                case enums::SurfaceType::Glue:
+                    return glueTexId;
+                }
+            };
+
+            glm::uvec3 textures1{};
+            glm::uvec3 textures2{};
             if (shape == enums::PartType::Block) {
-                texture = studsTexId;
-            } else if (shape == enums::PartType::Ball) {
-                texture = smoothTexId;
-            } else if (shape == enums::PartType::Head) {
-                texture = faceTexId;
+                textures1
+                    = {getTex(part->getSurfaceLeft()), getTex(part->getSurfaceRight()),
+                       getTex(part->getSurfaceTop())};
+                textures2
+                    = {getTex(part->getSurfaceBottom()), getTex(part->getSurfaceFront()),
+                       getTex(part->getSurfaceBack())};
+            } else {
+                textures1 = {smoothTexId, smoothTexId, smoothTexId};
+                textures2 = {smoothTexId, smoothTexId, smoothTexId};
             }
 
-            glm::vec2 texTile
-                = (shape == enums::PartType::Head) ? glm::vec2(1.0f, 0.0f) : glm::vec2(1.0f, 1.0f);
+            glm::vec2 texTile{1.0f, 1.0f};
+            auto decal = part->findFirstChildOfClass<types::Decal>();
+            if (decal) {
+                texTile = glm::vec2(1.0f, 0.0f);
+
+                uint32_t texId = 0;
+                try {
+                    texId = m_assetManager.getTextureId(decal->getSource());
+                } catch (const std::exception& e) {}
+
+                switch (decal->getFace()) {
+                case enums::Face::Left:
+                    textures1.x = texId;
+                    break;
+                case enums::Face::Right:
+                    textures1.y = texId;
+                    break;
+                case enums::Face::Top:
+                    textures1.z = texId;
+                    break;
+                case enums::Face::Bottom:
+                    textures2.x = texId;
+                    break;
+                case enums::Face::Front:
+                    textures2.y = texId;
+                    break;
+                case enums::Face::Back:
+                    textures2.z = texId;
+                    break;
+                }
+            }
 
             std::string bucket = "";
             if (transparency <= 0.0f) {
@@ -102,54 +151,43 @@ void InstanceManager::collectMapInstances(
 
             auto& vec = m_modelInstancesData[bucket];
             vec.push_back(
-                {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha), texture, texTile});
+                {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha),
+                 textures1, textures2, texTile});
 
             size_t instanceIndex = vec.size() - 1;
 
             if (!part->getAnchored()) {
                 m_partDynamicTargets.push_back({part, bucket, instanceIndex});
-            }
 
-            part->onPropertyChanged([this, bucket, instanceIndex](std::shared_ptr<types::Instance> updated) {
-                auto part = std::static_pointer_cast<types::Part>(updated);
+                part->onDestroy(
+                    [this](std::shared_ptr<types::Instance> destroyed) { markMapDirty(); });
+            } else {
+                part->onPropertyChanged([this, bucket, instanceIndex](std::shared_ptr<types::Instance> updated) {
+                    auto part = std::static_pointer_cast<types::Part>(updated);
 
-                if (part->getAnchored() && m_modelInstancesData.contains(bucket)
-                    && instanceIndex < m_modelInstancesData[bucket].size()) {
-                    float transparency = part->getTransparency();
-                    float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
-
-                    auto& renderData = m_modelInstancesData[bucket][instanceIndex];
-                    renderData.model = part->getModelMatrix();
-                    renderData.color = glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha);
-                }
-
-                if (part->getAnchored()) {
-                    auto it = std::find_if(
-                        m_partDynamicTargets.begin(), m_partDynamicTargets.end(),
-                        [&part](const auto& target) { return target.obj == part; });
-
-                    if (it != m_partDynamicTargets.end()) {
-                        m_partDynamicTargets.erase(it);
-                    }
-
-                    if (m_modelInstancesData.contains(bucket)
+                    if (part->getAnchored() && m_modelInstancesData.contains(bucket)
                         && instanceIndex < m_modelInstancesData[bucket].size()) {
-                        m_modelInstancesData[bucket][instanceIndex].model = part->getModelMatrix();
-                    }
-                } else {
-                    auto it = std::find_if(
-                        m_partDynamicTargets.begin(), m_partDynamicTargets.end(),
-                        [&part](const auto& target) { return target.obj == part; });
+                        float transparency = part->getTransparency();
+                        float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
 
-                    if (it == m_partDynamicTargets.end()) {
-                        m_partDynamicTargets.push_back({part, bucket, instanceIndex});
+                        auto& renderData = m_modelInstancesData[bucket][instanceIndex];
+                        renderData.model = part->getModelMatrix();
+                        renderData.color = glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha);
                     }
-                }
-            });
+                });
+            }
         } else if (type == enums::InstanceType::BillboardText) {
             auto billbText = std::static_pointer_cast<types::BillboardText>(obj);
 
-            std::string bucket = "nunito";
+            std::string bucket;
+            switch (billbText->getTextFont()) {
+            case enums::TextFont::Nunito:
+                bucket = "nunito";
+                break;
+            case enums::TextFont::Arial:
+                bucket = "arial";
+                break;
+            }
 
             auto& vec = m_billbTextInstancesContent[bucket];
             vec.push_back({billbText->getText(), billbText->getPosition(), billbText->getScale()});
@@ -157,7 +195,7 @@ void InstanceManager::collectMapInstances(
             m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1});
         }
 
-        collectMapInstances(obj, studsTexId, smoothTexId, faceTexId);
+        collectMapInstances(obj, studsTexId, inletsTexId, smoothTexId, glueTexId);
     }
 }
 
@@ -170,7 +208,15 @@ void InstanceManager::collectGuiInstances(const std::shared_ptr<types::Instance>
         if (type == enums::InstanceType::Text) {
             auto text = std::static_pointer_cast<types::Text>(obj);
 
-            std::string bucket = "nunito";
+            std::string bucket;
+            switch (text->getTextFont()) {
+            case enums::TextFont::Nunito:
+                bucket = "nunito";
+                break;
+            case enums::TextFont::Arial:
+                bucket = "arial";
+                break;
+            }
 
             auto& vec = m_textInstancesContent[bucket];
             vec.push_back({text->getText(), text->getPosition(), text->getScale()});
@@ -195,28 +241,13 @@ void InstanceManager::sortInstances(const glm::vec3& cameraPos, std::vector<gfx:
 }
 
 void InstanceManager::updateDynamicTransforms() {
-    for (size_t i = 0; i < m_partDynamicTargets.size();) {
-        const auto& target = m_partDynamicTargets[i];
-
-        glm::vec3 position = target.obj->getPosition();
-        if (position.y < -1000.0f) {
-            target.obj->destroy();
-
-            m_mapHierarchyDirty = true;
-
-            m_partDynamicTargets.erase(m_partDynamicTargets.begin() + i);
-
-            continue;
-        }
-
+    for (const auto& target : m_partDynamicTargets) {
         float transparency = target.obj->getTransparency();
         float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
 
         auto& instances = m_modelInstancesData[target.bucketName][target.index];
         instances.model = target.obj->getModelMatrix();
         instances.color = glm::vec4(glm::vec3(target.obj->getColor()) / 255.0f, alpha);
-
-        i++;
     }
 
     for (const auto& target : m_billbTextDynamicTargets) {

@@ -2,6 +2,8 @@
 
 #include "../types/types.hpp"
 
+#include "asset_manager.hpp"
+
 #include "graphics/graphics.hpp"
 
 #include <memory>
@@ -12,13 +14,15 @@ namespace game::mngrs {
 
 class InstanceManager {
 public:
-    InstanceManager();
+    InstanceManager(AssetManager& assetManager);
     ~InstanceManager();
 
     InstanceManager(const InstanceManager&) = delete;
     InstanceManager& operator=(const InstanceManager&) = delete;
 
-    void rebuildMap(const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId);
+    void rebuildMap(
+        const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t inletsTexId,
+        uint32_t smoothTexId, uint32_t glueTexId);
     void rebuildGui(const std::shared_ptr<types::Instance>& root);
 
     void updateDynamicTransforms();
@@ -46,6 +50,8 @@ public:
     bool isGuiDirty() const { return m_guiHierarchyDirty; }
 
 private:
+    AssetManager& m_assetManager;
+
     template <typename T>
     struct DynamicTarget {
         std::shared_ptr<T> obj;
@@ -65,7 +71,9 @@ private:
     bool m_mapHierarchyDirty = true;
     bool m_guiHierarchyDirty = true;
 
-    void collectMapInstances(const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t smoothTexId, uint32_t faceTexId);
+    void collectMapInstances(
+        const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t inletsTexId,
+        uint32_t smoothTexId, uint32_t glueTexId);
     void collectGuiInstances(const std::shared_ptr<types::Instance>& parent);
 
     void sortInstances(const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances);

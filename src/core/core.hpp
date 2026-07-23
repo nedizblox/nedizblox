@@ -5,8 +5,6 @@
 
 #include "args_parser.hpp"
 
-#include "hash.hpp"
-
 #include "camera.hpp"
 
 #include "msgbox.hpp"

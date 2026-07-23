@@ -3,8 +3,6 @@
 #include "vk/buffer.hpp"
 #include "vk/device.hpp"
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
 #include <memory>
@@ -36,7 +34,8 @@ public:
     struct InstanceData {
         glm::mat4 model;
         glm::vec4 color;
-        uint32_t texIndex;
+        glm::uvec3 texIndices1;
+        glm::uvec3 texIndices2;
         glm::vec2 texTile;
     };
 

@@ -72,6 +72,42 @@ public:
         propertyChanged();
     }
 
+    enums::SurfaceType getSurfaceTop() const { return m_surfaceTop; }
+    void setSurfaceTop(enums::SurfaceType surface) {
+        m_surfaceTop = surface;
+        propertyChanged();
+    }
+
+    enums::SurfaceType getSurfaceBottom() const { return m_surfaceBottom; }
+    void setSurfaceBottom(enums::SurfaceType surface) {
+        m_surfaceBottom = surface;
+        propertyChanged();
+    }
+
+    enums::SurfaceType getSurfaceLeft() const { return m_surfaceLeft; }
+    void setSurfaceLeft(enums::SurfaceType surface) {
+        m_surfaceLeft = surface;
+        propertyChanged();
+    }
+
+    enums::SurfaceType getSurfaceRight() const { return m_surfaceRight; }
+    void setSurfaceRight(enums::SurfaceType surface) {
+        m_surfaceRight = surface;
+        propertyChanged();
+    }
+
+    enums::SurfaceType getSurfaceFront() const { return m_surfaceFront; }
+    void setSurfaceFront(enums::SurfaceType surface) {
+        m_surfaceFront = surface;
+        propertyChanged();
+    }
+
+    enums::SurfaceType getSurfaceBack() const { return m_surfaceBack; }
+    void setSurfaceBack(enums::SurfaceType surface) {
+        m_surfaceBack = surface;
+        propertyChanged();
+    }
+
     btRigidBody* getRigidBody() const { return m_rigidBody; }
     void setRigidBody(btRigidBody* rigidBody) { m_rigidBody = rigidBody; }
 
@@ -91,6 +127,13 @@ private:
     bool m_anchored = false;
 
     enums::PartType m_shape = enums::PartType::Block;
+
+    enums::SurfaceType m_surfaceTop = enums::SurfaceType::Studs;
+    enums::SurfaceType m_surfaceBottom = enums::SurfaceType::Inlets;
+    enums::SurfaceType m_surfaceLeft = enums::SurfaceType::Smooth;
+    enums::SurfaceType m_surfaceRight = enums::SurfaceType::Smooth;
+    enums::SurfaceType m_surfaceFront = enums::SurfaceType::Smooth;
+    enums::SurfaceType m_surfaceBack = enums::SurfaceType::Smooth;
 
     btRigidBody* m_rigidBody = nullptr;
     uint32_t m_networkId = 0;

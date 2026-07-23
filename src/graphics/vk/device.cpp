@@ -74,9 +74,10 @@ void Device::createInstance() {
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Nedizblox";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.applicationVersion
+        = VK_MAKE_VERSION(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_PATCH);
     appInfo.pEngineName = "No Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.engineVersion = VK_MAKE_VERSION(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_PATCH);
     appInfo.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo createInfo{};
@@ -138,14 +139,15 @@ void Device::pickPhysicalDevice() {
         throw std::runtime_error("Vulkan: Failed to find a suitable GPU");
     }
 
-    vkGetPhysicalDeviceProperties(m_physicalDevice, &properties);
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
 
-    core::logger::info(std::format("Using GPU {}", properties.deviceName));
+    core::logger::info(std::format("Using GPU {}", m_deviceProperties.deviceName));
 
     core::logger::info(
         std::format(
-            "Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(properties.apiVersion),
-            VK_API_VERSION_MINOR(properties.apiVersion), VK_API_VERSION_PATCH(properties.apiVersion)));
+            "Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(m_deviceProperties.apiVersion),
+            VK_API_VERSION_MINOR(m_deviceProperties.apiVersion),
+            VK_API_VERSION_PATCH(m_deviceProperties.apiVersion)));
 }
 
 void Device::createLogicalDevice() {
@@ -280,7 +282,7 @@ bool Device::checkValidationLayerSupport() const {
         bool layerFound = false;
 
         for (const auto& layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
+            if (std::strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
             }

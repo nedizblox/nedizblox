@@ -12,18 +12,19 @@
 #include "managers/managers.hpp"
 #include "physics/physics.hpp"
 
+#include <deque>
 #include <memory>
 #include <string>
 
 namespace game {
 
-class Game {
+class GameClient {
 public:
-    Game(const std::string& server, uint16_t port, const std::string& nickname);
-    ~Game();
+    GameClient(const std::string& server, uint16_t port, const std::string& nickname);
+    ~GameClient();
 
-    Game(const Game&) = delete;
-    Game& operator=(const Game&) = delete;
+    GameClient(const GameClient&) = delete;
+    GameClient& operator=(const GameClient&) = delete;
 
     void buildMap(const std::string& rbxlPath); // for map redacting
 
@@ -45,6 +46,8 @@ private:
     std::unique_ptr<gfx::mngrs::UiManager> m_uiManager;
     std::unique_ptr<audio::AudioManager> m_audioManager;
 
+    std::unique_ptr<gfx::ui::Imgui> m_imgui;
+
     std::unique_ptr<engines::RenderEngine> m_renderEngine;
     std::unique_ptr<engines::ScriptEngine> m_scriptEngine;
 
@@ -65,6 +68,9 @@ private:
 
     std::shared_ptr<types::Text> m_fps;
 
+    static constexpr size_t kMaxLocallyOwnedObjects = 32;
+    std::deque<uint32_t> m_ownershipOrder;
+
     void initWindow();
     void initVulkan();
     void initDescriptors();
@@ -74,6 +80,8 @@ private:
     void loadModels();
     void loadUis();
 
+    void createCamera();
+
     void createServices();
     void createLocalRig(const std::string& nickname);
 
@@ -82,6 +90,8 @@ private:
     void createClient(const std::string& server, uint16_t port, const std::string& nickname);
 
     void sendLocalPhysicsState();
+
+    static void signalHandler(int sig);
 };
 
 } // namespace game

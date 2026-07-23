@@ -36,7 +36,7 @@ void AudioManager::moveListener(const core::camera::SphericalCamera& camera) {
 
     alListenerfv(AL_POSITION, &position.x);
 
-    glm::vec3 at = glm::normalize(camera.target - position);
+    glm::vec3 at = glm::normalize(camera.getTarget() - position);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
     float orientation[6] = {at.x, at.y, at.z, up.x, up.y, up.z};

@@ -35,12 +35,17 @@ public:
         propertyChanged();
     }
 
+    enums::TextFont getTextFont() const { return m_textFont; }
+    void setTextFont(enums::TextFont font) { m_textFont = font; }
+
 private:
     glm::vec3 m_position{0.0f};
     glm::vec3 m_offset{0.0f};
     glm::vec2 m_scale{0.009f};
 
     std::string m_text = "Billboard Text";
+
+    enums::TextFont m_textFont = enums::TextFont::Nunito;
 };
 
 } // namespace game::types

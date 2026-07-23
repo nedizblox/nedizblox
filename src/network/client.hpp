@@ -30,24 +30,21 @@ public:
 
     using ReliableMessageCallback = std::function<void(const std::vector<uint8_t>&)>;
 
-    Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, const std::string& nickname);
+    Client(const std::string& host, uint16_t port, const std::string& nickname);
     ~Client();
 
     Client(const Client&) = delete;
     Client& operator=(const Client&) = delete;
 
     void setOldPlayersCallback(OldPlayersCallback callback) { m_oldPlayersCallback = callback; }
-
     void setPlayerJoinedCallback(PlayerJoinedCallback callback) {
         m_playerJoinedCallback = callback;
     }
-
     void setPlayerLeftCallback(PlayerLeftCallback callback) { m_playerLeftCallback = callback; }
 
     void setPhysicsUpdateCallback(PhysicsUpdateCallback callback) {
         m_physicsUpdateCallback = callback;
     }
-
     void setMapCallback(MapCallback callback) { m_mapCallback = callback; }
 
     void setReliableMessageCallback(ReliableMessageCallback callback) {
@@ -75,6 +72,7 @@ private:
     udp::endpoint m_udpServer;
 
     uint32_t m_playerId = 0;
+    uint64_t m_sessionToken = 0;
 
     std::thread m_tcpReceiveThread;
     std::thread m_udpReceiveThread;

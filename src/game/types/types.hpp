@@ -13,6 +13,10 @@
 
 #include "part.hpp"
 
+#include "decal.hpp"
+
+#include "spawn_location.hpp"
+
 #include "billboard_text.hpp"
 
 #include "text.hpp"

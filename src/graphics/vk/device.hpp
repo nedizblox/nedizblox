@@ -11,8 +11,6 @@ namespace gfx::vk {
 
 class Device {
 public:
-    VkPhysicalDeviceProperties properties;
-
     Device(win::Window& window);
     ~Device();
 
@@ -23,6 +21,7 @@ public:
 
     VkDevice getDevice() const { return m_device; }
     VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
+    VkPhysicalDeviceProperties getDeviceProperties() const { return m_deviceProperties; }
     VkInstance getInstance() const { return m_instance; }
     VmaAllocator getAllocator() const { return m_allocator; }
     VkSurfaceKHR getSurface() const { return m_surface; }
@@ -67,6 +66,8 @@ private:
 
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
     VkDevice m_device;
+
+    VkPhysicalDeviceProperties m_deviceProperties;
 
     VmaAllocator m_allocator;
 

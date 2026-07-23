@@ -28,11 +28,16 @@ public:
         propertyChanged();
     }
 
+    enums::TextFont getTextFont() const { return m_textFont; }
+    void setTextFont(enums::TextFont font) { m_textFont = font; }
+
 private:
     glm::vec2 m_position{0.0f};
     glm::vec2 m_scale{0.5f};
 
     std::string m_text = "Text";
+
+    enums::TextFont m_textFont = enums::TextFont::Nunito;
 };
 
 } // namespace game::types

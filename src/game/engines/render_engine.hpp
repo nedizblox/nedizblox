@@ -43,6 +43,8 @@ public:
         VkCommandBuffer commandBuffer, win::Window& window, gfx::mngrs::UiManager& uiManager,
         const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData);
 
+    void renderImgui(VkCommandBuffer commandBuffer, win::Window& window, gfx::ui::Imgui& imgui);
+
 private:
     gfx::vk::Device& m_device;
     gfx::vk::Renderer& m_renderer;

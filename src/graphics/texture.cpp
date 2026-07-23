@@ -31,7 +31,7 @@ void Texture::createImage(const std::string& imagePath, VkFormat format, bool fl
 
     stbi_uc* pixels = stbi_load(imagePath.c_str(), &width, &height, &channels, 4);
     if (!pixels) {
-        throw std::runtime_error("STB: Failed to load image");
+        throw std::runtime_error("STB: Failed to load texture image file: " + imagePath);
     }
 
     if (genMipMaps) {

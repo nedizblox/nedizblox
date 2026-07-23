@@ -17,7 +17,8 @@ pub struct RbxlPartData {
     pub color: [u8; 3],
     pub transparency: f32,
     pub anchored: bool,
-    pub shape: RbxlPartType
+    pub shape: RbxlPartType,
+    pub is_spawn_location: bool
 }
 
 #[repr(C)]
@@ -51,7 +52,9 @@ pub extern "C" fn rbxlLoad(path: *const c_char, out_count: *mut usize) -> *mut R
     let mut parts = Vec::new();
 
     for inst in dom.descendants() {
-        if inst.class == "Part" {
+        if inst.class == "Part" || inst.class == "SpawnLocation" {
+            let is_spawn_location = inst.class == "SpawnLocation";
+
             let name = CString::new(inst.name.clone())
                 .unwrap_or_else(|_| CString::new("Unknown").unwrap());
 
@@ -147,7 +150,8 @@ pub extern "C" fn rbxlLoad(path: *const c_char, out_count: *mut usize) -> *mut R
                 color: [color.r, color.g, color.b],
                 transparency: transparency,
                 anchored: anchored,
-                shape: part_type
+                shape: part_type,
+                is_spawn_location: is_spawn_location
             });
         }
     }

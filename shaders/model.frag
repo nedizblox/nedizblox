@@ -5,11 +5,12 @@ layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec4 fragColor;
 layout(location = 3) in vec3 fragScale;
-layout(location = 4) flat in uint fragTexIndex;
-layout(location = 5) in vec2 fragTexTile;
-layout(location = 6) in vec3 fragCameraPos;
-layout(location = 7) in vec3 fragWorldPos;
-layout(location = 8) in vec3 fragWorldNormal;
+layout(location = 4) flat in uvec3 fragTexIndices1;
+layout(location = 5) flat in uvec3 fragTexIndices2;
+layout(location = 6) in vec2 fragTexTile;
+layout(location = 7) in vec3 fragCameraPos;
+layout(location = 8) in vec3 fragWorldPos;
+layout(location = 9) in vec3 fragWorldNormal;
 
 layout(location = 0) out vec4 outColor;
 
@@ -92,13 +93,24 @@ void main() {
     vec3 shiftedPos = fragPos + (fragScale * 0.5);
     FaceUV fuv = resolveUV(fragNormal, shiftedPos, fragScale, fragTexTile);
 
-    uint texIndex = fragTexIndex + fuv.layer;
+    uint texIndices[6] = uint[](
+        fragTexIndices1.x,
+        fragTexIndices1.y,
+        fragTexIndices1.z,
+        fragTexIndices2.x,
+        fragTexIndices2.y,
+        fragTexIndices2.z
+    );
+
+    uint texIndex = texIndices[fuv.layer];
+
+    uint baseTexIndex = texIndices[0];
+
     vec4 texColor = texture(textures[nonuniformEXT(texIndex)], fuv.uv);
-    vec4 baseTexColor = texture(textures[nonuniformEXT(fragTexIndex)], fuv.uv);
+    vec4 baseTexColor = texture(textures[nonuniformEXT(baseTexIndex)], fuv.uv);
     vec4 sampledColor = mix(baseTexColor, texColor, texColor.a);
 
     vec3 albedo = sampledColor.rgb * fragColor.rgb;
-
     vec3 ambient = AMBIENT_FACTOR * albedo;
 
     float NdotL = max(dot(N, L), 0.0);

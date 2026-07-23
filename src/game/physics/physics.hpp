@@ -50,6 +50,8 @@ private:
 
     std::mutex m_bodiesMutex;
     std::unordered_map<uint32_t, btRigidBody*> m_bodies;
+
+    std::unordered_map<btRigidBody*, float> m_bodyMasses;
 };
 
 } // namespace game::physics

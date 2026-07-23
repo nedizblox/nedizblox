@@ -11,6 +11,9 @@ public:
     PartMotionState(const btTransform& startTrans, types::Part* part) : m_part(part) {}
 
     void getWorldTransform(btTransform& worldTrans) const override {
+        if (!m_part)
+            return;
+
         btTransform t;
         t.setIdentity();
 
@@ -25,6 +28,9 @@ public:
     }
 
     void setWorldTransform(const btTransform& worldTrans) override {
+        if (!m_part)
+            return;
+
         btVector3 pos = worldTrans.getOrigin();
         btQuaternion q = worldTrans.getRotation();
 
@@ -32,10 +38,21 @@ public:
 
         m_part->setPosition(glm::vec3(pos.x(), pos.y(), pos.z()));
         m_part->setOrientation(orientation);
+
+        if (pos.y() < kKillHeight) {
+            m_pendingDestroy = true;
+        }
     }
 
+    bool isPendingDestroy() const { return m_pendingDestroy; }
+
+    types::Part* getPart() const { return m_part; }
+
 private:
+    static constexpr float kKillHeight = -500.0f;
+
     types::Part* m_part;
+    bool m_pendingDestroy = false;
 };
 
 } // namespace game::physics

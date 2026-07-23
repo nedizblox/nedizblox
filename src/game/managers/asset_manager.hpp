@@ -19,17 +19,12 @@ public:
     uint32_t getTextureId(const std::string& name) const;
     uint32_t getCubemapId(const std::string& name) const;
 
-    void initSamplers();
-
     uint32_t loadTexture(
         const std::string& name, const std::string& filePath, const std::string& samplerName = "repeat",
         bool flipVertically = false, bool genMipMaps = true);
     uint32_t loadCubemap(
         const std::string& name, const std::array<std::string, 6>& facePaths,
         const std::string& samplerName = "repeat", bool flipVertically = false);
-    uint32_t loadCubeFaces(
-        const std::string& name, const std::vector<std::string>& facePaths,
-        const std::string& samplerName = "repeat", bool flipVertically = false, bool genMipMaps = true);
 
     gfx::vk::Sampler& getSampler(const std::string& name) const;
 
@@ -40,6 +35,8 @@ private:
     std::unordered_map<std::string, std::unique_ptr<gfx::vk::Sampler>> m_samplers;
     std::unordered_map<std::string, uint32_t> m_textures;
     std::unordered_map<std::string, uint32_t> m_cubemaps;
+
+    void initSamplers();
 };
 
 } // namespace game::mngrs

@@ -2,19 +2,20 @@
 
 #include "tcp_framing.hpp"
 
+#include "core/crypto.hpp"
 #include "core/logger.hpp"
 
 #include <cstring>
-#include <stdexcept>
+#include <format>
 
 // NOLINTBEGIN(bugprone-unused-return-value)
 
 namespace net {
 
-Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, const std::string& nickname) :
+Client::Client(const std::string& host, uint16_t port, const std::string& nickname) :
     m_udpSocket(m_ioContext, udp::v4()), m_tcpSocket(m_ioContext) {
     tcp::resolver tcpResolver(m_ioContext);
-    auto tcpEndpoints = tcpResolver.resolve(host, std::to_string(tcpPort));
+    auto tcpEndpoints = tcpResolver.resolve(host, std::to_string(port));
 
     boost::system::error_code ec;
     boost::asio::connect(m_tcpSocket, tcpEndpoints, ec);
@@ -25,6 +26,8 @@ Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, cons
 
     packets::PlayerInfoPacket info{};
     std::strncpy(info.nickname, nickname.c_str(), sizeof(info.nickname) - 1);
+    info.clientVersion
+        = core::crypto::encodeVersion(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_PATCH);
 
     if (!tcpframing::writeFramed(m_tcpSocket, &info, sizeof(info), ec)) {
         throw std::runtime_error("Client failed to send PlayerInfoPacket: " + ec.message());
@@ -38,16 +41,21 @@ Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, cons
     if (reply.size() == sizeof(packets::PlayerKickPacket)) {
         packets::PlayerKickPacket kick{};
         std::memcpy(&kick, reply.data(), sizeof(kick));
-        throw std::runtime_error(std::format("Client kicked from server. Reason: {}", kick.reason));
+        throw std::runtime_error(std::format("Client kicked from server: {}", kick.reason));
     }
 
     if (reply.size() != sizeof(packets::PlayerAcceptPacket)) {
-        throw std::runtime_error("Client did not receive a valid PlayerAcceptPacket: Size mismatch");
+        throw std::runtime_error(
+            std::format(
+                "Client did not receive a valid PlayerAcceptPacket: Size mismatch (Expected {}, "
+                "got {})",
+                sizeof(packets::PlayerAcceptPacket), reply.size()));
     }
 
     packets::PlayerAcceptPacket accept{};
     std::memcpy(&accept, reply.data(), sizeof(accept));
     m_playerId = accept.playerId;
+    m_sessionToken = accept.sessionToken;
 
     std::vector<uint8_t> stateReply;
     if (!tcpframing::readFramed(m_tcpSocket, stateReply, ec)
@@ -63,12 +71,11 @@ Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, cons
                           + (initialState.playerCount * sizeof(packets::OldPlayerInfo));
 
     if (stateReply.size() == expectedSize) {
-        for (uint32_t i = 0; i < initialState.playerCount; ++i) {
+        for (uint32_t i = 0; i < initialState.playerCount; i++) {
             packets::OldPlayerInfo oldPlayer{};
             std::memcpy(&oldPlayer, playersDataPtr + (i * sizeof(packets::OldPlayerInfo)), sizeof(oldPlayer));
 
             m_objectStates[oldPlayer.playerId] = packets::PhysicalObjectState{};
-
             m_cachedOldPlayers.push_back(oldPlayer);
         }
     }
@@ -86,7 +93,7 @@ Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, cons
         = sizeof(packets::InitialMapPacket) + (mapHeader.partCount * sizeof(packets::MapPartInfo));
 
     if (mapReply.size() == expectedMapSize) {
-        for (uint32_t i = 0; i < mapHeader.partCount; ++i) {
+        for (uint32_t i = 0; i < mapHeader.partCount; i++) {
             packets::MapPartInfo mapPart{};
             std::memcpy(&mapPart, mapPartsPtr + (i * sizeof(packets::MapPartInfo)), sizeof(mapPart));
 
@@ -94,10 +101,19 @@ Client::Client(const std::string& host, uint16_t tcpPort, uint16_t udpPort, cons
         }
     }
 
-    core::logger::info("Client TCP handshake complete");
-
     udp::resolver udpResolver(m_ioContext);
-    m_udpServer = *udpResolver.resolve(udp::v4(), host, std::to_string(udpPort)).begin();
+    m_udpServer = *udpResolver.resolve(udp::v4(), host, std::to_string(port)).begin();
+
+    packets::ClientUdpConnectPacket helloPacket{};
+    helloPacket.playerId = m_playerId;
+    helloPacket.sessionToken = m_sessionToken;
+
+    m_udpSocket.send_to(boost::asio::buffer(&helloPacket, sizeof(helloPacket)), m_udpServer, 0, ec);
+    if (ec) {
+        throw std::runtime_error("Client failed to send UDP handshake: " + ec.message());
+    }
+
+    core::logger::info(std::format("Successfully connected to the server ({}:{})", host, port));
 }
 
 Client::~Client() { stop(); }
@@ -152,43 +168,32 @@ void Client::start() {
 
     m_cachedMapParts.clear();
 
-    packets::ClientUdpConnectPacket helloPacket{};
-    helloPacket.playerId = m_playerId;
-
-    boost::system::error_code ec;
-    m_udpSocket.send_to(boost::asio::buffer(&helloPacket, sizeof(helloPacket)), m_udpServer, 0, ec);
-    if (ec) {
-        core::logger::err("Client failed to send UDP handshake: " + ec.message());
-    } else {
-        core::logger::info("Client UDP handshake complete");
-    }
-
     m_tcpReceiveThread = std::thread(&Client::tcpUpdateLoop, this);
     m_udpReceiveThread = std::thread(&Client::udpUpdateLoop, this);
 }
 
 void Client::stop() {
-    if (m_running) {
-        m_running = false;
+    if (!m_running)
+        return;
+    m_running = false;
 
-        boost::system::error_code ec;
-        if (m_udpSocket.is_open()) {
-            m_udpSocket.shutdown(udp::socket::shutdown_both, ec);
-            m_udpSocket.close(ec);
-        }
+    boost::system::error_code ec;
+    if (m_udpSocket.is_open()) {
+        m_udpSocket.shutdown(udp::socket::shutdown_both, ec);
+        m_udpSocket.close(ec);
+    }
 
-        if (m_tcpSocket.is_open()) {
-            m_tcpSocket.shutdown(tcp::socket::shutdown_both, ec);
-            m_tcpSocket.close(ec);
-        }
+    if (m_tcpSocket.is_open()) {
+        m_tcpSocket.shutdown(tcp::socket::shutdown_both, ec);
+        m_tcpSocket.close(ec);
+    }
 
-        if (m_udpReceiveThread.joinable()) {
-            m_udpReceiveThread.join();
-        }
+    if (m_udpReceiveThread.joinable()) {
+        m_udpReceiveThread.join();
+    }
 
-        if (m_tcpReceiveThread.joinable()) {
-            m_tcpReceiveThread.join();
-        }
+    if (m_tcpReceiveThread.joinable()) {
+        m_tcpReceiveThread.join();
     }
 }
 
@@ -204,7 +209,13 @@ void Client::tcpUpdateLoop() {
             break;
         }
 
-        if (payload.size() == sizeof(packets::PlayerJoinedPacket)) {
+        if (payload.size() < sizeof(packets::PacketHeader)) {
+            continue;
+        }
+
+        auto type = static_cast<packets::PacketType>(payload[0]);
+
+        if (type == packets::PacketType::PlayerJoined && payload.size() == sizeof(packets::PlayerJoinedPacket)) {
             packets::PlayerJoinedPacket joined{};
             std::memcpy(&joined, payload.data(), sizeof(joined));
 
@@ -214,7 +225,7 @@ void Client::tcpUpdateLoop() {
                 m_playerJoinedCallback(joined.playerId, std::string(joined.nickname));
             }
             continue;
-        } else if (payload.size() == sizeof(packets::PlayerLeftPacket)) {
+        } else if (type == packets::PacketType::PlayerLeft && payload.size() == sizeof(packets::PlayerLeftPacket)) {
             packets::PlayerLeftPacket left{};
             std::memcpy(&left, payload.data(), sizeof(left));
 
@@ -224,13 +235,11 @@ void Client::tcpUpdateLoop() {
                 m_playerLeftCallback(left.playerId);
             }
             continue;
-        } else if (payload.size() == sizeof(packets::PlayerKickPacket)) {
+        } else if (type == packets::PacketType::PlayerKick && payload.size() == sizeof(packets::PlayerKickPacket)) {
             packets::PlayerKickPacket kick{};
             std::memcpy(&kick, payload.data(), sizeof(kick));
 
             core::logger::err(std::format("Client kicked from server. Reason: {}", kick.reason));
-
-            m_running = false;
             break;
         }
 
@@ -279,6 +288,8 @@ void Client::udpUpdateLoop() {
             m_physicsUpdateCallback(header.senderPlayerId, objects);
         }
     }
+
+    m_running = false;
 }
 
 } // namespace net

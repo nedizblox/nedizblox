@@ -1,25 +1,10 @@
 #include "model.hpp"
-#include "core/hash.hpp"
-
-#include <tinyobj/tiny_obj_loader.h>
-
-#include <glm/gtx/hash.hpp>
 
 #include <cstring>
-#include <unordered_map>
 
-namespace std {
-
-template <>
-struct hash<gfx::Model::Vertex> {
-    size_t operator()(const gfx::Model::Vertex& vertex) const {
-        size_t seed = 0;
-        core::hash::combine(seed, vertex.position, vertex.normal, vertex.uv);
-        return seed;
-    }
-};
-
-} // namespace std
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
 namespace gfx {
 
@@ -129,59 +114,51 @@ std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescri
 
     attributeDescriptions.push_back({7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, color)});
 
-    attributeDescriptions.push_back({8, 1, VK_FORMAT_R32_UINT, offsetof(InstanceData, texIndex)});
-    attributeDescriptions.push_back({9, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, texTile)});
+    attributeDescriptions.push_back({8, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices1)});
+    attributeDescriptions.push_back({9, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices2)});
+    attributeDescriptions.push_back({10, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(InstanceData, texTile)});
 
     return attributeDescriptions;
 }
 
 void Model::Builder::loadModel(const std::string& filepath) {
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string warn, err;
+    Assimp::Importer importer;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filepath.c_str())) {
-        throw std::runtime_error("OBJ: " + err);
+    const aiScene* scene = importer.ReadFile(
+        filepath, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_GenNormals | aiProcess_FlipUVs);
+
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
     vertices.clear();
     indices.clear();
 
-    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-    for (const auto& shape : shapes) {
-        for (const auto& index : shape.mesh.indices) {
+    for (size_t m = 0; m < scene->mNumMeshes; ++m) {
+        aiMesh* mesh = scene->mMeshes[m];
+        uint32_t vertexOffset = static_cast<uint32_t>(vertices.size());
+
+        for (size_t i = 0; i < mesh->mNumVertices; ++i) {
             Vertex vertex{};
 
-            if (index.vertex_index >= 0) {
-                vertex.position = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2],
-                };
+            vertex.position = {mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z};
+
+            if (mesh->HasNormals()) {
+                vertex.normal = {mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z};
             }
 
-            if (index.normal_index >= 0) {
-                vertex.normal = {
-                    attrib.normals[3 * index.normal_index + 0],
-                    attrib.normals[3 * index.normal_index + 1],
-                    attrib.normals[3 * index.normal_index + 2],
-                };
+            if (mesh->HasTextureCoords(0)) {
+                vertex.uv = {mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y};
             }
 
-            if (index.texcoord_index >= 0) {
-                vertex.uv = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    attrib.texcoords[2 * index.texcoord_index + 1],
-                };
-            }
+            vertices.push_back(vertex);
+        }
 
-            if (uniqueVertices.count(vertex) == 0) {
-                uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                vertices.push_back(vertex);
+        for (size_t i = 0; i < mesh->mNumFaces; ++i) {
+            aiFace face = mesh->mFaces[i];
+            for (size_t j = 0; j < face.mNumIndices; ++j) {
+                indices.push_back(vertexOffset + face.mIndices[j]);
             }
-
-            indices.push_back(uniqueVertices[vertex]);
         }
     }
 }

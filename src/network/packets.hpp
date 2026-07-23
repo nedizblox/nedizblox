@@ -7,18 +7,34 @@
 
 namespace net::packets {
 
-enum class PartShape : uint8_t { Ball = 0, Block = 1 };
+enum class PacketType : uint8_t {
+    PlayerInfo = 1,
+    PlayerAccept = 2,
+    PlayerJoined = 3,
+    PlayerLeft = 4,
+    PlayerKick = 5
+};
+
+enum class PartShape : uint8_t { Ball = 0, Block = 1, Cylinder = 2, Wedge = 3, Head = 4 };
 
 #pragma pack(push, 1)
 
 // TCP
 
+struct PacketHeader {
+    PacketType type;
+};
+
 struct PlayerInfoPacket {
+    PacketHeader header{PacketType::PlayerInfo};
+    uint32_t clientVersion = 0;
     char nickname[16] = {};
 };
 
 struct PlayerAcceptPacket {
+    PacketHeader header{PacketType::PlayerAccept};
     uint32_t playerId = 0;
+    uint64_t sessionToken = 0;
 };
 
 struct OldPlayerInfo {
@@ -32,16 +48,19 @@ struct InitialStatePacket {
 };
 
 struct PlayerJoinedPacket {
+    PacketHeader header{PacketType::PlayerJoined};
     uint32_t playerId = 0;
     char nickname[16] = {};
 };
 
 struct PlayerLeftPacket {
+    PacketHeader header{PacketType::PlayerLeft};
     uint32_t playerId = 0;
 };
 
 struct PlayerKickPacket {
-    char reason[64] = {};
+    PacketHeader header{PacketType::PlayerKick};
+    char reason[256] = {};
 };
 
 struct TcpMessageHeader {
@@ -67,6 +86,7 @@ struct InitialMapPacket {
 
 struct ClientUdpConnectPacket {
     uint32_t playerId = 0;
+    uint64_t sessionToken = 0;
 };
 
 struct PhysicalObjectState {

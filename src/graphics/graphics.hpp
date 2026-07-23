@@ -17,6 +17,7 @@
 #include "texture.hpp"
 
 #include "ui/text.hpp"
+#include "ui/imgui.hpp"
 
 #include "billboard.hpp"
 // IWYU pragma: end_exports

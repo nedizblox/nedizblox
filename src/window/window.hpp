@@ -21,7 +21,7 @@ public:
 
     void update();
 
-    void setTitle(const std::string& title);
+    void setTitle(const std::string& title) { glfwSetWindowTitle(m_window, title.c_str()); }
     void setIcon(const std::string& filePath);
 
     void resetResizedState() { m_resized = false; }

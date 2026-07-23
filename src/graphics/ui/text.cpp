@@ -100,7 +100,7 @@ void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::Bi
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
 
     uint8_t* pData = static_cast<uint8_t*>(stagingBuffer.map());
-    memset(pData, 0, bufferSize);
+    std::memset(pData, 0, bufferSize);
 
     uint32_t currentX = 0;
     uint32_t currentY = 0;

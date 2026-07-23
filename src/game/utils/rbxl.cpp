@@ -18,6 +18,7 @@ struct RbxlPartData {
     float transparency;
     bool anchored;
     RbxlPartType shape;
+    bool isSpawnLocation;
 };
 
 RbxlPartData* rbxlLoad(const char* path, size_t* out_count);
@@ -40,7 +41,12 @@ std::vector<std::shared_ptr<types::Part>> rbxl::parseRbxl(const std::string& fil
     for (size_t i = 0; i < count; i++) {
         RbxlPartData& p = raw[i];
 
-        auto part = std::make_shared<types::Part>();
+        std::shared_ptr<types::Part> part;
+        if (p.isSpawnLocation) {
+            part = types::SpawnLocation::create(p.name);
+        } else {
+            part = std::make_shared<types::Part>();
+        }
 
         part->setName(p.name);
         part->setPosition({p.position[0], p.position[1], p.position[2]});

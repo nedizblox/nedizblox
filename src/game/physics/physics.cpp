@@ -62,7 +62,7 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     btRigidBody* body = new btRigidBody(ci);
 
     body->setSleepingThresholds(0.6f, 0.8f);
-    body->setDeactivationTime(0.2f);
+    body->setDeactivationTime(1.0f);
 
     m_dynamicsWorld->addRigidBody(body);
 
@@ -71,6 +71,7 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     {
         std::lock_guard<std::mutex> lock(m_bodiesMutex);
         m_bodies[part->getNetworkId()] = body;
+        m_bodyMasses[body] = mass;
     }
 
     part->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
@@ -82,6 +83,7 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
         {
             std::lock_guard<std::mutex> lock(m_bodiesMutex);
             m_bodies.erase(obj->getNetworkId());
+            m_bodyMasses.erase(rigidBody);
         }
 
         {
@@ -135,6 +137,7 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     {
         std::lock_guard<std::mutex> lock(m_bodiesMutex);
         m_bodies[rootPart->getNetworkId()] = body;
+        m_bodyMasses[body] = mass;
     }
 
     rootPart->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
@@ -146,6 +149,7 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
         {
             std::lock_guard<std::mutex> lock(m_bodiesMutex);
             m_bodies.erase(obj->getNetworkId());
+            m_bodyMasses.erase(rigidBody);
         }
 
         {
@@ -273,16 +277,76 @@ void Physics::setBodyNetworkMode(btRigidBody* body, bool isLocalOwner) {
     if (currentlyKinematic != wantKinematic) {
         if (isLocalOwner) {
             body->setCollisionFlags(flags & ~btCollisionObject::CF_KINEMATIC_OBJECT);
-            body->setActivationState(ACTIVE_TAG);
+
+            {
+                std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+                for (const auto& [id, b] : m_bodies) {
+                    if (b == body) {
+                        auto targetIt = m_networkTargets.find(id);
+                        if (targetIt != m_networkTargets.end()) {
+                            const auto& lastState = targetIt->second;
+                            body->setLinearVelocity(btVector3(
+                                lastState.linearVelocity.x, lastState.linearVelocity.y,
+                                lastState.linearVelocity.z));
+                            body->setAngularVelocity(btVector3(
+                                lastState.angularVelocity.x, lastState.angularVelocity.y,
+                                lastState.angularVelocity.z));
+                        }
+
+                        m_networkTargets.erase(id);
+                        break;
+                    }
+                }
+            }
+
+            btScalar mass = 10.0f;
+            {
+                std::lock_guard<std::mutex> lock(m_bodiesMutex);
+                auto it = m_bodyMasses.find(body);
+                if (it != m_bodyMasses.end())
+                    mass = it->second;
+            }
+
+            btVector3 localInertia(0, 0, 0);
+            if (body->getCollisionShape())
+                body->getCollisionShape()->calculateLocalInertia(mass, localInertia);
+            body->setMassProps(mass, localInertia);
+            body->updateInertiaTensor();
+
+            body->forceActivationState(ACTIVE_TAG);
+            body->activate(true);
         } else {
+            net::packets::PhysicalObjectState localState{};
+            bool found = false;
+            {
+                std::lock_guard<std::mutex> lock(m_bodiesMutex);
+                for (const auto& [id, b] : m_bodies) {
+                    if (b == body) {
+                        localState = captureNetworkState(id, body);
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
             body->setCollisionFlags(flags | btCollisionObject::CF_KINEMATIC_OBJECT);
-            body->setActivationState(DISABLE_SIMULATION);
+            body->setMassProps(0.0f, btVector3(0, 0, 0));
+
+            body->forceActivationState(DISABLE_SIMULATION);
+
+            if (found) {
+                std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+                for (const auto& [id, b] : m_bodies) {
+                    if (b == body) {
+                        m_networkTargets[id] = localState;
+                        break;
+                    }
+                }
+            }
         }
 
-        if (m_dynamicsWorld && body->getBroadphaseHandle()) {
-            m_dynamicsWorld->getBroadphase()->getOverlappingPairCache()->cleanProxyFromPairs(
-                body->getBroadphaseHandle(), m_dynamicsWorld->getDispatcher());
-        }
+        body->updateInertiaTensor();
+        body->activate(true);
     }
 }
 
@@ -291,6 +355,25 @@ void Physics::step(float deltaTime) {
         deltaTime = 0.1f;
 
     m_dynamicsWorld->stepSimulation(deltaTime, 5, 1.0f / 60.0f);
+
+    std::vector<types::Part*> fallenParts;
+    {
+        std::lock_guard<std::mutex> lock(m_bodiesMutex);
+        for (const auto& [networkId, body] : m_bodies) {
+            if (!body)
+                continue;
+
+            auto* motionState = dynamic_cast<PartMotionState*>(body->getMotionState());
+            if (motionState && motionState->isPendingDestroy()) {
+                if (types::Part* part = motionState->getPart())
+                    fallenParts.push_back(part);
+            }
+        }
+    }
+
+    for (types::Part* part : fallenParts) {
+        part->destroy();
+    }
 }
 
 } // namespace game::physics

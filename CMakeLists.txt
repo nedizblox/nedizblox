@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
-project(nedizblox VERSION 1.0.0 LANGUAGES CXX)
+
+set(NEDIZBLOX_VERSION_MAJOR 0)
+set(NEDIZBLOX_VERSION_MINOR 6)
+set(NEDIZBLOX_VERSION_PATCH 0)
+
+project(nedizblox LANGUAGES C CXX)
+
+set(PROJECT_VERSION "${NEDIZBLOX_VERSION_MAJOR}.${NEDIZBLOX_VERSION_MINOR}.${NEDIZBLOX_VERSION_PATCH}")
+set(PROJECT_VERSION_MAJOR ${APP_VERSION_MAJOR})
+set(PROJECT_VERSION_MINOR ${APP_VERSION_MINOR})
+set(PROJECT_VERSION_PATCH ${APP_VERSION_PATCH})
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,6 +20,9 @@ find_package(Freetype REQUIRED)
 find_package(OpenAL REQUIRED)
 find_package(Bullet REQUIRED)
 find_package(Boost REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -20,9 +33,14 @@ add_subdirectory(extern/glfw)
 set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
 add_subdirectory(extern/glm)
 
-set(LUAU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(LUAU_BUILD_CLI OFF CACHE BOOL "" FORCE)
-add_subdirectory(extern/luau)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(ASSIMP_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_MINIZIP ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+add_subdirectory(extern/assimp)
 
 add_subdirectory(extern/boxer)
 
@@ -44,6 +62,8 @@ set(SHADER_SOURCES
     shaders/text.vert
     shaders/text.frag
     shaders/billboard.vert
+    shaders/imgui.vert
+    shaders/imgui.frag
     shaders/skybox.vert
     shaders/skybox.frag
 )
@@ -69,6 +89,7 @@ set(MAIN_SOURCES
     src/core/args_parser.cpp
     src/core/camera.cpp
     src/core/msgbox.cpp
+    src/core/crypto.cpp
     src/window/window.cpp
     src/graphics/vk/device.cpp
     src/graphics/vk/swapchain.cpp
@@ -83,6 +104,7 @@ set(MAIN_SOURCES
     src/graphics/skybox.cpp
     src/graphics/billboard.cpp
     src/graphics/ui/text.cpp
+    src/graphics/ui/imgui.cpp
     src/graphics/managers/bindless_manager.cpp
     src/graphics/managers/model_manager.cpp
     src/graphics/managers/billboard_manager.cpp
@@ -98,7 +120,7 @@ set(MAIN_SOURCES
     src/game/engines/render_engine.cpp
     src/game/engines/script_engine.cpp
     src/game/prefabs/rig.cpp
-    src/game/game.cpp
+    src/game/game_client.cpp
     src/main.cpp
 )
 
@@ -106,8 +128,21 @@ set(EXTERN_SOURCES
     extern/stb/stb_image.cpp
     extern/stb/stb_vorbis.cpp
     extern/vma/vk_mem_alloc.cpp
-    extern/tinyobj/tiny_obj_loader.cpp
     extern/dr/dr_wav.cpp
+    extern/imgui/imgui_demo.cpp
+    extern/imgui/imgui_draw.cpp
+    extern/imgui/imgui_tables.cpp
+    extern/imgui/imgui_widgets.cpp
+    extern/imgui/imgui.cpp
+    extern/wren/wren_compiler.c
+    extern/wren/wren_core.c
+    extern/wren/wren_debug.c
+    extern/wren/wren_opt_meta.c
+    extern/wren/wren_opt_random.c
+    extern/wren/wren_primitive.c
+    extern/wren/wren_utils.c
+    extern/wren/wren_value.c
+    extern/wren/wren_vm.c
 )
 
 add_executable(nedizblox-client ${MAIN_SOURCES} ${EXTERN_SOURCES} ${SPIRV_BINARY_FILES})
@@ -129,13 +164,17 @@ target_link_libraries(nedizblox-client PRIVATE
     OpenAL::OpenAL
     ${Boost_LIBRARIES}
     ${BULLET_LIBRARIES}
+    OpenSSL::Crypto
     glm::glm
+    assimp
     Boxer
-
-    Luau.Compiler
-    Luau.VM
-
     rbx_dom
+)
+
+target_compile_definitions(nedizblox-client PRIVATE
+    CLIENT_VERSION_MAJOR=${NEDIZBLOX_VERSION_MAJOR}
+    CLIENT_VERSION_MINOR=${NEDIZBLOX_VERSION_MINOR}
+    CLIENT_VERSION_PATCH=${NEDIZBLOX_VERSION_PATCH}
 )
 
 target_compile_definitions(nedizblox-client PUBLIC GLM_ENABLE_EXPERIMENTAL BOOST_ASIO_HEADER_ONLY)

@@ -2,12 +2,15 @@
 
 namespace game::prefabs {
 
-Rig::Rig(physics::Physics& physics, const std::string& name) :
-    m_physics(physics), types::Model(name) {
-    createBodyParts();
+std::shared_ptr<Rig> Rig::create(game::physics::Physics& physics, const std::string& name, uint32_t networkId) {
+    auto instance = std::shared_ptr<Rig>(new Rig(physics, name, networkId));
+    instance->createBodyParts();
+    return instance;
 }
 
 void Rig::createBodyParts() {
+    auto self = shared_from_this();
+
     m_head = std::make_shared<types::Part>("Head");
     auto torso = std::make_shared<types::Part>("Torso");
     auto rootPart = std::make_shared<types::Part>("RootPart");
@@ -32,13 +35,18 @@ void Rig::createBodyParts() {
     rightLeg->setColor(glm::u8vec3(0, 98, 255));
 
     rootPart->setTransparency(1.0f);
+    rootPart->setNetworkId(m_networkId);
 
     m_head->setShape(enums::PartType::Head);
+
+    auto face = std::make_shared<types::Decal>("face");
+    face->setSource("headFace");
+    face->setFace(enums::Face::Front);
+    face->setParent(m_head);
 
     m_rigidBody = m_physics.createRigidBodyModel(this, rootPart.get());
     m_rigidBody->setAngularFactor(btVector3(0.0f, 0.0f, 0.0f));
     m_rigidBody->setActivationState(DISABLE_DEACTIVATION);
-    m_rigidBody->setFriction(0.1f);
 
     glm::quat identityRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
@@ -49,17 +57,18 @@ void Rig::createBodyParts() {
     m_bones.push_back({leftLeg, glm::vec3(-0.5f, -2.0f, 0.0f), identityRot});
     m_bones.push_back({rightLeg, glm::vec3(0.5f, -2.0f, 0.0f), identityRot});
 
-    rootPart->setParent(this);
+    rootPart->setParent(self);
 
     for (auto& bone : m_bones) {
-        bone.part->setParent(this);
+        bone.part->setParent(self);
     }
 
     m_nickname = std::make_shared<types::BillboardText>();
     m_nickname->setText(getName());
     m_nickname->setOffset(glm::vec3(0.0f, 2.3f, 0.0f));
     m_nickname->setPosition(getPivotPosition());
-    m_nickname->setParent(m_head.get());
+
+    m_nickname->setParent(m_head);
 
     syncParts();
 
@@ -90,20 +99,20 @@ void Rig::setPivotPosition(const glm::vec3& position) {
     }
 }
 
-void Rig::move(MoveDirection direction, float phi) {
+void Rig::move(enums::RigMoveDirection direction, float phi) {
     glm::vec3 forward = glm::normalize(glm::vec3(-glm::sin(phi), 0.0f, -glm::cos(phi)));
 
     glm::vec3 up(0.0f, 1.0f, 0.0f);
     glm::vec3 right = glm::normalize(glm::cross(forward, up));
 
     glm::vec3 moveDir(0.0f);
-    if (direction == MoveDirection::Forward)
+    if (direction == enums::RigMoveDirection::Forward)
         moveDir += forward;
-    if (direction == MoveDirection::Backward)
+    if (direction == enums::RigMoveDirection::Backward)
         moveDir -= forward;
-    if (direction == MoveDirection::Left)
+    if (direction == enums::RigMoveDirection::Left)
         moveDir -= right;
-    if (direction == MoveDirection::Right)
+    if (direction == enums::RigMoveDirection::Right)
         moveDir += right;
 
     if (glm::length(moveDir) > 0.0f) {

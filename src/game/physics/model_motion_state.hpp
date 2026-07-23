@@ -11,6 +11,9 @@ public:
     ModelMotionState(const btTransform& startTrans, types::Model* model) : m_model(model) {}
 
     virtual void getWorldTransform(btTransform& worldTrans) const override {
+        if (!m_model)
+            return;
+
         btTransform t;
         t.setIdentity();
 
@@ -26,6 +29,9 @@ public:
     }
 
     virtual void setWorldTransform(const btTransform& worldTrans) override {
+        if (!m_model)
+            return;
+        
         btVector3 pos = worldTrans.getOrigin();
         btQuaternion q = worldTrans.getRotation();
 
@@ -35,10 +41,21 @@ public:
         glm::mat4 pivot = glm::translate(glm::mat4(1.0f), position) * glm::toMat4(orientation);
 
         m_model->setPivot(pivot);
+
+        if (pos.y() < kKillHeight) {
+            m_pendingDestroy = true;
+        }
     }
 
+    bool isPendingDestroy() const { return m_pendingDestroy; }
+
+    types::Model* getModel() const { return m_model; }
+
 private:
+    static constexpr float kKillHeight = -500.0f;
+
     types::Model* m_model;
+    bool m_pendingDestroy = false;
 };
 
 } // namespace game::physics

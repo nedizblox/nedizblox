@@ -14,14 +14,8 @@ public:
         glm::quat localOrientation;
     };
 
-    enum class MoveDirection {
-        Forward = 0,
-        Backward = 1,
-        Left = 2,
-        Right = 3
-    };
-
-    Rig(physics::Physics& physics, const std::string& name = "Rig");
+    static std::shared_ptr<Rig>
+    create(game::physics::Physics& physics, const std::string& name = "Rig", uint32_t networkId = 0);
 
     std::shared_ptr<types::Part> getHead() const { return m_head; }
 
@@ -35,7 +29,7 @@ public:
 
     void setPivotPosition(const glm::vec3& position) override;
 
-    void move(MoveDirection direction, float phi);
+    void move(enums::RigMoveDirection direction, float phi);
     void jump();
 
     bool isGrounded();
@@ -43,7 +37,12 @@ public:
     void update(float deltaTime);
 
 private:
+    Rig(physics::Physics& physics, const std::string& name, uint32_t networkId) :
+        m_physics(physics), types::Model(name), m_networkId(networkId) {}
+
     physics::Physics& m_physics;
+
+    uint32_t m_networkId = 0;
 
     std::vector<Bone> m_bones;
 

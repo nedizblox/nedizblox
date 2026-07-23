@@ -1,4 +1,4 @@
-#include "game/game.hpp"
+#include "game/game_client.hpp"
 
 #include "core/core.hpp"
 
@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     auto args = core::argsparser::parseArguments(argc, argv);
 
     try {
-        std::unique_ptr<game::Game> game;
+        std::unique_ptr<game::GameClient> game;
         
         if (args.contains("address") && args.contains("port") && args.contains("nickname")) {
             std::string address = args["address"];
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
                 throw std::runtime_error("Port must be a valid number");
             }
 
-            game = std::make_unique<game::Game>(address, port, nickname);
+            game = std::make_unique<game::GameClient>(address, port, nickname);
         } else {
             throw std::runtime_error("Please specify the server address, port and your nickname using the --address, --port and --nickname argument");
         }

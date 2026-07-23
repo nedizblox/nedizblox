@@ -10,7 +10,8 @@
 
 namespace win {
 
-Window::Window(int width, int height, const std::string& title) : m_fbWidth(width), m_fbHeight(height) {
+Window::Window(int width, int height, const std::string& title) :
+    m_winWidth(width), m_winHeight(height), m_fbWidth(width), m_fbHeight(height) {
     if (!glfwInit()) {
         throw std::runtime_error("GLFW: Failed to initialize");
     }
@@ -22,28 +23,28 @@ Window::Window(int width, int height, const std::string& title) : m_fbWidth(widt
         glfwWindowHintString(GLFW_WAYLAND_APP_ID, "nedizblox_client");
     }
 
-    #ifndef NDEBUG
+#ifndef NDEBUG
     switch (glfwGetPlatform()) {
-        case GLFW_PLATFORM_WIN32:
-            core::logger::info("Using WSI platform Win32", true);
-            break;
-        case GLFW_PLATFORM_WAYLAND:
-            core::logger::info("Using WSI platform Wayland", true);
-            break;
-        case GLFW_PLATFORM_X11:
-            core::logger::info("Using WSI platform X11", true);
-            break;
-        case GLFW_PLATFORM_COCOA:
-            core::logger::info("Using WSI platform Cocoa", true);
-            break;
-        case GLFW_PLATFORM_NULL:
-            core::logger::info("Using WSI platform Null", true);
-            break;
-        default:
-            core::logger::warn("Failed to fetch WSI platform", true);
-            break;
+    case GLFW_PLATFORM_WIN32:
+        core::logger::info("Using WSI platform Win32", true);
+        break;
+    case GLFW_PLATFORM_WAYLAND:
+        core::logger::info("Using WSI platform Wayland", true);
+        break;
+    case GLFW_PLATFORM_X11:
+        core::logger::info("Using WSI platform X11", true);
+        break;
+    case GLFW_PLATFORM_COCOA:
+        core::logger::info("Using WSI platform Cocoa", true);
+        break;
+    case GLFW_PLATFORM_NULL:
+        core::logger::info("Using WSI platform Null", true);
+        break;
+    default:
+        core::logger::warn("Failed to fetch WSI platform", true);
+        break;
     }
-    #endif
+#endif
 
     m_window = glfwCreateWindow(m_fbWidth, m_fbHeight, title.c_str(), nullptr, nullptr);
 
@@ -76,8 +77,6 @@ Window::~Window() {
     glfwDestroyWindow(m_window);
     glfwTerminate();
 }
-
-void Window::setTitle(const std::string& title) { glfwSetWindowTitle(m_window, title.c_str()); }
 
 void Window::setIcon(const std::string& filePath) {
     int width, height, channels;

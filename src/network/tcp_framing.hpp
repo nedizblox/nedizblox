@@ -9,7 +9,7 @@
 
 namespace net::tcpframing {
 
-template<typename SyncStream>
+template <typename SyncStream>
 inline bool writeFramed(SyncStream& socket, const void* data, size_t size, boost::system::error_code& ec) {
     packets::TcpMessageHeader header{static_cast<uint32_t>(size)};
 
@@ -26,13 +26,20 @@ inline bool writeFramed(SyncStream& socket, const void* data, size_t size, boost
     return true;
 }
 
-template<typename SyncStream>
+constexpr uint32_t kMaxFrameSize = 10 * 1024 * 1024;
+
+template <typename SyncStream>
 inline bool readFramed(SyncStream& socket, std::vector<uint8_t>& payload, boost::system::error_code& ec) {
     packets::TcpMessageHeader header{};
 
     boost::asio::read(socket, boost::asio::buffer(&header, sizeof(header)), ec);
     if (ec)
         return false;
+
+    if (header.size > kMaxFrameSize) {
+        ec = boost::asio::error::message_size;
+        return false;
+    }
 
     payload.resize(header.size);
     if (header.size > 0) {
@@ -44,4 +51,4 @@ inline bool readFramed(SyncStream& socket, std::vector<uint8_t>& payload, boost:
     return true;
 }
 
-} // namespace net
+} // namespace net::tcpframing

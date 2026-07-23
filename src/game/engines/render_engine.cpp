@@ -75,6 +75,17 @@ void RenderEngine::initPipelines(VkDescriptorSetLayout setLayout) {
               .disableDepthWrite()
               .enableAlphaBlending()
               .build();
+
+    m_pipelines["imgui"] = gfx::vk::Pipeline::Builder(m_device)
+                               .setVertShaderPath("shaders/imgui.vert.spv")
+                               .setFragShaderPath("shaders/imgui.frag.spv")
+                               .setConstantSize(sizeof(gfx::ui::Imgui::PushConstantObject))
+                               .setDescriptorLayouts({setLayout})
+                               .setRenderPass(m_renderer.getRenderPass())
+                               .setBindingDescriptions(gfx::ui::Imgui::getBindingDescriptions())
+                               .setAttributeDescriptions(gfx::ui::Imgui::getAttributeDescriptions())
+                               .enableAlphaBlending()
+                               .build();
 }
 
 void RenderEngine::renderModelsOpaque(
@@ -158,12 +169,27 @@ void RenderEngine::renderTexts(
             continue;
 
         gfx::ui::Text::PushConstantObject push{};
-        push.proj = glm::ortho(0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
+        push.proj = glm::ortho(
+            0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
         push.texIndex = uiManager.getTextureIndex(name);
 
         pipeline->pushConstant(commandBuffer, push);
         uiManager.drawText(commandBuffer, instances);
     }
+}
+
+void RenderEngine::renderImgui(VkCommandBuffer commandBuffer, win::Window& window, gfx::ui::Imgui& imgui) {
+    auto& pipeline = m_pipelines["imgui"];
+    pipeline->bind(commandBuffer);
+    m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
+
+    gfx::ui::Imgui::PushConstantObject push{};
+    push.proj = glm::ortho(
+        0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
+    push.texIndex = imgui.getTextureIndex();
+
+    pipeline->pushConstant(commandBuffer, push);
+    imgui.draw(commandBuffer);
 }
 
 } // namespace game::engines
