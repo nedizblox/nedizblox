@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["staticlib"]
 
 [dependencies]
-rbx_binary = "2.0.1"
-rbx_dom_weak = "4.0"
+rbx_binary = "3.0.0"
+rbx_dom_weak = "4.2.0"

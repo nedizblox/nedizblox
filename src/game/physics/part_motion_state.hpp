@@ -34,10 +34,11 @@ public:
         btVector3 pos = worldTrans.getOrigin();
         btQuaternion q = worldTrans.getRotation();
 
+        glm::vec3 position(pos.x(), pos.y(), pos.z());
         glm::quat orientation(q.getW(), q.getX(), q.getY(), q.getZ());
 
-        m_part->setPosition(glm::vec3(pos.x(), pos.y(), pos.z()));
-        m_part->setOrientation(orientation);
+        m_part->setPosition(position, true);
+        m_part->setOrientation(orientation, true);
 
         if (pos.y() < kKillHeight) {
             m_pendingDestroy = true;
@@ -47,6 +48,11 @@ public:
     bool isPendingDestroy() const { return m_pendingDestroy; }
 
     types::Part* getPart() const { return m_part; }
+
+    void detachPart() {
+        m_part = nullptr;
+        m_pendingDestroy = false;
+    }
 
 private:
     static constexpr float kKillHeight = -500.0f;

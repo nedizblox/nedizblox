@@ -1,9 +1,9 @@
 #pragma once
 
 // IWYU pragma: begin_exports
-#include "../enums/enums.hpp"
-
 #include "instance.hpp"
+
+#include "game.hpp"
 
 #include "workspace.hpp"
 

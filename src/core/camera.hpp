@@ -6,7 +6,7 @@ namespace core::camera {
 
 class FreeCamera {
 public:
-    enum CameraDirection { FORWARD, BACKWARD, LEFT, RIGHT };
+    enum class CameraDirection { Forward, Backward, Left, Right };
 
     float getMovementSpeed() const { return m_movementSpeed; }
     void setMovementSpeed(float movementSpeed) { m_movementSpeed = movementSpeed; }
@@ -25,7 +25,7 @@ public:
 
     void move(CameraDirection direction, float deltaTime);
 
-    void update(float aspect, glm::vec2 mouseDelta);
+    void update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta);
 
 private:
     glm::vec3 m_front{0.0f, 0.0f, -1.0f};
@@ -71,7 +71,7 @@ public:
 
     float getPhi() const { return m_phi; }
 
-    void update(float aspect, glm::vec2 mouseDelta, glm::vec2 scrollDelta);
+    void update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta);
 
 private:
     float m_sensitivity = 0.01f;

@@ -35,7 +35,7 @@ void Rig::createBodyParts() {
     rightLeg->setColor(glm::u8vec3(0, 98, 255));
 
     rootPart->setTransparency(1.0f);
-    rootPart->setNetworkId(m_networkId);
+    rootPart->setNetworkId(getNetworkId());
 
     m_head->setShape(enums::PartType::Head);
 
@@ -46,6 +46,7 @@ void Rig::createBodyParts() {
 
     m_rigidBody = m_physics.createRigidBodyModel(this, rootPart.get());
     m_rigidBody->setAngularFactor(btVector3(0.0f, 0.0f, 0.0f));
+    m_rigidBody->setFriction(0.1f);
     m_rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     glm::quat identityRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -87,8 +88,22 @@ void Rig::syncParts() {
     }
 }
 
-void Rig::setPivotPosition(const glm::vec3& position) {
-    types::Model::setPivotPosition(position);
+void Rig::setPivot(const glm::mat4& pivot, bool silent) {
+    types::Model::setPivot(pivot, silent);
+
+    if (m_rigidBody) {
+        glm::vec3 position = getPivotPosition();
+        
+        btTransform trans = m_rigidBody->getWorldTransform();
+        trans.setOrigin(btVector3(position.x, position.y, position.z));
+        m_rigidBody->setWorldTransform(trans);
+
+        m_rigidBody->activate(true);
+    }
+}
+
+void Rig::setPivotPosition(const glm::vec3& position, bool silent) {
+    types::Model::setPivotPosition(position, silent);
 
     if (m_rigidBody) {
         btTransform trans = m_rigidBody->getWorldTransform();

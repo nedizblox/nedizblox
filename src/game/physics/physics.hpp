@@ -52,6 +52,9 @@ private:
     std::unordered_map<uint32_t, btRigidBody*> m_bodies;
 
     std::unordered_map<btRigidBody*, float> m_bodyMasses;
+
+    btCylinderShape* createCylinderShape(types::Part* part);
+    btConvexHullShape* createWedgeShape(types::Part* part);
 };
 
 } // namespace game::physics

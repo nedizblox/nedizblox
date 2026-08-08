@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -5,11 +6,14 @@ use std::io::BufReader;
 use std::os::raw::c_char;
 
 use rbx_binary::from_reader;
-use rbx_dom_weak::types::{BrickColor, CFrame, Color3uint8, Variant, Vector3};
+use rbx_dom_weak::types::{BrickColor, CFrame, Color3uint8, Ref, Variant, Vector3};
 use rbx_dom_weak::{Ustr, WeakDom};
 
 #[repr(C)]
 pub struct RbxlPartData {
+    pub id: i64,
+    pub parent_id: i64,
+    pub is_container: bool,
     pub name: *const c_char,
     pub position: [f32; 3],
     pub size: [f32; 3],
@@ -27,6 +31,28 @@ pub enum RbxlPartType {
     Block,
     Cylinder,
     Wedge
+}
+
+fn is_exportable_class(class_name: &str) -> bool {
+    matches!(class_name, "Model" | "Folder" | "Part" | "SpawnLocation")
+}
+
+fn resolve_parent_id(dom: &WeakDom, referent: Ref, id_map: &HashMap<Ref, i64>) -> i64 {
+    let mut current = referent;
+    
+    while let Some(parent) = dom.get_by_ref(current).and_then(|inst| inst.parent().into()) {
+        if parent == dom.root_ref() {
+            break;
+        }
+        
+        if let Some(&parent_id) = id_map.get(&parent) {
+            return parent_id;
+        }
+        
+        current = parent;
+    }
+    
+    -1
 }
 
 #[no_mangle]
@@ -49,111 +75,154 @@ pub extern "C" fn rbxlLoad(path: *const c_char, out_count: *mut usize) -> *mut R
         Err(_) => return std::ptr::null_mut(),
     };
 
+    let mut id_map: HashMap<Ref, i64> = HashMap::new();
+    let mut next_id: i64 = 0;
+
+    for inst in dom.descendants() {
+        if is_exportable_class(inst.class.as_str()) {
+            id_map.insert(inst.referent(), next_id);
+            next_id += 1;
+        }
+    }
+
     let mut parts = Vec::new();
 
     for inst in dom.descendants() {
-        if inst.class == "Part" || inst.class == "SpawnLocation" {
-            let is_spawn_location = inst.class == "SpawnLocation";
+        let class = inst.class.as_str();
+        let is_container = class == "Model" || class == "Folder";
+        let is_part_like = class == "Part" || class == "SpawnLocation";
 
-            let name = CString::new(inst.name.clone())
-                .unwrap_or_else(|_| CString::new("Unknown").unwrap());
-
-            let (pos, ort) = match inst.properties.get(&Ustr::from("CFrame")) {
-                Some(Variant::CFrame(cf)) => {
-                    let pos = cf.position;
-                    let rot = cframe_to_euler_rad(cf);
-                    (pos, rot)
-                }
-                _ => {
-                    let pos = inst
-                        .properties
-                        .get(&Ustr::from("Position"))
-                        .and_then(|v| match v {
-                            Variant::Vector3(v3) => Some(*v3),
-                            _ => None,
-                        })
-                        .unwrap_or(Vector3::new(0.0, 0.0, 0.0));
-
-                    let rot = inst
-                        .properties
-                        .get(&Ustr::from("Orientation"))
-                        .and_then(|v| match v {
-                            Variant::Vector3(v3) => Some(*v3),
-                            _ => None,
-                        })
-                        .unwrap_or(Vector3::new(0.0, 0.0, 0.0));
-
-                    (pos, rot)
-                }
-            };
-
-            let size = inst
-                .properties
-                .get(&Ustr::from("Size"))
-                .and_then(|v| match v {
-                    Variant::Vector3(v3) => Some(*v3),
-                    _ => None,
-                })
-                .unwrap_or(Vector3::new(4.0, 1.0, 2.0));
-
-            let color = match inst.properties.get(&Ustr::from("Color")) {
-                Some(Variant::Color3(c)) => Color3uint8 {
-                    r: (c.r * 255.0) as u8,
-                    g: (c.g * 255.0) as u8,
-                    b: (c.b * 255.0) as u8,
-                },
-                Some(Variant::BrickColor(br)) => br.to_color3uint8(),
-                Some(Variant::Color3uint8(c)) => *c,
-                _ => BrickColor::MediumStoneGrey.to_color3uint8(),
-            };
-
-            let transparency = inst
-                .properties
-                .get(&Ustr::from("Transparency"))
-                .and_then(|v| match v {
-                    Variant::Float32(f) => Some(*f),
-                    _ => None,
-                })
-                .unwrap_or(0.0);
-
-            let anchored = inst
-                .properties
-                .get(&Ustr::from("Anchored"))
-                .and_then(|v| match v {
-                    Variant::Bool(b) => Some(*b),
-                    _ => None,
-                })
-                .unwrap_or(false);
-
-            let shape_id = inst
-                .properties
-                .get(&Ustr::from("Shape"))
-                .and_then(|v| match v {
-                    Variant::Enum(e) => Some(e.to_u32()),
-                    _ => None
-                })
-                .unwrap_or(1);
-
-            let part_type = match shape_id {
-                0 => RbxlPartType::Ball,
-                1 => RbxlPartType::Block,
-                2 => RbxlPartType::Cylinder,
-                3 => RbxlPartType::Wedge,
-                _ => RbxlPartType::Block,
-            };
-
-            parts.push(RbxlPartData {
-                name: name.into_raw(),
-                position: [pos.x, pos.y, pos.z],
-                size: [size.x, size.y, size.z],
-                orientation: [ort.x, ort.y, ort.z],
-                color: [color.r, color.g, color.b],
-                transparency: transparency,
-                anchored: anchored,
-                shape: part_type,
-                is_spawn_location: is_spawn_location
-            });
+        if !is_container && !is_part_like {
+            continue;
         }
+
+        let id = *id_map
+            .get(&inst.referent())
+            .expect("exportable instance must have been assigned an id in the first pass");
+
+        let parent_id = resolve_parent_id(&dom, inst.referent(), &id_map);
+
+        let name = CString::new(inst.name.clone())
+            .unwrap_or_else(|_| CString::new("Unknown").unwrap());
+
+        if is_container {
+            parts.push(RbxlPartData {
+                id,
+                parent_id,
+                is_container: true,
+                name: name.into_raw(),
+                position: [0.0, 0.0, 0.0],
+                size: [0.0, 0.0, 0.0],
+                orientation: [0.0, 0.0, 0.0],
+                color: [0, 0, 0],
+                transparency: 0.0,
+                anchored: false,
+                shape: RbxlPartType::Block,
+                is_spawn_location: false,
+            });
+            continue;
+        }
+
+        let is_spawn_location = class == "SpawnLocation";
+
+        let (pos, ort) = match inst.properties.get(&Ustr::from("CFrame")) {
+            Some(Variant::CFrame(cf)) => {
+                let pos = cf.position;
+                let rot = cframe_to_euler_rad(cf);
+                (pos, rot)
+            }
+            _ => {
+                let pos = inst
+                    .properties
+                    .get(&Ustr::from("Position"))
+                    .and_then(|v| match v {
+                        Variant::Vector3(v3) => Some(*v3),
+                        _ => None,
+                    })
+                    .unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+
+                let rot = inst
+                    .properties
+                    .get(&Ustr::from("Orientation"))
+                    .and_then(|v| match v {
+                        Variant::Vector3(v3) => Some(*v3),
+                        _ => None,
+                    })
+                    .unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+
+                (pos, rot)
+            }
+        };
+
+        let size = inst
+            .properties
+            .get(&Ustr::from("Size"))
+            .and_then(|v| match v {
+                Variant::Vector3(v3) => Some(*v3),
+                _ => None,
+            })
+            .unwrap_or(Vector3::new(4.0, 1.0, 2.0));
+
+        let color = match inst.properties.get(&Ustr::from("Color")) {
+            Some(Variant::Color3(c)) => Color3uint8 {
+                r: (c.r * 255.0) as u8,
+                g: (c.g * 255.0) as u8,
+                b: (c.b * 255.0) as u8,
+            },
+            Some(Variant::BrickColor(br)) => br.to_color3uint8(),
+            Some(Variant::Color3uint8(c)) => *c,
+            _ => BrickColor::MediumStoneGrey.to_color3uint8(),
+        };
+
+        let transparency = inst
+            .properties
+            .get(&Ustr::from("Transparency"))
+            .and_then(|v| match v {
+                Variant::Float32(f) => Some(*f),
+                _ => None,
+            })
+            .unwrap_or(0.0);
+
+        let anchored = inst
+            .properties
+            .get(&Ustr::from("Anchored"))
+            .and_then(|v| match v {
+                Variant::Bool(b) => Some(*b),
+                _ => None,
+            })
+            .unwrap_or(false);
+
+        let shape_id = inst
+            .properties
+            .get(&Ustr::from("Shape"))
+            .and_then(|v| match v {
+                Variant::Enum(e) => Some(e.to_u32()),
+                _ => None
+            })
+            .unwrap_or(1);
+
+        let part_type = match shape_id {
+            0 => RbxlPartType::Ball,
+            1 => RbxlPartType::Block,
+            2 => RbxlPartType::Cylinder,
+            3 => RbxlPartType::Wedge,
+            _ => RbxlPartType::Block,
+        };
+
+        parts.push(RbxlPartData {
+            id,
+            parent_id,
+            is_container: false,
+            name: name.into_raw(),
+            position: [pos.x, pos.y, pos.z],
+            size: [size.x, size.y, size.z],
+            orientation: [ort.x, ort.y, ort.z],
+            color: [color.r, color.g, color.b],
+            transparency: transparency,
+            anchored: anchored,
+            shape: part_type,
+            is_spawn_location: is_spawn_location
+        });
     }
 
     unsafe {

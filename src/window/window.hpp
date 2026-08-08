@@ -92,6 +92,7 @@ private:
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
     static void winResizeCallback(GLFWwindow* window, int width, int height);
     static void fbResizeCallback(GLFWwindow* window, int width, int height);
+    static void errorCallback(int error, const char* description);
 };
 
 } // namespace win

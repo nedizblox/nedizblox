@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model.hpp"
+#include "../skybox.hpp"
 
 #include <memory>
 #include <string>
@@ -17,6 +18,7 @@ public:
     ModelManager& operator=(const ModelManager&) = delete;
 
     void loadModel(const std::string& name, const std::string& filePath);
+    void loadSkybox();
 
     void drawOpaque(
         VkCommandBuffer commandBuffer,
@@ -24,6 +26,7 @@ public:
     void drawTransparent(
         VkCommandBuffer commandBuffer,
         const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData);
+    void drawSkybox(VkCommandBuffer commandBuffer);
 
 private:
     struct ManagedModel {
@@ -34,6 +37,8 @@ private:
     vk::Device& m_device;
 
     std::unordered_map<std::string, ManagedModel> m_models;
+
+    std::unique_ptr<Skybox> m_skybox;
 };
 
 } // namespace gfx::mngrs

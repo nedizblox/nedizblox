@@ -36,7 +36,7 @@ public:
         glm::vec4 color;
         glm::uvec3 texIndices1;
         glm::uvec3 texIndices2;
-        glm::vec2 texTile;
+        glm::uvec3 texTilesPacked;
     };
 
     struct Builder {

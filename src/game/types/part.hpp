@@ -17,22 +17,36 @@ public:
     }
 
     glm::vec3 getPosition() const { return m_position; }
-    void setPosition(const glm::vec3& position) {
+    void setPosition(const glm::vec3& position, bool silent = false) {
         m_position = position;
         updateModelMatrix();
-        propertyChanged();
+
+        if (!silent)
+            propertyChanged();
     }
 
     glm::quat getOrientation() const { return m_orientation; }
-    void setOrientation(const glm::quat& orientation) {
+    void setOrientation(const glm::quat& orientation, bool silent = false) {
         m_orientation = orientation;
         updateModelMatrix();
-        propertyChanged();
+
+        if (!silent)
+            propertyChanged();
     }
 
     glm::vec3 getSize() const { return m_size; }
     void setSize(const glm::vec3& size) {
-        m_size = size;
+        if (m_shape == enums::PartType::Cylinder) {
+            float diameter = size.x;
+
+            if (glm::abs(size.z - m_size.z) > 0.001f)
+                diameter = size.z;
+
+            m_size = glm::vec3(diameter, size.y, diameter);
+        } else {
+            m_size = size;
+        }
+        
         updateModelMatrix();
         propertyChanged();
     }
@@ -69,6 +83,12 @@ public:
     enums::PartType getShape() const { return m_shape; }
     void setShape(enums::PartType shape) {
         m_shape = shape;
+        propertyChanged();
+    }
+
+    enums::MaterialType getMaterial() const { return m_material; }
+    void setMaterial(enums::MaterialType material) {
+        m_material = material;
         propertyChanged();
     }
 
@@ -111,9 +131,6 @@ public:
     btRigidBody* getRigidBody() const { return m_rigidBody; }
     void setRigidBody(btRigidBody* rigidBody) { m_rigidBody = rigidBody; }
 
-    uint32_t getNetworkId() const { return m_networkId; }
-    void setNetworkId(uint32_t networkId) { m_networkId = networkId; }
-
 private:
     glm::vec3 m_position{0.0f};
     glm::quat m_orientation{0.0f, 0.0f, 0.0f, 0.0f};
@@ -128,6 +145,8 @@ private:
 
     enums::PartType m_shape = enums::PartType::Block;
 
+    enums::MaterialType m_material = enums::MaterialType::SmoothPlastic;
+
     enums::SurfaceType m_surfaceTop = enums::SurfaceType::Studs;
     enums::SurfaceType m_surfaceBottom = enums::SurfaceType::Inlets;
     enums::SurfaceType m_surfaceLeft = enums::SurfaceType::Smooth;
@@ -136,7 +155,6 @@ private:
     enums::SurfaceType m_surfaceBack = enums::SurfaceType::Smooth;
 
     btRigidBody* m_rigidBody = nullptr;
-    uint32_t m_networkId = 0;
 };
 
 } // namespace game::types

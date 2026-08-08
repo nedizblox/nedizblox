@@ -57,6 +57,16 @@ public:
 
     void sendReliable(const void* data, size_t size);
 
+    void sendPing();
+
+    uint32_t getPingMs() const { return m_pingMs.load(); }
+
+    double getSentKB() const { return static_cast<double>(m_bytesSent.load()) / 1024.0; }
+    double getRecvKB() const { return static_cast<double>(m_bytesReceived.load()) / 1024.0; }
+
+    double getSentKBps() const { return m_sentKBps.load(); }
+    double getRecvKBps() const { return m_recvKBps.load(); }
+
     void start();
     void stop();
 
@@ -76,6 +86,7 @@ private:
 
     std::thread m_tcpReceiveThread;
     std::thread m_udpReceiveThread;
+    std::thread m_statsThread;
     std::atomic<bool> m_running{false};
 
     std::unordered_map<uint32_t, packets::PhysicalObjectState> m_objectStates;
@@ -90,8 +101,15 @@ private:
 
     ReliableMessageCallback m_reliableMessageCallback;
 
+    std::atomic<uint32_t> m_pingMs{0};
+    std::atomic<uint64_t> m_bytesSent{0};
+    std::atomic<uint64_t> m_bytesReceived{0};
+    std::atomic<double> m_sentKBps{0.0};
+    std::atomic<double> m_recvKBps{0.0};
+
     void tcpUpdateLoop();
     void udpUpdateLoop();
+    void statsLoop();
 };
 
 } // namespace net

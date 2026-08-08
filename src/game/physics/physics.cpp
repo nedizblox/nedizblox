@@ -24,19 +24,62 @@ Physics::~Physics() {
     delete m_collisionConfiguration;
 }
 
+btCylinderShape* Physics::createCylinderShape(types::Part* part) {
+    auto size = part->getSize();
+
+    btScalar radius = size.x * 0.5f;
+    btScalar halfHeight = size.y * 0.5f;
+
+    return new btCylinderShape(btVector3(radius, halfHeight, radius));
+}
+
+btConvexHullShape* Physics::createWedgeShape(types::Part* part) {
+    btConvexHullShape* wedgeShape = new btConvexHullShape();
+
+    auto size = part->getSize();
+
+    btScalar halfW = size.x * 0.5f;
+    btScalar halfH = size.y * 0.5f;
+    btScalar halfD = size.z * 0.5f;
+
+    wedgeShape->addPoint(btVector3(-halfW, -halfH, -halfD));
+    wedgeShape->addPoint(btVector3(halfW, -halfH, -halfD));
+    wedgeShape->addPoint(btVector3(halfW, -halfH, halfD));
+    wedgeShape->addPoint(btVector3(-halfW, -halfH, halfD));
+
+    wedgeShape->addPoint(btVector3(-halfW, halfH, halfD));
+    wedgeShape->addPoint(btVector3(halfW, halfH, halfD));
+
+    wedgeShape->initializePolyhedralFeatures();
+
+    return wedgeShape;
+}
+
 btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     btCollisionShape* shape = nullptr;
 
     glm::vec3 size = part->getSize();
     btVector3 halfExtents(size.x / 2.0f, size.y / 2.0f, size.z / 2.0f);
 
-    auto type = part->getShape();
-    if (type == enums::PartType::Block) {
+    switch (part->getShape()) {
+    case enums::PartType::Block:
         shape = new btBoxShape(halfExtents);
-    } else if (type == enums::PartType::Ball) {
+        break;
+    case enums::PartType::Ball:
         shape = new btSphereShape(size.x / 2.0f);
-    } else {
+        break;
+    case enums::PartType::Cylinder:
+        shape = createCylinderShape(part);
+        break;
+    case enums::PartType::Wedge:
+        shape = createWedgeShape(part);
+        break;
+    case enums::PartType::Head:
+        shape = createCylinderShape(part);
+        break;
+    default:
         shape = new btBoxShape(halfExtents);
+        break;
     }
 
     shape->setLocalScaling(btVector3(1.0f, 1.0f, 1.0f));
@@ -78,6 +121,9 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
         auto obj = std::static_pointer_cast<types::Part>(destroying);
         auto rigidBody = obj->getRigidBody();
 
+        if (!rigidBody)
+            return;
+
         m_dynamicsWorld->removeRigidBody(rigidBody);
 
         {
@@ -90,6 +136,12 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
             std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
             m_networkTargets.erase(obj->getNetworkId());
         }
+
+        if (auto* ms = dynamic_cast<PartMotionState*>(rigidBody->getMotionState())) {
+            ms->detachPart();
+        }
+
+        obj->setRigidBody(nullptr);
 
         delete rigidBody->getMotionState();
         delete rigidBody;
@@ -128,7 +180,7 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     btRigidBody* body = new btRigidBody(ci);
 
     body->setSleepingThresholds(0.6f, 0.8f);
-    body->setDeactivationTime(0.2f);
+    body->setDeactivationTime(1.0f);
 
     m_dynamicsWorld->addRigidBody(body);
 
@@ -144,6 +196,9 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
         auto obj = std::static_pointer_cast<types::Part>(destroying);
         auto rigidBody = obj->getRigidBody();
 
+        if (!rigidBody)
+            return;
+
         m_dynamicsWorld->removeRigidBody(rigidBody);
 
         {
@@ -156,6 +211,12 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
             std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
             m_networkTargets.erase(obj->getNetworkId());
         }
+
+        if (auto* ms = dynamic_cast<ModelMotionState*>(rigidBody->getMotionState())) {
+            ms->detachModel();
+        }
+
+        obj->setRigidBody(nullptr);
 
         delete rigidBody->getMotionState();
         delete rigidBody;
@@ -357,22 +418,41 @@ void Physics::step(float deltaTime) {
     m_dynamicsWorld->stepSimulation(deltaTime, 5, 1.0f / 60.0f);
 
     std::vector<types::Part*> fallenParts;
+    std::vector<types::Model*> fallenModels;
     {
         std::lock_guard<std::mutex> lock(m_bodiesMutex);
         for (const auto& [networkId, body] : m_bodies) {
             if (!body)
                 continue;
 
-            auto* motionState = dynamic_cast<PartMotionState*>(body->getMotionState());
-            if (motionState && motionState->isPendingDestroy()) {
-                if (types::Part* part = motionState->getPart())
-                    fallenParts.push_back(part);
+            if (auto* motionState = dynamic_cast<PartMotionState*>(body->getMotionState())) {
+                if (motionState->isPendingDestroy()) {
+                    if (types::Part* part = motionState->getPart()) {
+                        fallenParts.push_back(part);
+                        motionState->detachPart();
+                    }
+                }
+            } else if (auto* motionState = dynamic_cast<ModelMotionState*>(body->getMotionState())) {
+                if (motionState->isPendingDestroy()) {
+                    if (types::Model* model = motionState->getModel()) {
+                        fallenModels.push_back(model);
+                        motionState->detachModel();
+                    }
+                }
             }
         }
     }
 
-    for (types::Part* part : fallenParts) {
-        part->destroy();
+    for (auto* part : fallenParts) {
+        if (part) {
+            part->destroy();
+        }
+    }
+
+    for (auto* model : fallenModels) {
+        if (model) {
+            model->destroy();
+        }
     }
 }
 

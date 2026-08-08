@@ -20,9 +20,7 @@ public:
     InstanceManager(const InstanceManager&) = delete;
     InstanceManager& operator=(const InstanceManager&) = delete;
 
-    void rebuildMap(
-        const std::shared_ptr<types::Instance>& root, uint32_t studsTexId, uint32_t inletsTexId,
-        uint32_t smoothTexId, uint32_t glueTexId);
+    void rebuildMap(const std::shared_ptr<types::Instance>& root);
     void rebuildGui(const std::shared_ptr<types::Instance>& root);
 
     void updateDynamicTransforms();
@@ -71,9 +69,9 @@ private:
     bool m_mapHierarchyDirty = true;
     bool m_guiHierarchyDirty = true;
 
-    void collectMapInstances(
-        const std::shared_ptr<types::Instance>& parent, uint32_t studsTexId, uint32_t inletsTexId,
-        uint32_t smoothTexId, uint32_t glueTexId);
+    glm::uvec3 packTexTiles(const glm::vec2* texTiles);
+
+    void collectMapInstances(const std::shared_ptr<types::Instance>& parent);
     void collectGuiInstances(const std::shared_ptr<types::Instance>& parent);
 
     void sortInstances(const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances);

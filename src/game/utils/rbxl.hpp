@@ -8,6 +8,6 @@
 
 namespace game::utils::rbxl {
 
-std::vector<std::shared_ptr<types::Part>> parseRbxl(const std::string& filePath);
+std::vector<std::shared_ptr<types::Instance>> parseRbxl(const std::string& filePath);
 
 } // namespace game::utils::rbxl

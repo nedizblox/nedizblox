@@ -4,6 +4,8 @@
 
 namespace core::logger {
 
+void init();
+
 void info(const std::string& msg, bool debug = false);
 void warn(const std::string& msg, bool debug = false);
 void err(const std::string& msg, bool debug = false);

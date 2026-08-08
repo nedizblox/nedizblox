@@ -27,7 +27,8 @@ public:
     glm::vec3 getSpawnPosition() const { return m_spawnPosition; }
     void setSpawnPosition(const glm::vec3& spawnPosition) { m_spawnPosition = spawnPosition; }
 
-    void setPivotPosition(const glm::vec3& position) override;
+    void setPivot(const glm::mat4& pivot, bool silent = false) override;
+    void setPivotPosition(const glm::vec3& position, bool silent = false) override;
 
     void move(enums::RigMoveDirection direction, float phi);
     void jump();
@@ -38,11 +39,9 @@ public:
 
 private:
     Rig(physics::Physics& physics, const std::string& name, uint32_t networkId) :
-        m_physics(physics), types::Model(name), m_networkId(networkId) {}
+        m_physics(physics), types::Model(name) { setNetworkId(networkId); }
 
     physics::Physics& m_physics;
-
-    uint32_t m_networkId = 0;
 
     std::vector<Bone> m_bones;
 
@@ -50,8 +49,8 @@ private:
 
     glm::vec3 m_velocity{0.0f};
 
-    float m_walkSpeed = 16.0f;
-    float m_jumpPower = 50.0f;
+    float m_walkSpeed = 25.0f;
+    float m_jumpPower = 60.0f;
 
     glm::vec3 m_spawnPosition{0.0f, 5.0f, 0.0f};
 

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace game::engines {
+namespace scripting {
 
 class ScriptEngine {
 public:

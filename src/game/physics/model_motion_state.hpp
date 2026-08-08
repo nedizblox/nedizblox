@@ -31,7 +31,7 @@ public:
     virtual void setWorldTransform(const btTransform& worldTrans) override {
         if (!m_model)
             return;
-        
+
         btVector3 pos = worldTrans.getOrigin();
         btQuaternion q = worldTrans.getRotation();
 
@@ -40,7 +40,7 @@ public:
 
         glm::mat4 pivot = glm::translate(glm::mat4(1.0f), position) * glm::toMat4(orientation);
 
-        m_model->setPivot(pivot);
+        m_model->setPivot(pivot, true);
 
         if (pos.y() < kKillHeight) {
             m_pendingDestroy = true;
@@ -50,6 +50,11 @@ public:
     bool isPendingDestroy() const { return m_pendingDestroy; }
 
     types::Model* getModel() const { return m_model; }
+
+    void detachModel() {
+        m_model = nullptr;
+        m_pendingDestroy = false;
+    }
 
 private:
     static constexpr float kKillHeight = -500.0f;

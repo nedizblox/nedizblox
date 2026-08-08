@@ -159,7 +159,8 @@ void Imgui::draw(VkCommandBuffer commandBuffer) {
         ImGui::End();
     }
 
-    ImGui::ShowDemoWindow(&m_showDemoWindow);
+    if (m_showDemoWindow)
+        ImGui::ShowDemoWindow(&m_showDemoWindow);
 
     ImGui::Render();
 

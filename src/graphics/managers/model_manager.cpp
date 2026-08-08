@@ -17,6 +17,13 @@ void ModelManager::loadModel(const std::string& name, const std::string& filePat
     m_models[name] = std::move(managed);
 }
 
+void ModelManager::loadSkybox() {
+    if (m_skybox)
+        return;
+
+    m_skybox = std::make_unique<gfx::Skybox>(m_device);
+}
+
 void ModelManager::drawOpaque(
     VkCommandBuffer commandBuffer,
     const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
@@ -49,6 +56,10 @@ void ModelManager::drawTransparent(
             model.transparent->draw(commandBuffer, it->second);
         }
     }
+}
+
+void ModelManager::drawSkybox(VkCommandBuffer commandBuffer) {
+    m_skybox->draw(commandBuffer);
 }
 
 } // namespace gfx::mngrs

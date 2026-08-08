@@ -1,15 +1,23 @@
-#include "render_engine.hpp"
+#include "render_manager.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace game::engines {
+namespace game::mngrs {
 
-RenderEngine::RenderEngine(gfx::vk::Device& device, gfx::vk::Renderer& renderer, gfx::mngrs::BindlessManager& bindlessManager) :
-    m_device(device), m_renderer(renderer), m_bindlessManager(bindlessManager) {}
+RenderManager::RenderManager(
+    gfx::vk::Device& device, gfx::vk::Renderer& renderer,
+    gfx::mngrs::BindlessManager& bindlessManager, gfx::mngrs::ModelManager& modelManager,
+    gfx::mngrs::BillboardManager& billboardManager, gfx::mngrs::UiManager& uiManager) :
+    m_device(device),
+    m_renderer(renderer),
+    m_bindlessManager(bindlessManager),
+    m_modelManager(modelManager),
+    m_billboardManager(billboardManager),
+    m_uiManager(uiManager) {}
 
-RenderEngine::~RenderEngine() {}
+RenderManager::~RenderManager() {}
 
-void RenderEngine::initPipelines(VkDescriptorSetLayout setLayout) {
+void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
     m_pipelines["skybox"] = gfx::vk::Pipeline::Builder(m_device)
                                 .setVertShaderPath("shaders/skybox.vert.spv")
                                 .setFragShaderPath("shaders/skybox.frag.spv")
@@ -88,56 +96,51 @@ void RenderEngine::initPipelines(VkDescriptorSetLayout setLayout) {
                                .build();
 }
 
-void RenderEngine::renderModelsOpaque(
-    VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
-    gfx::mngrs::ModelManager& modelManager,
+void RenderManager::renderModelsOpaque(
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
     auto& pipeline = m_pipelines["modelOpaque"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
     gfx::Model::PushConstantObject push{};
-    push.viewProj = camera.getProjection() * camera.getView();
-    push.cameraPos = camera.getPosition();
+    push.viewProj = proj * view;
+    push.cameraPos = pos;
     pipeline->pushConstant(commandBuffer, push);
 
-    modelManager.drawOpaque(commandBuffer, instancesData);
+    m_modelManager.drawOpaque(commandBuffer, instancesData);
 }
 
-void RenderEngine::renderSkybox(
-    VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera, gfx::Skybox& skybox,
-    uint32_t skyboxCubemapId) {
+void RenderManager::renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, uint32_t skyboxCubId) {
     auto& pipeline = m_pipelines["skybox"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
     gfx::Skybox::PushConstantObject push{};
-    push.viewProj = camera.getProjection() * glm::mat4(glm::mat3(camera.getView()));
-    push.cubIndex = skyboxCubemapId;
+    push.viewProj = proj * glm::mat4(glm::mat3(view));
+    push.cubIndex = skyboxCubId;
     pipeline->pushConstant(commandBuffer, push);
 
-    skybox.draw(commandBuffer);
+    m_modelManager.drawSkybox(commandBuffer);
 }
 
-void RenderEngine::renderModelsTransparent(
-    VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
-    gfx::mngrs::ModelManager& modelManager,
+void RenderManager::renderModelsTransparent(
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
     auto& pipeline = m_pipelines["modelTransparent"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
     gfx::Model::PushConstantObject push{};
-    push.viewProj = camera.getProjection() * camera.getView();
-    push.cameraPos = camera.getPosition();
+    push.viewProj = proj * view;
+    push.cameraPos = pos;
     pipeline->pushConstant(commandBuffer, push);
 
-    modelManager.drawTransparent(commandBuffer, instancesData);
+    m_modelManager.drawTransparent(commandBuffer, instancesData);
 }
 
-void RenderEngine::renderBillboardTexts(
-    VkCommandBuffer commandBuffer, const core::camera::SphericalCamera& camera,
-    gfx::mngrs::BillboardManager& billboardManager,
+void RenderManager::renderBillboardTexts(
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
     const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& instancesData) {
     auto& pipeline = m_pipelines["billboard"];
     pipeline->bind(commandBuffer);
@@ -148,17 +151,17 @@ void RenderEngine::renderBillboardTexts(
             continue;
 
         gfx::Billboard::PushConstantObject push{};
-        push.view = camera.getView();
-        push.proj = camera.getProjection();
-        push.texIndex = billboardManager.getTextureIndex(name);
+        push.view = view;
+        push.proj = proj;
+        push.texIndex = m_billboardManager.getTextureIndex(name);
 
         pipeline->pushConstant(commandBuffer, push);
-        billboardManager.drawText(commandBuffer, instances);
+        m_billboardManager.drawText(commandBuffer, instances);
     }
 }
 
-void RenderEngine::renderTexts(
-    VkCommandBuffer commandBuffer, win::Window& window, gfx::mngrs::UiManager& uiManager,
+void RenderManager::renderTexts(
+    VkCommandBuffer commandBuffer, win::Window& window,
     const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData) {
     auto& pipeline = m_pipelines["text"];
     pipeline->bind(commandBuffer);
@@ -171,14 +174,14 @@ void RenderEngine::renderTexts(
         gfx::ui::Text::PushConstantObject push{};
         push.proj = glm::ortho(
             0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
-        push.texIndex = uiManager.getTextureIndex(name);
+        push.texIndex = m_uiManager.getTextureIndex(name);
 
         pipeline->pushConstant(commandBuffer, push);
-        uiManager.drawText(commandBuffer, instances);
+        m_uiManager.drawText(commandBuffer, instances);
     }
 }
 
-void RenderEngine::renderImgui(VkCommandBuffer commandBuffer, win::Window& window, gfx::ui::Imgui& imgui) {
+void RenderManager::renderImgui(VkCommandBuffer commandBuffer, win::Window& window, gfx::ui::Imgui& imgui) {
     auto& pipeline = m_pipelines["imgui"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -192,4 +195,4 @@ void RenderEngine::renderImgui(VkCommandBuffer commandBuffer, win::Window& windo
     imgui.draw(commandBuffer);
 }
 
-} // namespace game::engines
+} // namespace game::mngrs

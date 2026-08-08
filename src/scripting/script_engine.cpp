@@ -4,7 +4,7 @@
 
 #include <cstring>
 
-namespace game::engines {
+namespace scripting {
 
 ScriptEngine::ScriptEngine() {
     init();
@@ -64,4 +64,4 @@ void ScriptEngine::runString(const std::string& name, const std::string& source)
     wrenInterpret(m_vm, name.c_str(), source.c_str());
 }
 
-} // namespace game::engines
+} // namespace scripting

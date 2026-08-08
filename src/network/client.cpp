@@ -5,6 +5,7 @@
 #include "core/crypto.hpp"
 #include "core/logger.hpp"
 
+#include <chrono>
 #include <cstring>
 #include <format>
 
@@ -27,16 +28,18 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     packets::PlayerInfoPacket info{};
     std::strncpy(info.nickname, nickname.c_str(), sizeof(info.nickname) - 1);
     info.clientVersion
-        = core::crypto::encodeVersion(CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_PATCH);
+        = core::crypto::encodeVersion(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 
     if (!tcpframing::writeFramed(m_tcpSocket, &info, sizeof(info), ec)) {
         throw std::runtime_error("Client failed to send PlayerInfoPacket: " + ec.message());
     }
+    m_bytesSent += sizeof(packets::TcpMessageHeader) + sizeof(info);
 
     std::vector<uint8_t> reply;
     if (!tcpframing::readFramed(m_tcpSocket, reply, ec)) {
         throw std::runtime_error("Client did not receive TCP handshake response: " + ec.message());
     }
+    m_bytesReceived += sizeof(packets::TcpMessageHeader) + reply.size();
 
     if (reply.size() == sizeof(packets::PlayerKickPacket)) {
         packets::PlayerKickPacket kick{};
@@ -62,6 +65,7 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
         || stateReply.size() < sizeof(packets::InitialStatePacket)) {
         throw std::runtime_error("Client did not receive a valid InitialStatePacket: " + ec.message());
     }
+    m_bytesReceived += sizeof(packets::TcpMessageHeader) + stateReply.size();
 
     packets::InitialStatePacket initialState{};
     std::memcpy(&initialState, stateReply.data(), sizeof(initialState));
@@ -84,6 +88,7 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     if (!tcpframing::readFramed(m_tcpSocket, mapReply, ec) || mapReply.size() < sizeof(packets::InitialMapPacket)) {
         throw std::runtime_error("Client did not receive a valid InitialMapPacket: " + ec.message());
     }
+    m_bytesReceived += sizeof(packets::TcpMessageHeader) + mapReply.size();
 
     packets::InitialMapPacket mapHeader{};
     std::memcpy(&mapHeader, mapReply.data(), sizeof(mapHeader));
@@ -112,6 +117,7 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     if (ec) {
         throw std::runtime_error("Client failed to send UDP handshake: " + ec.message());
     }
+    m_bytesSent += sizeof(helloPacket);
 
     core::logger::info(std::format("Successfully connected to the server ({}:{})", host, port));
 }
@@ -139,6 +145,9 @@ void Client::sendPhysicsState(const std::vector<packets::PhysicalObjectState>& o
 
         boost::system::error_code ec;
         m_udpSocket.send_to(boost::asio::buffer(buffer), m_udpServer, 0, ec);
+        if (!ec) {
+            m_bytesSent += buffer.size();
+        }
     }
 }
 
@@ -148,6 +157,22 @@ void Client::sendReliable(const void* data, size_t size) {
     boost::system::error_code ec;
     if (!tcpframing::writeFramed(m_tcpSocket, data, size, ec)) {
         core::logger::err("Client sendReliable: " + ec.message());
+    } else {
+        m_bytesSent += sizeof(packets::TcpMessageHeader) + size;
+    }
+}
+
+void Client::sendPing() {
+    packets::PingPacket ping{};
+    ping.clientTimeUs = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+
+    boost::system::error_code ec;
+    m_udpSocket.send_to(boost::asio::buffer(&ping, sizeof(ping)), m_udpServer, 0, ec);
+    if (!ec) {
+        m_bytesSent += sizeof(ping);
     }
 }
 
@@ -170,6 +195,7 @@ void Client::start() {
 
     m_tcpReceiveThread = std::thread(&Client::tcpUpdateLoop, this);
     m_udpReceiveThread = std::thread(&Client::udpUpdateLoop, this);
+    m_statsThread = std::thread(&Client::statsLoop, this);
 }
 
 void Client::stop() {
@@ -195,6 +221,10 @@ void Client::stop() {
     if (m_tcpReceiveThread.joinable()) {
         m_tcpReceiveThread.join();
     }
+
+    if (m_statsThread.joinable()) {
+        m_statsThread.join();
+    }
 }
 
 void Client::tcpUpdateLoop() {
@@ -208,6 +238,8 @@ void Client::tcpUpdateLoop() {
             }
             break;
         }
+
+        m_bytesReceived += sizeof(packets::TcpMessageHeader) + payload.size();
 
         if (payload.size() < sizeof(packets::PacketHeader)) {
             continue;
@@ -262,6 +294,25 @@ void Client::udpUpdateLoop() {
             break;
         }
 
+        m_bytesReceived += bytes;
+
+        if (bytes == sizeof(packets::PongPacket)) {
+            packets::PongPacket pong{};
+            std::memcpy(&pong, buffer.data(), sizeof(pong));
+
+            if (pong.magic == packets::kPongMagic) {
+                auto nowUs = static_cast<uint64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count());
+
+                if (nowUs >= pong.clientTimeUs) {
+                    m_pingMs = static_cast<uint32_t>((nowUs - pong.clientTimeUs) / 1000);
+                }
+                continue;
+            }
+        }
+
         if (bytes < sizeof(packets::PhysicsStepPacket)) {
             continue;
         }
@@ -290,6 +341,35 @@ void Client::udpUpdateLoop() {
     }
 
     m_running = false;
+}
+
+void Client::statsLoop() {
+    auto lastTime = std::chrono::steady_clock::now();
+    uint64_t lastSent = m_bytesSent.load();
+    uint64_t lastReceived = m_bytesReceived.load();
+
+    while (m_running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (!m_running)
+            break;
+
+        auto now = std::chrono::steady_clock::now();
+        double elapsedSec = std::chrono::duration<double>(now - lastTime).count();
+        if (elapsedSec < 1.0)
+            continue;
+
+        uint64_t sentNow = m_bytesSent.load();
+        uint64_t receivedNow = m_bytesReceived.load();
+
+        m_sentKBps = (static_cast<double>(sentNow - lastSent) / 1024.0) / elapsedSec;
+        m_recvKBps = (static_cast<double>(receivedNow - lastReceived) / 1024.0) / elapsedSec;
+
+        lastSent = sentNow;
+        lastReceived = receivedNow;
+        lastTime = now;
+
+        sendPing();
+    }
 }
 
 } // namespace net

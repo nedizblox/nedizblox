@@ -1,4 +1,4 @@
-#include "game/game_client.hpp"
+#include "game/game_server.hpp"
 
 #include "core/core.hpp"
 
@@ -6,16 +6,16 @@
 #include <stdexcept>
 
 int main(int argc, char* argv[]) {
+    core::logger::init();
+
     auto args = core::argsparser::parseArguments(argc, argv);
 
     try {
-        std::unique_ptr<game::GameClient> game;
-        
-        if (args.contains("address") && args.contains("port") && args.contains("nickname")) {
-            std::string address = args["address"];
-            std::string portStr = args["port"];
-            std::string nickname = args["nickname"];
+        std::unique_ptr<game::GameServer> game;
 
+        if (args.contains("port") && args.contains("map")) {
+            std::string portStr = args["port"];
+            std::string map = args["map"];
             uint16_t port = 0;
 
             auto [ptr, ec] = std::from_chars(portStr.data(), portStr.data() + portStr.size(), port);
@@ -26,15 +26,14 @@ int main(int argc, char* argv[]) {
                 throw std::runtime_error("Port must be a valid number");
             }
 
-            game = std::make_unique<game::GameClient>(address, port, nickname);
+            game = std::make_unique<game::GameServer>(port, map);
         } else {
-            throw std::runtime_error("Please specify the server address, port and your nickname using the --address, --port and --nickname argument");
+            throw std::runtime_error("Please specify the server port and rbxl map path using the --port and --map argument");
         }
 
         game->run();
     } catch (const std::exception& e) {
         core::logger::err(e.what());
-        core::msgbox::showError("Nedizblox", e.what());
         return 1;
     }
 

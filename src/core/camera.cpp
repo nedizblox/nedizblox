@@ -6,21 +6,21 @@ namespace core::camera {
 
 void FreeCamera::move(CameraDirection direction, float deltaTime) {
     float velocity = m_movementSpeed * deltaTime;
-    if (direction == FORWARD) {
+    if (direction == CameraDirection::Forward) {
         m_position += m_front * velocity;
     }
-    if (direction == BACKWARD) {
+    if (direction == CameraDirection::Backward) {
         m_position -= m_front * velocity;
     }
-    if (direction == LEFT) {
+    if (direction == CameraDirection::Left) {
         m_position -= m_right * velocity;
     }
-    if (direction == RIGHT) {
+    if (direction == CameraDirection::Right) {
         m_position += m_right * velocity;
     }
 }
 
-void FreeCamera::update(float aspect, glm::vec2 mouseDelta) {
+void FreeCamera::update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta) {
     m_yaw += mouseDelta.x * m_sensitivity;
     m_pitch += mouseDelta.y * m_sensitivity;
     m_pitch = glm::clamp(m_pitch, -glm::radians(89.0f), glm::radians(89.0f));
@@ -34,13 +34,15 @@ void FreeCamera::update(float aspect, glm::vec2 mouseDelta) {
     m_right = glm::normalize(glm::cross(m_front, m_worldUp));
     m_up = glm::normalize(glm::cross(m_right, m_front));
 
+    m_position += m_front * scrollDelta.y;
+
     m_projection = glm::perspective(glm::radians(m_fov), aspect, 0.1f, 1000.0f);
     m_projection[1][1] *= -1; // inverse for vulkan
 
     m_view = glm::lookAt(m_position, m_position + m_front, m_up);
 }
 
-void SphericalCamera::update(float aspect, glm::vec2 mouseDelta, glm::vec2 scrollDelta) {
+void SphericalCamera::update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta) {
     m_radius -= scrollDelta.y * m_zoomSpeed * (m_radius * 0.1f);
     m_radius = glm::clamp(m_radius, 0.1f, m_maxRadius);
 

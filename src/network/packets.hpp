@@ -69,6 +69,8 @@ struct TcpMessageHeader {
 
 struct MapPartInfo {
     uint32_t networkId = 0;
+    uint32_t parentNetworkId = 0;
+    char name[100] = {};
     glm::vec3 position{0.0f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 size{4.0f, 1.0f, 2.0f};
@@ -80,6 +82,10 @@ struct MapPartInfo {
 
 struct InitialMapPacket {
     uint32_t partCount = 0;
+};
+
+struct DestroyInstancePacket {
+    uint32_t networkId;
 };
 
 // UDP
@@ -100,6 +106,19 @@ struct PhysicalObjectState {
 struct PhysicsStepPacket {
     uint32_t senderPlayerId = 0;
     uint32_t objectCount = 0;
+};
+
+inline constexpr uint32_t kPingMagic = 0x50494e47;
+inline constexpr uint32_t kPongMagic = 0x504f4e47;
+
+struct PingPacket {
+    uint32_t magic = kPingMagic;
+    uint64_t clientTimeUs = 0;
+};
+
+struct PongPacket {
+    uint32_t magic = kPongMagic;
+    uint64_t clientTimeUs = 0;
 };
 
 #pragma pack(pop)

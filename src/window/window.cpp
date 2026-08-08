@@ -4,9 +4,7 @@
 
 #include <stdexcept>
 
-#ifndef NDEBUG
 #include "core/logger.hpp"
-#endif
 
 namespace win {
 
@@ -71,6 +69,7 @@ Window::Window(int width, int height, const std::string& title) :
     glfwSetScrollCallback(m_window, scrollCallback);
     glfwSetWindowSizeCallback(m_window, winResizeCallback);
     glfwSetFramebufferSizeCallback(m_window, fbResizeCallback);
+    glfwSetErrorCallback(errorCallback);
 }
 
 Window::~Window() {
@@ -179,6 +178,10 @@ void Window::fbResizeCallback(GLFWwindow* window, int width, int height) {
     self->m_fbHeight = height;
 
     self->m_resized = true;
+}
+
+void Window::errorCallback(int error, const char* description) {
+    core::logger::err(description);
 }
 
 } // namespace win
