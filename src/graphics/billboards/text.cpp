@@ -1,4 +1,4 @@
-#include "billboard.hpp"
+#include "text.hpp"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -6,9 +6,9 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace gfx {
+namespace gfx::billb {
 
-Billboard::Billboard(
+Text::Text(
     vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager,
     const std::string& fontPath, uint32_t maxChars) :
     m_device(device) {
@@ -18,9 +18,9 @@ Billboard::Billboard(
     loadFont(fontPath, sampler, bindlessManager);
 }
 
-Billboard::~Billboard() {} // buffers will be automatically destroyed
+Text::~Text() {} // buffers will be automatically destroyed
 
-void Billboard::createVertexBuffer() {
+void Text::createVertexBuffer() {
     std::vector<glm::vec2> vertices = {{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}};
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -37,7 +37,7 @@ void Billboard::createVertexBuffer() {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_vertexBuffer->getBuffer(), bufferSize);
 }
 
-void Billboard::createIndexBuffer(uint32_t maxChars) {
+void Text::createIndexBuffer(uint32_t maxChars) {
     std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
     uint32_t indexCount = static_cast<uint32_t>(indices.size());
 
@@ -67,7 +67,7 @@ void Billboard::createIndexBuffer(uint32_t maxChars) {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_indexBuffer->getBuffer(), bufferSize);
 }
 
-void Billboard::createInstanceBuffer() {
+void Text::createInstanceBuffer() {
     VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
@@ -77,7 +77,7 @@ void Billboard::createInstanceBuffer() {
     m_instanceData = m_instanceBuffer->map();
 }
 
-void Billboard::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
+void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager) {
     FT_Library ft;
     if (FT_Init_FreeType(&ft)) {
         throw std::runtime_error("FreeType: Failed to init library");
@@ -162,7 +162,7 @@ void Billboard::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngr
     FT_Done_FreeType(ft);
 }
 
-void Billboard::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances) {
+void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances) {
     if (instances.empty())
         return;
 
@@ -228,7 +228,7 @@ void Billboard::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceCo
     vkCmdDrawIndexed(commandBuffer, 6, letterCount, 0, 0, 0);
 }
 
-std::vector<VkVertexInputBindingDescription> Billboard::Vertex::getBindingDescriptions() {
+std::vector<VkVertexInputBindingDescription> Text::Vertex::getBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 
     bindingDescriptions.push_back({0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
@@ -237,7 +237,7 @@ std::vector<VkVertexInputBindingDescription> Billboard::Vertex::getBindingDescri
     return bindingDescriptions;
 }
 
-std::vector<VkVertexInputAttributeDescription> Billboard::Vertex::getAttributeDescriptions() {
+std::vector<VkVertexInputAttributeDescription> Text::Vertex::getAttributeDescriptions() {
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
     attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, position)});

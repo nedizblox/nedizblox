@@ -16,6 +16,8 @@ public:
     bool load(const std::string& filename);
 
     void setPosition(const glm::vec3& position);
+    void setBackground(bool background);
+    
     void setLooping(bool loop);
 
     void setPitch(float pitch);

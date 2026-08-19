@@ -1,7 +1,10 @@
 #pragma once
 
 #include <AL/al.h>
+
 #include <string>
+
+#include <glm/glm.hpp>
 
 struct stb_vorbis;
 
@@ -12,7 +15,15 @@ public:
     Music();
     ~Music();
 
-    bool open(const std::string& filename);
+    bool load(const std::string& filename);
+
+    void setPosition(const glm::vec3& position);
+    void setBackground(bool background);
+    
+    void setLooping(bool loop);
+
+    void setPitch(float pitch);
+    void setVolume(float volume);
     
     void play();
     void stop();
@@ -20,11 +31,11 @@ public:
     void update(); 
 
 private:
-    static const size_t NUM_BUFFERS = 3;
-    static const size_t BUFFER_SIZE = 40960;
+    static constexpr size_t kNumBuffers = 3;
+    static constexpr size_t kBufferSize = 40960;
 
     ALuint m_source = 0;
-    ALuint m_buffers[NUM_BUFFERS]{};
+    ALuint m_buffers[kNumBuffers]{};
     
     stb_vorbis* m_oggStream = nullptr;
 

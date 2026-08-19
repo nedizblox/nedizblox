@@ -12,7 +12,7 @@ namespace game::physics {
 
 class Physics {
 public:
-    Physics(float gravity);
+    Physics(const std::shared_ptr<types::Workspace>& workspace);
     ~Physics();
 
     Physics(const Physics&) = delete;
@@ -55,6 +55,8 @@ private:
 
     btCylinderShape* createCylinderShape(types::Part* part);
     btConvexHullShape* createWedgeShape(types::Part* part);
+
+    void bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace);
 };
 
 } // namespace game::physics

@@ -55,7 +55,9 @@ void SphericalCamera::update(float aspect, const glm::vec2& mouseDelta, const gl
     front.y = m_radius * glm::sin(m_theta);
     front.z = m_radius * glm::cos(m_theta) * glm::cos(m_phi);
 
-    m_position = m_target + front;
+    m_front = front;
+
+    m_position = m_target + m_front;
 
     m_projection = glm::perspective(glm::radians(m_fov), aspect, 0.1f, 1000.0f);
     m_projection[1][1] *= -1; // inverse for vulkan

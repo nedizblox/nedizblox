@@ -10,10 +10,203 @@
 
 namespace game::types {
 
-class Part : public Instance {
+class Part : public TypedInstance<Part> {
 public:
-    Part(const std::string& name = "Part") : Instance(enums::InstanceType::Part, name) {
+    Part(const std::string& name = "Part") : TypedInstance<Part>(enums::InstanceType::Part, name) {
         updateModelMatrix();
+    }
+
+    std::vector<PropertyDescriptor> getProperties() override {
+        std::weak_ptr<Part> self = std::static_pointer_cast<Part>(shared_from_this());
+
+        auto instanceProps = Instance::getProperties();
+        std::vector<PropertyDescriptor> partProps = {
+            {
+                "Position",
+                "Part position",
+                enums::PropertyType::Vector3,
+                static_cast<void*>(&m_position),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            /*{
+                "Orientation",
+                "Part orientation",
+                enums::PropertyType::Vector3,
+                static_cast<void*>(&m_orientation),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            }*/
+            {
+                "Size",
+                "Part size",
+                enums::PropertyType::Vector3,
+                static_cast<void*>(&m_size),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Color",
+                "Part color",
+                enums::PropertyType::Color3,
+                static_cast<void*>(&m_color),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Transparency",
+                "Part transparency",
+                enums::PropertyType::Float,
+                static_cast<void*>(&m_transparency),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Anchored",
+                "Part anchored state",
+                enums::PropertyType::Bool,
+                static_cast<void*>(&m_anchored),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Shape",
+                "Part shape",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_shape),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::PartType>()
+            },
+            {
+                "Material",
+                "Part material",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_material),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::MaterialType>()
+            },
+            {
+                "SurfaceTop",
+                "Part surface top",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceTop),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            },
+            {
+                "SurfaceBottom",
+                "Part surface bottom",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceBottom),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            },
+            {
+                "SurfaceLeft",
+                "Part surface left",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceLeft),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            },
+            {
+                "SurfaceRight",
+                "Part surface right",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceRight),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            },
+            {
+                "SurfaceFront",
+                "Part surface front",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceFront),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            },
+            {
+                "SurfaceBack",
+                "Part surface back",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_surfaceBack),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::SurfaceType>()
+            }
+        };
+
+        instanceProps.insert(
+            instanceProps.end(),
+            std::make_move_iterator(partProps.begin()),
+            std::make_move_iterator(partProps.end()));
+
+        return instanceProps;
     }
 
     glm::vec3 getPosition() const { return m_position; }
@@ -42,9 +235,9 @@ public:
             if (glm::abs(size.z - m_size.z) > 0.001f)
                 diameter = size.z;
 
-            m_size = glm::vec3(diameter, size.y, diameter);
+            m_size = glm::abs(glm::vec3(diameter, size.y, diameter));
         } else {
-            m_size = size;
+            m_size = glm::abs(size);
         }
         
         updateModelMatrix();

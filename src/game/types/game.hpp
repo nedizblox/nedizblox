@@ -4,9 +4,9 @@
 
 namespace game::types {
 
-class Game : public Instance {
+class Game : public TypedInstance<Game> {
 public:
-    Game() : Instance(enums::InstanceType::Game, "game") {}
+    Game() : TypedInstance<Game>(enums::InstanceType::Game, "game") {}
 };
 
 } // namespace game::types

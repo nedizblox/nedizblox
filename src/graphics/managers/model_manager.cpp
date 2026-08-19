@@ -10,11 +10,44 @@ void ModelManager::loadModel(const std::string& name, const std::string& filePat
     if (m_models.contains(name))
         return;
 
-    ManagedModel managed;
+    Managed<Model> managed;
     managed.opaque = Model::createModelFromFile(m_device, filePath);
     managed.transparent = Model::createModelFromFile(m_device, filePath);
 
     m_models[name] = std::move(managed);
+}
+
+void ModelManager::loadModel(const std::string& name, const std::span<const uint8_t>& geometryRaw) {
+    if (m_models.contains(name))
+        return;
+
+    Managed<Model> managed;
+    managed.opaque = Model::createModelFromGeometryRaw(m_device, geometryRaw);
+    managed.transparent = Model::createModelFromGeometryRaw(m_device, geometryRaw);
+
+    m_models[name] = std::move(managed);
+}
+
+void ModelManager::loadModelOutline(const std::string& name, const std::string& filePath) {
+    if (m_modelOutlines.contains(name))
+        return;
+
+    Managed<ModelOutline> managed;
+    managed.opaque = ModelOutline::createModelFromFile(m_device, filePath);
+    managed.transparent = ModelOutline::createModelFromFile(m_device, filePath);
+
+    m_modelOutlines[name] = std::move(managed);
+}
+
+void ModelManager::loadModelOutline(const std::string& name, const std::span<const uint8_t>& geometryRaw) {
+    if (m_modelOutlines.contains(name))
+        return;
+
+    Managed<ModelOutline> managed;
+    managed.opaque = ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
+    managed.transparent = ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
+
+    m_modelOutlines[name] = std::move(managed);
 }
 
 void ModelManager::loadSkybox() {
@@ -27,8 +60,8 @@ void ModelManager::loadSkybox() {
 void ModelManager::drawOpaque(
     VkCommandBuffer commandBuffer,
     const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
-    for (auto& [name, model] : m_models) {
-        std::string bucketName = name + "Opaque";
+    for (auto& [name, managed] : m_models) {
+        std::string bucketName = name + "_opaque";
         auto it = instancesData.find(bucketName);
 
         if (it == instancesData.end()) {
@@ -36,7 +69,7 @@ void ModelManager::drawOpaque(
         }
 
         if (it != instancesData.end() && !it->second.empty()) {
-            model.opaque->draw(commandBuffer, it->second);
+            managed.opaque->draw(commandBuffer, it->second);
         }
     }
 }
@@ -44,8 +77,8 @@ void ModelManager::drawOpaque(
 void ModelManager::drawTransparent(
     VkCommandBuffer commandBuffer,
     const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
-    for (auto& [name, model] : m_models) {
-        std::string bucketName = name + "Transparent";
+    for (auto& [name, managed] : m_models) {
+        std::string bucketName = name + "_transparent";
         auto it = instancesData.find(bucketName);
 
         if (it == instancesData.end()) {
@@ -53,7 +86,41 @@ void ModelManager::drawTransparent(
         }
 
         if (it != instancesData.end() && !it->second.empty()) {
-            model.transparent->draw(commandBuffer, it->second);
+            managed.transparent->draw(commandBuffer, it->second);
+        }
+    }
+}
+
+void ModelManager::drawOutlinesOpaque(
+    VkCommandBuffer commandBuffer,
+    const std::unordered_map<std::string, std::vector<ModelOutline::InstanceData>>& instancesData) {
+    for (auto& [name, managed] : m_modelOutlines) {
+        std::string bucketName = name + "_opaque";
+        auto it = instancesData.find(bucketName);
+
+        if (it == instancesData.end()) {
+            it = instancesData.find(name);
+        }
+
+        if (it != instancesData.end() && !it->second.empty()) {
+            managed.transparent->draw(commandBuffer, it->second);
+        }
+    }
+}
+
+void ModelManager::drawOutlinesTransparent(
+    VkCommandBuffer commandBuffer,
+    const std::unordered_map<std::string, std::vector<ModelOutline::InstanceData>>& instancesData) {
+    for (auto& [name, managed] : m_modelOutlines) {
+        std::string bucketName = name + "_transparent";
+        auto it = instancesData.find(bucketName);
+
+        if (it == instancesData.end()) {
+            it = instancesData.find(name);
+        }
+
+        if (it != instancesData.end() && !it->second.empty()) {
+            managed.transparent->draw(commandBuffer, it->second);
         }
     }
 }

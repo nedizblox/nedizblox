@@ -144,6 +144,14 @@ Pipeline::Builder& Pipeline::Builder::setDepthCompareOp(VkCompareOp op) {
     return *this;
 }
 
+Pipeline::Builder& Pipeline::Builder::setDepthBias(float constantFactor, float clamp, float slopeFactor) {
+    m_configInfo.rasterizationInfo.depthBiasEnable = VK_TRUE;
+    m_configInfo.rasterizationInfo.depthBiasConstantFactor = constantFactor;
+    m_configInfo.rasterizationInfo.depthBiasClamp = clamp;
+    m_configInfo.rasterizationInfo.depthBiasConstantFactor = slopeFactor;
+    return *this;
+}
+
 Pipeline::Builder& Pipeline::Builder::setCullMode(VkCullModeFlags mode) {
     m_configInfo.rasterizationInfo.cullMode = mode;
     return *this;

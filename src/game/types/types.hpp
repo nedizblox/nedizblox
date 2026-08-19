@@ -13,6 +13,8 @@
 
 #include "part.hpp"
 
+#include "selection_box.hpp"
+
 #include "decal.hpp"
 
 #include "spawn_location.hpp"

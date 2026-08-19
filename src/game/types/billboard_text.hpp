@@ -6,15 +6,71 @@
 
 namespace game::types {
 
-class BillboardText : public Instance {
+class BillboardText : public TypedInstance<BillboardText> {
 public:
     BillboardText(const std::string& name = "BillboardText") :
-        Instance(enums::InstanceType::BillboardText, name) {}
+        TypedInstance<BillboardText>(enums::InstanceType::BillboardText, name) {}
 
-    glm::vec3 getPosition() const { return m_position; }
-    void setPosition(const glm::vec3& position) {
-        m_position = position;
-        propertyChanged();
+    std::vector<PropertyDescriptor> getProperties() override {
+        std::weak_ptr<BillboardText> self = std::static_pointer_cast<BillboardText>(shared_from_this());
+
+        auto instanceProps = Instance::getProperties();
+        std::vector<PropertyDescriptor> billbTextProps = {
+            {
+                "Offset",
+                "Billboard Text 3D offset of position",
+                enums::PropertyType::Vector3,
+                static_cast<void*>(&m_offset),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Scale",
+                "Billboard Text 2D scale",
+                enums::PropertyType::Vector2,
+                static_cast<void*>(&m_scale),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "Text",
+                "Billboard Text content",
+                enums::PropertyType::String,
+                static_cast<void*>(&m_text),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                }
+            },
+            {
+                "TextFont",
+                "Billboard Text font",
+                enums::PropertyType::Enum,
+                static_cast<void*>(&m_textFont),
+                false,
+                [self]() {
+                    if (auto instance = self.lock())
+                        instance->propertyChanged();
+                },
+                nullptr,
+                nullptr,
+                enums::getStringsFromEnums<enums::TextFont>()
+            }
+        };
+
+        instanceProps.insert(
+            instanceProps.end(),
+            std::make_move_iterator(billbTextProps.begin()),
+            std::make_move_iterator(billbTextProps.end()));
+
+        return instanceProps;
     }
 
     glm::vec3 getOffset() const { return m_offset; }
@@ -39,7 +95,6 @@ public:
     void setTextFont(enums::TextFont font) { m_textFont = font; }
 
 private:
-    glm::vec3 m_position{0.0f};
     glm::vec3 m_offset{0.0f};
     glm::vec2 m_scale{0.009f};
 

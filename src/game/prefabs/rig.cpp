@@ -44,9 +44,13 @@ void Rig::createBodyParts() {
     face->setFace(enums::Face::Front);
     face->setParent(m_head);
 
+    auto tshirt = std::make_shared<types::Decal>("tshirt");
+    tshirt->setSource("nedizbloxTshirt");
+    tshirt->setFace(enums::Face::Front);
+    tshirt->setParent(torso);
+
     m_rigidBody = m_physics.createRigidBodyModel(this, rootPart.get());
     m_rigidBody->setAngularFactor(btVector3(0.0f, 0.0f, 0.0f));
-    m_rigidBody->setFriction(0.1f);
     m_rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     glm::quat identityRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -67,8 +71,6 @@ void Rig::createBodyParts() {
     m_nickname = std::make_shared<types::BillboardText>();
     m_nickname->setText(getName());
     m_nickname->setOffset(glm::vec3(0.0f, 2.3f, 0.0f));
-    m_nickname->setPosition(getPivotPosition());
-
     m_nickname->setParent(m_head);
 
     syncParts();
@@ -83,8 +85,8 @@ void Rig::syncParts() {
     for (const auto& bone : m_bones) {
         glm::vec4 worldPos = pivot * glm::vec4(bone.localPosition, 1.0f);
 
-        bone.part->setPosition(glm::vec3(worldPos));
-        bone.part->setOrientation(modelOrientation * bone.localOrientation);
+        bone.part->setPosition(glm::vec3(worldPos), true);
+        bone.part->setOrientation(modelOrientation * bone.localOrientation, true);
     }
 }
 
@@ -214,13 +216,7 @@ void Rig::update(float deltaTime) {
         m_rigidBody->activate(true);
     }
 
-    btVector3 origin = trans.getOrigin();
-    types::Model::setPivotPosition(glm::vec3(origin.x(), origin.y(), origin.z()));
-
     m_velocity = glm::vec3(0.0f);
-
-    m_nickname->setPosition(getPivotPosition());
-    m_nickname->setText(getName());
 }
 
 } // namespace game::prefabs

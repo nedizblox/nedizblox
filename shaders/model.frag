@@ -116,20 +116,28 @@ void main() {
     uint texIndex = texIndices[fuv.layer];
     uint baseTexIndex = texIndices[0];
 
-    vec4 finalSampledColor;
+    vec3 albedo;
+    float finalAlpha = fragColor.a;
 
     if (fuv.isStretched) {
         vec2 backgroundUV = (shiftedPos.xy) * 0.5;
         vec4 baseTexColor = texture(textures[nonuniformEXT(baseTexIndex)], backgroundUV);
+        vec3 baseColor = baseTexColor.rgb * fragColor.rgb;
 
         vec4 decalColor = texture(textures[nonuniformEXT(texIndex)], fuv.uv);
 
-        finalSampledColor = mix(baseTexColor, decalColor, decalColor.a);
+        float inBounds = step(0.0, fuv.uv.x) * step(fuv.uv.x, 1.0) *
+                         step(0.0, fuv.uv.y) * step(fuv.uv.y, 1.0);
+        float decalAlpha = decalColor.a * inBounds;
+
+        albedo = mix(baseColor, decalColor.rgb, decalAlpha);
+        finalAlpha = mix(baseTexColor.a * fragColor.a, decalColor.a, decalAlpha);
     } else {
-        finalSampledColor = texture(textures[nonuniformEXT(texIndex)], fuv.uv);
+        vec4 sampled = texture(textures[nonuniformEXT(texIndex)], fuv.uv);
+        albedo = sampled.rgb * fragColor.rgb;
+        finalAlpha = sampled.a * fragColor.a;
     }
 
-    vec3 albedo = finalSampledColor.rgb * fragColor.rgb;
     vec3 ambient = AMBIENT_FACTOR * albedo;
 
     float NdotL = max(dot(N, L), 0.0);
@@ -141,5 +149,5 @@ void main() {
 
     vec3 litColor = ambient + diffuse + specColor;
 
-    outColor = vec4(litColor, finalSampledColor.a * fragColor.a);
+    outColor = vec4(litColor, finalAlpha);
 }

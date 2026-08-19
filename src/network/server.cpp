@@ -292,7 +292,7 @@ void Server::handleTcpClient(TcpClient client) {
         }
     }
 
-    core::logger::info(std::format("Player '{}' (id {}) disconnected", client.nickname, client.playerId));
+    core::logger::info(std::format("Player \"{}\" (id {}) disconnected", client.nickname, client.playerId));
 
     packets::PlayerLeftPacket left{};
     left.playerId = client.playerId;

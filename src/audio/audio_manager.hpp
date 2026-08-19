@@ -10,25 +10,35 @@
 #include <unordered_map>
 #include <memory>
 
-#include "core/camera.hpp"
-
 namespace audio {
 
 class AudioManager {
 public:
+    struct Properties {
+        std::string fileName;
+
+        glm::vec3 position{};
+        bool background = true;
+
+        bool loop = false;
+
+        float pitch = 1.0f;
+        float volume = 1.0f;
+    };
+    
     AudioManager();
     ~AudioManager();
 
     AudioManager(const AudioManager&) = delete;
     AudioManager& operator=(const AudioManager&) = delete;
 
-    void addSound(const std::string& name, std::unique_ptr<Sound> sound);
-    void addMusic(const std::string& name, std::unique_ptr<Music> sound);
+    void addSound(const std::string& name, const Properties& properties);
+    void addMusic(const std::string& name, const Properties& properties);
 
-    void moveListener(const core::camera::SphericalCamera& camera);
+    void moveListener(const glm::vec3& position, const glm::vec3& at, const glm::vec3& up);
 
-    const std::unique_ptr<Sound>& getSound(const std::string& name) { return m_sounds[name]; }
-    const std::unique_ptr<Music>& getMusic(const std::string& name) { return m_music[name]; }
+    void changeSoundProperties(const std::string& name, const Properties& properties);
+    void changeMusicProperties(const std::string& name, const Properties& properties);
 
     void update();
 

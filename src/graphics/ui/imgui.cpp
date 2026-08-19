@@ -137,6 +137,9 @@ void Imgui::update() {
         io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
     }
 
+    io.AddKeyEvent(ImGuiKey_Backspace, m_window.isMouseButtonPressed(GLFW_KEY_BACKSPACE));
+    io.AddKeyEvent(ImGuiKey_Delete, m_window.isMouseButtonPressed(GLFW_KEY_DELETE));
+
     io.AddMouseButtonEvent(ImGuiMouseButton_Left, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT));
     io.AddMouseButtonEvent(ImGuiMouseButton_Right, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT));
     io.AddMouseButtonEvent(ImGuiMouseButton_Middle, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE));

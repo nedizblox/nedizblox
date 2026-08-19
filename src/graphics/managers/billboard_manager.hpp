@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../billboard.hpp"
+#include "../billboards/text.hpp"
 
 #include <unordered_map>
 
@@ -18,13 +18,13 @@ public:
 
     void loadText(const std::string& name, vk::Sampler& sampler, const std::string& fontPath, uint32_t maxChars);
 
-    void drawText(VkCommandBuffer commandBuffer, const std::vector<Billboard::InstanceContent>& instancesData);
+    void drawText(VkCommandBuffer commandBuffer, const std::vector<billb::Text::InstanceContent>& instancesData);
 
 private:
     vk::Device& m_device;
     BindlessManager& m_bindlessManager;
 
-    std::unordered_map<std::string, std::unique_ptr<Billboard>> m_texts;
+    std::unordered_map<std::string, std::unique_ptr<billb::Text>> m_texts;
 };
 
 } // namespace gfx::mngrs

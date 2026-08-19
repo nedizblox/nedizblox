@@ -128,7 +128,7 @@ void Text::loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::Bi
             rowHeight = 0;
         }
 
-        for (uint32_t row = 0; row < bitmap.rows; ++row) {
+        for (uint32_t row = 0; row < bitmap.rows; row++) {
             uint32_t stagingOffset = (currentY + row + padding) * atlasWidth + (currentX + padding);
             uint32_t srcOffset = row * bitmap.pitch;
             std::memcpy(pData + stagingOffset, bitmap.buffer + srcOffset, bitmap.width);

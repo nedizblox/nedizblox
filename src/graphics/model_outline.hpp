@@ -12,7 +12,7 @@
 
 namespace gfx {
 
-class Model {
+class ModelOutline {
 public:
     struct Vertex {
         glm::vec3 position{};
@@ -34,10 +34,7 @@ public:
 
     struct InstanceData {
         glm::mat4 model;
-        glm::vec4 color;
-        glm::uvec3 texIndices1;
-        glm::uvec3 texIndices2;
-        glm::uvec3 texTilesPacked;
+        glm::vec4 outlineColor;
     };
 
     struct Builder {
@@ -48,14 +45,14 @@ public:
         void loadModel(const std::span<const uint8_t>& geometryRaw);
     };
 
-    Model(vk::Device& device, const Builder& builder);
-    ~Model();
+    ModelOutline(vk::Device& device, const Builder& builder);
+    ~ModelOutline();
 
-    Model(const Model&) = delete;
-    Model& operator=(const Model&) = delete;
+    ModelOutline(const ModelOutline&) = delete;
+    ModelOutline& operator=(const ModelOutline&) = delete;
 
-    static std::unique_ptr<Model> createModelFromFile(vk::Device& device, const std::string& filepath);
-    static std::unique_ptr<Model> createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw);
+    static std::unique_ptr<ModelOutline> createModelFromFile(vk::Device& device, const std::string& filepath);
+    static std::unique_ptr<ModelOutline> createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw);
 
     void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>& instances);
 

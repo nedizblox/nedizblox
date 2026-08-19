@@ -2,8 +2,6 @@
 
 #include <dr/dr_wav.h>
 
-#include "core/logger.hpp"
-
 #include <vector>
 
 namespace audio {
@@ -20,7 +18,6 @@ Sound::~Sound() {
 bool Sound::load(const std::string& filename) {
     drwav wav;
     if (!drwav_init_file(&wav, filename.c_str(), nullptr)) {
-        core::logger::err("Failed to open WAV file: " + filename);
         return false;
     }
 
@@ -45,6 +42,10 @@ bool Sound::load(const std::string& filename) {
 
 void Sound::setPosition(const glm::vec3& position) {
     alSourcefv(m_source, AL_POSITION, &position.x);
+}
+
+void Sound::setBackground(bool background) {
+    alSourcei(m_source, AL_SOURCE_RELATIVE, background ? AL_TRUE : AL_FALSE);
 }
 
 void Sound::setLooping(bool loop) {

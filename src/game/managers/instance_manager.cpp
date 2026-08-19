@@ -1,34 +1,69 @@
 #include "instance_manager.hpp"
 
-#include <glm/gtc/packing.hpp>
-
 #include <algorithm>
+#include <glm/gtc/packing.hpp>
+#include <numeric>
 
 namespace game::mngrs {
 
-InstanceManager::InstanceManager(AssetManager& assetManager) : m_assetManager(assetManager) {}
+InstanceManager::InstanceManager(AssetManager& assetManager) :
+    m_assetManager(assetManager) {}
 
 InstanceManager::~InstanceManager() {}
 
 glm::uvec3 InstanceManager::packTexTiles(const glm::vec2* texTiles) {
     glm::uvec3 packed;
-
     packed.x = glm::packHalf2x16(glm::vec2(texTiles[0].x, texTiles[1].x));
     packed.y = glm::packHalf2x16(glm::vec2(texTiles[2].x, texTiles[3].x));
     packed.z = glm::packHalf2x16(glm::vec2(texTiles[4].x, texTiles[5].x));
-
     return packed;
 }
 
-void InstanceManager::rebuildMap(const std::shared_ptr<types::Instance>& root) {
-    for (auto& [name, vec] : m_modelInstancesData) {
-        vec.clear();
+std::string InstanceManager::getModelBucketFromShape(enums::PartType shape) {
+    switch (shape) {
+    case enums::PartType::Block:
+        return "cube";
+    case enums::PartType::Ball:
+        return "sphere";
+    case enums::PartType::Cylinder:
+        return "cylinder";
+    case enums::PartType::Wedge:
+        return "wedge";
+    case enums::PartType::Head:
+        return "head";
+    default:
+        return "cube";
     }
-    for (auto& [name, vec] : m_billbTextInstancesContent) {
-        vec.clear();
+}
+
+void InstanceManager::rebuildMap(const std::shared_ptr<types::Instance>& root) {
+    if (m_currentRoot.lock() != root) {
+        if (auto oldRoot = m_currentRoot.lock()) {
+            oldRoot->removeDescendantPropertyChangedCallback(m_rootSubscriptionId);
+        }
+
+        m_currentRoot = root;
+        if (root) {
+            m_rootSubscriptionId = root->onDescendantPropertyChanged(
+                [this](std::shared_ptr<types::Instance> changed) { this->markMapDirty(); });
+        }
     }
 
+    for (auto& [name, vec] : m_opaqueModelInstancesData)
+        vec.clear();
+    for (auto& [name, vec] : m_transparentModelInstancesData)
+        vec.clear();
+
+    for (auto& [name, vec] : m_opaqueModelOutlineInstancesData)
+        vec.clear();
+    for (auto& [name, vec] : m_transparentModelOutlineInstancesData)
+        vec.clear();
+
+    for (auto& [name, vec] : m_billbTextInstancesContent)
+        vec.clear();
+
     m_partDynamicTargets.clear();
+    m_selectionBoxDynamicTargets.clear();
     m_billbTextDynamicTargets.clear();
 
     collectMapInstances(root);
@@ -40,7 +75,6 @@ void InstanceManager::rebuildGui(const std::shared_ptr<types::Instance>& root) {
     for (auto& [name, vec] : m_textInstancesContent) {
         vec.clear();
     }
-
     m_textDynamicTargets.clear();
 
     collectGuiInstances(root);
@@ -54,12 +88,17 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
 
     for (const auto& obj : parent->getChildren()) {
         auto type = obj->getType();
+
         if (type == enums::InstanceType::Part) {
             auto part = std::static_pointer_cast<types::Part>(obj);
 
             float transparency = part->getTransparency();
-            if (transparency == 1.0f)
+            if (transparency >= 1.0f) {
+                collectMapInstances(obj);
                 continue;
+            }
+
+            bool isTransparent = transparency > 0.0f;
 
             uint32_t studsId = m_assetManager.getTextureId("studs");
             uint32_t inletsId = m_assetManager.getTextureId("inlets");
@@ -106,10 +145,10 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
                 if (material == enums::MaterialType::SmoothPlastic) {
                     textures1
                         = {getSurfTex(part->getSurfaceLeft()), getSurfTex(part->getSurfaceRight()),
-                        getSurfTex(part->getSurfaceTop())};
+                           getSurfTex(part->getSurfaceTop())};
                     textures2
-                        = {getSurfTex(part->getSurfaceBottom()), getSurfTex(part->getSurfaceFront()),
-                        getSurfTex(part->getSurfaceBack())};
+                        = {getSurfTex(part->getSurfaceBottom()),
+                           getSurfTex(part->getSurfaceFront()), getSurfTex(part->getSurfaceBack())};
                 } else {
                     uint32_t matId = getMatTex(material);
                     textures1 = {matId, matId, matId};
@@ -129,7 +168,7 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
                 uint32_t texId = 0;
                 try {
                     texId = m_assetManager.getTextureId(decal->getSource());
-                } catch (const std::exception& e) {}
+                } catch (const std::exception&) {}
 
                 glm::vec2 decalTile{};
 
@@ -161,76 +200,18 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
                 }
             }
 
-            std::string bucket = "";
-            if (transparency <= 0.0f) {
-                switch (shape) {
-                case enums::PartType::Block:
-                    bucket = "cubeOpaque";
-                    break;
-                case enums::PartType::Ball:
-                    bucket = "sphereOpaque";
-                    break;
-                case enums::PartType::Cylinder:
-                    bucket = "cylinderOpaque";
-                    break;
-                case enums::PartType::Wedge:
-                    bucket = "wedgeOpaque";
-                    break;
-                case enums::PartType::Head:
-                    bucket = "headOpaque";
-                    break;
-                default:
-                    bucket = "cubeOpaque";
-                    break;
-                }
-            } else {
-                switch (shape) {
-                case enums::PartType::Block:
-                    bucket = "cubeTransparent";
-                    break;
-                case enums::PartType::Ball:
-                    bucket = "sphereTransparent";
-                    break;
-                case enums::PartType::Cylinder:
-                    bucket = "cylinderTransparent";
-                    break;
-                case enums::PartType::Wedge:
-                    bucket = "wedgeTransparent";
-                    break;
-                case enums::PartType::Head:
-                    bucket = "headTransparent";
-                    break;
-                default:
-                    bucket = "cubeTransparent";
-                    break;
-                }
-            }
+            std::string bucket = getModelBucketFromShape(shape);
+            float alpha = isTransparent ? (1.0f - transparency) : 1.0f;
 
-            float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
+            auto& map = isTransparent ? m_transparentModelInstancesData : m_opaqueModelInstancesData;
+            auto& vec = map[bucket];
 
-            auto& vec = m_modelInstancesData[bucket];
             vec.push_back(
                 {part->getModelMatrix(), glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha),
                  textures1, textures2, packTexTiles(faceTiles)});
 
-            size_t instanceIndex = vec.size() - 1;
-
             if (!part->getAnchored()) {
-                m_partDynamicTargets.push_back({part, bucket, instanceIndex});
-            } else {
-                part->onPropertyChanged([this, bucket, instanceIndex](std::shared_ptr<types::Instance> updated) {
-                    auto part = std::static_pointer_cast<types::Part>(updated);
-
-                    if (part->getAnchored() && m_modelInstancesData.contains(bucket)
-                        && instanceIndex < m_modelInstancesData[bucket].size()) {
-                        float transparency = part->getTransparency();
-                        float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
-
-                        auto& renderData = m_modelInstancesData[bucket][instanceIndex];
-                        renderData.model = part->getModelMatrix();
-                        renderData.color = glm::vec4(glm::vec3(part->getColor()) / 255.0f, alpha);
-                    }
-                });
+                m_partDynamicTargets.push_back({part, bucket, vec.size() - 1, isTransparent});
             }
         } else if (type == enums::InstanceType::BillboardText) {
             auto billbText = std::static_pointer_cast<types::BillboardText>(obj);
@@ -245,13 +226,46 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
                 break;
             }
 
+            auto parent = billbText->getParent();
+            if (!parent || parent->getType() != enums::InstanceType::Part)
+                continue;
+
+            auto part = std::static_pointer_cast<types::Part>(parent);
+
             auto& vec = m_billbTextInstancesContent[bucket];
-            vec.push_back({billbText->getText(), billbText->getPosition(), billbText->getScale()});
+            vec.push_back({billbText->getText(), part->getPosition() + billbText->getOffset(), billbText->getScale()});
 
-            m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1});
+            if (!part->getAnchored()) {
+                m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1, true, part});
+            }
+        } else if (type == enums::InstanceType::SelectionBox) {
+            auto selectionBox = std::static_pointer_cast<types::SelectionBox>(obj);
+
+            auto parent = selectionBox->getParent();
+            if (!parent || parent->getType() != enums::InstanceType::Part)
+                continue;
+
+            auto part = std::static_pointer_cast<types::Part>(parent);
+
+            float transparency = selectionBox->getTransparency();
+            if (transparency >= 1.0f)
+                continue;
+
+            bool isTransparent = transparency > 0.0f;
+            enums::PartType shape = part->getShape();
+            std::string bucket = getModelBucketFromShape(shape);
+
+            float alpha = isTransparent ? (1.0f - transparency) : 1.0f;
+
+            auto& map = isTransparent ? m_transparentModelOutlineInstancesData : m_opaqueModelOutlineInstancesData;
+            auto& vec = map[bucket];
+
+            vec.push_back({part->getModelMatrix(), glm::vec4(glm::vec3(selectionBox->getColor()) / 255.0f, alpha)});
+
+            if (!part->getAnchored()) {
+                m_selectionBoxDynamicTargets.push_back({selectionBox, bucket, vec.size() - 1, isTransparent, part});
+            }
         }
-
-        obj->onDestroy([this](std::shared_ptr<types::Instance> destroyed) { markMapDirty(); });
 
         collectMapInstances(obj);
     }
@@ -279,23 +293,85 @@ void InstanceManager::collectGuiInstances(const std::shared_ptr<types::Instance>
             auto& vec = m_textInstancesContent[bucket];
             vec.push_back({text->getText(), text->getPosition(), text->getScale()});
 
-            m_textDynamicTargets.push_back({text, bucket, vec.size() - 1});
+            m_textDynamicTargets.push_back({text, bucket, vec.size() - 1, false});
         }
 
         collectGuiInstances(obj);
     }
 }
 
-void InstanceManager::sortInstances(const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances) {
-    std::sort(instances.begin(), instances.end(), [&cameraPos](const auto& a, const auto& b) {
-        glm::vec3 posA = glm::vec3(a.model[3]);
-        glm::vec3 posB = glm::vec3(b.model[3]);
+void InstanceManager::sortInstances(
+    const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances,
+    std::vector<DynamicTarget<types::Part>>& targets, const std::string& bucketName) {
+    if (instances.empty())
+        return;
+
+    std::vector<size_t> p(instances.size());
+    std::iota(p.begin(), p.end(), 0);
+
+    std::sort(p.begin(), p.end(), [&instances, &cameraPos](size_t i1, size_t i2) {
+        glm::vec3 posA = glm::vec3(instances[i1].model[3]);
+        glm::vec3 posB = glm::vec3(instances[i2].model[3]);
 
         glm::vec3 diffA = posA - cameraPos;
         glm::vec3 diffB = posB - cameraPos;
 
         return glm::dot(diffA, diffA) > glm::dot(diffB, diffB);
     });
+
+    std::vector<gfx::Model::InstanceData> sortedInstances(instances.size());
+    std::vector<size_t> oldToNewIndex(instances.size());
+
+    for (size_t newIdx = 0; newIdx < p.size(); newIdx++) {
+        size_t oldIdx = p[newIdx];
+        sortedInstances[newIdx] = instances[oldIdx];
+        oldToNewIndex[oldIdx] = newIdx;
+    }
+
+    instances = std::move(sortedInstances);
+
+    for (auto& target : targets) {
+        if (target.isTransparent && target.bucketName == bucketName) {
+            target.index = oldToNewIndex[target.index];
+        }
+    }
+}
+
+void InstanceManager::sortInstances(
+    const glm::vec3& cameraPos, std::vector<gfx::ModelOutline::InstanceData>& instances,
+    std::vector<DynamicTarget<types::SelectionBox>>& targets, const std::string& bucketName) {
+    if (instances.empty())
+        return;
+
+    std::vector<size_t> p(instances.size());
+    std::iota(p.begin(), p.end(), 0);
+
+    std::sort(p.begin(), p.end(), [&instances, &cameraPos](size_t i1, size_t i2) {
+        glm::vec3 posA = glm::vec3(instances[i1].model[3]);
+        glm::vec3 posB = glm::vec3(instances[i2].model[3]);
+
+        glm::vec3 diffA = posA - cameraPos;
+        glm::vec3 diffB = posB - cameraPos;
+
+        return glm::dot(diffA, diffA) > glm::dot(diffB, diffB);
+    });
+
+    std::vector<gfx::ModelOutline::InstanceData> sortedInstances(instances.size());
+    std::vector<size_t> oldToNewIndex(instances.size());
+
+    for (size_t newIdx = 0; newIdx < p.size(); newIdx++) {
+        size_t oldIdx = p[newIdx];
+        sortedInstances[newIdx] = instances[oldIdx];
+        oldToNewIndex[oldIdx] = newIdx;
+    }
+
+    instances = std::move(sortedInstances);
+
+    for (auto& target : targets) {
+        if (target.isTransparent && target.bucketName == bucketName) {
+            target.index = oldToNewIndex[target.index];
+        }
+    }
 }
 
 void InstanceManager::updateDynamicTransforms() {
@@ -303,14 +379,27 @@ void InstanceManager::updateDynamicTransforms() {
         float transparency = target.obj->getTransparency();
         float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
 
-        auto& instances = m_modelInstancesData[target.bucketName][target.index];
-        instances.model = target.obj->getModelMatrix();
-        instances.color = glm::vec4(glm::vec3(target.obj->getColor()) / 255.0f, alpha);
+        auto& map = target.isTransparent ? m_transparentModelInstancesData : m_opaqueModelInstancesData;
+        auto& instance = map[target.bucketName][target.index];
+
+        instance.model = target.obj->getModelMatrix();
+        instance.color = glm::vec4(glm::vec3(target.obj->getColor()) / 255.0f, alpha);
+    }
+
+    for (const auto& target : m_selectionBoxDynamicTargets) {
+        float transparency = target.obj->getTransparency();
+        float alpha = (transparency <= 0.0f) ? 1.0f : (1.0f - transparency);
+
+        auto& map = target.isTransparent ? m_transparentModelOutlineInstancesData : m_opaqueModelOutlineInstancesData;
+        auto& instance = map[target.bucketName][target.index];
+
+        instance.model = target.parentPart->getModelMatrix();
+        instance.outlineColor = glm::vec4(glm::vec3(target.obj->getColor()) / 255.0f, alpha);
     }
 
     for (const auto& target : m_billbTextDynamicTargets) {
         auto& content = m_billbTextInstancesContent[target.bucketName][target.index];
-        content.position = target.obj->getPosition() + target.obj->getOffset();
+        content.position = target.parentPart->getPosition() + target.obj->getOffset();
         content.scale = target.obj->getScale();
         content.text = target.obj->getText();
     }
@@ -324,12 +413,13 @@ void InstanceManager::updateDynamicTransforms() {
 }
 
 void InstanceManager::sortTransparentInstances(const glm::vec3& cameraPos) {
-    if (m_modelInstancesData.contains("cubeTransparent"))
-        sortInstances(cameraPos, m_modelInstancesData["cubeTransparent"]);
-    if (m_modelInstancesData.contains("sphereTransparent"))
-        sortInstances(cameraPos, m_modelInstancesData["sphereTransparent"]);
-    if (m_modelInstancesData.contains("headTransparent"))
-        sortInstances(cameraPos, m_modelInstancesData["headTransparent"]);
+    for (auto& [bucketName, instanceVec] : m_transparentModelInstancesData) {
+        sortInstances(cameraPos, instanceVec, m_partDynamicTargets, bucketName);
+    }
+
+    for (auto& [bucketName, instanceVec] : m_transparentModelOutlineInstancesData) {
+        sortInstances(cameraPos, instanceVec, m_selectionBoxDynamicTargets, bucketName);
+    }
 }
 
 } // namespace game::mngrs

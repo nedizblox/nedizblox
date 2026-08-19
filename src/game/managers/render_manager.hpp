@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/camera.hpp"
-
 #include "graphics/graphics.hpp"
 
 #include <memory>
@@ -27,15 +25,23 @@ public:
         VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
         const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
 
+    void renderModelOutlinesOpaque(
+        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+
     void renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, uint32_t skyboxCubId);
 
     void renderModelsTransparent(
         VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
         const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
 
+    void renderModelOutlinesTransparent(
+        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+
     void renderBillboardTexts(
         VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
-        const std::unordered_map<std::string, std::vector<gfx::Billboard::InstanceContent>>& instancesData);
+        const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
 
     void renderTexts(
         VkCommandBuffer commandBuffer, win::Window& window,

@@ -24,6 +24,9 @@ private:
     void createGUIs();
 
     void drawNode(const std::shared_ptr<types::Instance>& node);
+
+    void drawPropertiesPanel();
+    void drawProperty(types::Instance::PropertyDescriptor& prop);
 };
 
 } // namespace game::utils

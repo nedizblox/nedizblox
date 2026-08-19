@@ -19,10 +19,10 @@ void BillboardManager::loadText(const std::string& name, vk::Sampler& sampler, c
     if (m_texts.contains(name))
         return;
 
-    m_texts[name] = std::make_unique<Billboard>(m_device, sampler, m_bindlessManager, fontPath, maxChars);
+    m_texts[name] = std::make_unique<billb::Text>(m_device, sampler, m_bindlessManager, fontPath, maxChars);
 }
 
-void BillboardManager::drawText(VkCommandBuffer commandBuffer, const std::vector<Billboard::InstanceContent>& instancesData) {
+void BillboardManager::drawText(VkCommandBuffer commandBuffer, const std::vector<billb::Text::InstanceContent>& instancesData) {
     for (auto& [name, text] : m_texts) {
         text->draw(commandBuffer, instancesData);
     }

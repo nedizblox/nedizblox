@@ -45,19 +45,20 @@ void GameClient::initManagers() {
         device, renderer, bindlessManager, *m_modelManager, *m_billboardManager, *m_uiManager);
     m_renderManager->initPipelines(m_renderContext->getDescriptorSetLayout().getDescriptorSetLayout());
 
-    // m_audioManager = std::make_unique<audio::AudioManager>();
+    m_audioManager = std::make_unique<audio::AudioManager>();
 }
 
 void GameClient::loadTextures() {
+    m_assetManager->loadTexture("smooth", "assets/textures/smooth.png");
     m_assetManager->loadTexture("studs", "assets/textures/studs.png");
     m_assetManager->loadTexture("inlets", "assets/textures/inlets.png");
     m_assetManager->loadTexture("glue", "assets/textures/glue.png");
-    m_assetManager->loadTexture("smooth", "assets/textures/smooth.png");
 
     m_assetManager->loadTexture("grass", "assets/textures/grass.png");
     m_assetManager->loadTexture("wood", "assets/textures/wood.png");
 
     m_assetManager->loadTexture("headFace", "assets/textures/face.png", "repeat", true, false);
+    m_assetManager->loadTexture("nedizbloxTshirt", "assets/textures/logo_tshirt.png", "repeat", true, false);
     m_assetManager->loadTexture("spawnLocation", "assets/textures/spawn_location.png", "repeat", true, false);
 
     std::array<std::string, 6> skyboxFaces
@@ -72,10 +73,15 @@ void GameClient::loadModels() {
 
     m_modelManager->loadSkybox();
 
-    m_modelManager->loadModel("cube", "assets/models/cube.obj");
-    m_modelManager->loadModel("sphere", "assets/models/sphere.obj");
-    m_modelManager->loadModel("cylinder", "assets/models/cylinder.obj");
-    m_modelManager->loadModel("wedge", "assets/models/wedge.obj");
+    m_modelManager->loadModel("cube", gfx::geoms::cube);
+    m_modelManager->loadModel("sphere", gfx::geoms::sphere);
+    m_modelManager->loadModel("cylinder", gfx::geoms::cylinder);
+    m_modelManager->loadModel("wedge", gfx::geoms::wedge);
+
+    m_modelManager->loadModelOutline("cube", gfx::geoms::cube);
+    m_modelManager->loadModelOutline("sphere", gfx::geoms::sphere);
+    m_modelManager->loadModelOutline("cylinder", gfx::geoms::cylinder);
+    m_modelManager->loadModelOutline("wedge", gfx::geoms::wedge);
 
     m_modelManager->loadModel("head", "assets/models/head.obj");
 }
@@ -117,15 +123,15 @@ void GameClient::createServices() {
 
     m_workspace = std::make_shared<types::Workspace>();
     m_workspace->onChildrenChanged(
-        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markMapDirty(); });
+        [this](std::shared_ptr<types::Workspace> newChild) { m_instanceManager->markMapDirty(); });
     m_workspace->setParent(m_game);
 
     m_coreGui = std::make_shared<types::CoreGui>();
     m_coreGui->onChildrenChanged(
-        [this](std::shared_ptr<types::Instance> newChild) { m_instanceManager->markGuiDirty(); });
+        [this](std::shared_ptr<types::CoreGui> newChild) { m_instanceManager->markGuiDirty(); });
     m_workspace->setParent(m_game);
 
-    m_physics = std::make_unique<physics::Physics>(m_workspace->getGravity());
+    m_physics = std::make_unique<physics::Physics>(m_workspace);
 
     m_devTools = std::make_unique<utils::DevTools>(*m_imgui, m_game);
 }
@@ -151,14 +157,18 @@ void GameClient::run() {
     while (window.isOpen() && !core::sighandler::shouldStop) {
         window.update();
         m_imgui->update();
-        // m_audioManager->update();
-
+        m_audioManager->update();
         m_controller->update();
 
         float dt = window.getDeltaTime();
 
         m_physics->step(dt);
         m_physics->stepNetworkInterpolation(dt);
+
+        if (m_instanceManager->isMapDirty())
+            m_instanceManager->rebuildMap(m_workspace);
+        if (m_instanceManager->isGuiDirty())
+            m_instanceManager->rebuildGui(m_coreGui);
 
         m_localRig->update(dt);
         m_replicator->updateNetworkRigs(dt);
@@ -170,48 +180,48 @@ void GameClient::run() {
         auto outgoingStates = m_ownership->update(m_localRig, m_replicator->getNetworkParts());
         m_replicator->sendPhysicsState(outgoingStates);
 
-        // m_audioManager->moveListener(*m_camera);
-
         if (VkCommandBuffer cmd = renderer.beginFrame()) {
             glm::mat4 projection{};
             glm::mat4 view{};
+
             glm::vec3 position{};
+            glm::vec3 at{}, up{};
+
             if (m_controller->isFreeCameraMode()) {
                 projection = m_freeCamera->getProjection();
                 view = m_freeCamera->getView();
+
                 position = m_freeCamera->getPosition();
+                at = m_freeCamera->getFront();
+                up = m_freeCamera->getUp();
             } else {
                 projection = m_sphericalCamera->getProjection();
                 view = m_sphericalCamera->getView();
+
                 position = m_sphericalCamera->getPosition();
+                at = m_sphericalCamera->getFront();
+                up = glm::vec3(0.0f, 1.0f, 0.0f);
             }
 
-            renderer.beginRenderPass(cmd);
+            m_audioManager->moveListener(position, at, up);
 
-            if (m_instanceManager->isMapDirty())
-                m_instanceManager->rebuildMap(m_workspace);
-            if (m_instanceManager->isGuiDirty())
-                m_instanceManager->rebuildGui(m_coreGui);
+            renderer.beginRenderPass(cmd);
 
             m_instanceManager->updateDynamicTransforms();
 
             m_instanceManager->sortTransparentInstances(position);
 
-            const auto& modelInstancesData = m_instanceManager->getModelInstancesData();
-
-            m_renderManager->renderModelsOpaque(cmd, projection, view, position, modelInstancesData);
+            m_renderManager->renderModelsOpaque(cmd, projection, view, position, m_instanceManager->getOpaqueModelInstancesData());
+            m_renderManager->renderModelOutlinesOpaque(cmd, projection, view, position, m_instanceManager->getOpaqueModelOutlineInstancesData());
 
             m_renderManager->renderSkybox(cmd, projection, view, m_assetManager->getCubemapId("skybox"));
 
-            m_renderManager->renderModelsTransparent(cmd, projection, view, position, modelInstancesData);
+            m_renderManager->renderModelsTransparent(cmd, projection, view, position, m_instanceManager->getTransparentModelInstancesData());
+            m_renderManager->renderModelOutlinesTransparent(cmd, projection, view, position, m_instanceManager->getTransparentModelOutlineInstancesData());
 
-            const auto& billbTextInstancesContent = m_instanceManager->getBillbTextInstancesContent();
+            m_renderManager->renderBillboardTexts(cmd, projection, view, m_instanceManager->getBillbTextInstancesContent());
 
-            m_renderManager->renderBillboardTexts(cmd, projection, view, billbTextInstancesContent);
-
-            const auto& textInstancesContent = m_instanceManager->getTextInstancesContent();
-
-            m_renderManager->renderTexts(cmd, window, textInstancesContent);
+            m_renderManager->renderTexts(cmd, window, m_instanceManager->getTextInstancesContent());
 
             m_renderManager->renderImgui(cmd, window, *m_imgui);
 

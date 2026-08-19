@@ -1,9 +1,9 @@
 #pragma once
 
-#include "vk/buffer.hpp"
-#include "vk/device.hpp"
+#include "../vk/buffer.hpp"
+#include "../vk/device.hpp"
 
-#include "managers/bindless_manager.hpp"
+#include "../managers/bindless_manager.hpp"
 
 #include <glm/glm.hpp>
 
@@ -11,9 +11,9 @@
 #include <string>
 #include <unordered_map>
 
-namespace gfx {
+namespace gfx::billb {
 
-class Billboard {
+class Text {
 public:
     struct Vertex {
         glm::vec2 position{};
@@ -42,11 +42,11 @@ public:
         glm::vec2 scale;
     };
 
-    Billboard(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
-    ~Billboard();
+    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
+    ~Text();
 
-    Billboard(const Billboard&) = delete;
-    Billboard& operator=(const Billboard&) = delete;
+    Text(const Text&) = delete;
+    Text& operator=(const Text&) = delete;
 
     uint32_t getTextureIndex() const { return m_fontTextureIndex; }
 

@@ -1,4 +1,4 @@
-#include "model.hpp"
+#include "model_outline.hpp"
 
 #include <cstring>
 
@@ -8,15 +8,15 @@
 
 namespace gfx {
 
-Model::Model(vk::Device& device, const Builder& builder) : m_device(device) {
+ModelOutline::ModelOutline(vk::Device& device, const Builder& builder) : m_device(device) {
     createVertexBuffer(builder.vertices);
     createIndexBuffer(builder.indices);
     createInstanceBuffer();
 }
 
-Model::~Model() {} // buffers will be automatically destroyed
+ModelOutline::~ModelOutline() {} // buffers will be automatically destroyed
 
-void Model::createVertexBuffer(const std::vector<Vertex>& vertices) {
+void ModelOutline::createVertexBuffer(const std::vector<Vertex>& vertices) {
     m_vertexCount = static_cast<uint32_t>(vertices.size());
 
     VkDeviceSize bufferSize = sizeof(vertices[0]) * m_vertexCount;
@@ -33,7 +33,7 @@ void Model::createVertexBuffer(const std::vector<Vertex>& vertices) {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_vertexBuffer->getBuffer(), bufferSize);
 }
 
-void Model::createIndexBuffer(const std::vector<uint32_t>& indices) {
+void ModelOutline::createIndexBuffer(const std::vector<uint32_t>& indices) {
     m_indexCount = static_cast<uint32_t>(indices.size());
     m_hasIndexBuffer = m_indexCount > 0;
     if (!m_hasIndexBuffer) {
@@ -54,7 +54,7 @@ void Model::createIndexBuffer(const std::vector<uint32_t>& indices) {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_indexBuffer->getBuffer(), bufferSize);
 }
 
-void Model::createInstanceBuffer() {
+void ModelOutline::createInstanceBuffer() {
     VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
@@ -64,21 +64,21 @@ void Model::createInstanceBuffer() {
     m_instanceData = m_instanceBuffer->map();
 }
 
-std::unique_ptr<Model> Model::createModelFromFile(vk::Device& device, const std::string& filepath) {
+std::unique_ptr<ModelOutline> ModelOutline::createModelFromFile(vk::Device& device, const std::string& filepath) {
     Builder builder{};
     builder.loadModel(filepath);
 
-    return std::make_unique<Model>(device, builder);
+    return std::make_unique<ModelOutline>(device, builder);
 }
 
-std::unique_ptr<Model> Model::createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw) {
+std::unique_ptr<ModelOutline> ModelOutline::createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw) {
     Builder builder{};
     builder.loadModel(geometryRaw);
 
-    return std::make_unique<Model>(device, builder);
+    return std::make_unique<ModelOutline>(device, builder);
 }
 
-void Model::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>& instances) {
+void ModelOutline::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>& instances) {
     VkBuffer buffers[] = {m_vertexBuffer->getBuffer(), m_instanceBuffer->getBuffer()};
     VkDeviceSize offsets[] = {0, 0};
 
@@ -97,7 +97,7 @@ void Model::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>&
     }
 }
 
-std::vector<VkVertexInputBindingDescription> Model::Vertex::getBindingDescriptions() {
+std::vector<VkVertexInputBindingDescription> ModelOutline::Vertex::getBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 
     bindingDescriptions.push_back({0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
@@ -106,7 +106,7 @@ std::vector<VkVertexInputBindingDescription> Model::Vertex::getBindingDescriptio
     return bindingDescriptions;
 }
 
-std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescriptions() {
+std::vector<VkVertexInputAttributeDescription> ModelOutline::Vertex::getAttributeDescriptions() {
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
     attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)});
@@ -119,16 +119,12 @@ std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescri
              static_cast<uint32_t>(offsetof(InstanceData, model) + sizeof(glm::vec4) * i)});
     }
 
-    attributeDescriptions.push_back({7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, color)});
-
-    attributeDescriptions.push_back({8, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices1)});
-    attributeDescriptions.push_back({9, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices2)});
-    attributeDescriptions.push_back({10, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texTilesPacked)});
+    attributeDescriptions.push_back({7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, outlineColor)});
 
     return attributeDescriptions;
 }
 
-void Model::Builder::loadModel(const std::string& filepath) {
+void ModelOutline::Builder::loadModel(const std::string& filepath) {
     Assimp::Importer importer;
 
     const aiScene* scene = importer.ReadFile(
@@ -184,7 +180,7 @@ struct MeshHeader {
 };
 #pragma pack(pop)
 
-void Model::Builder::loadModel(const std::span<const uint8_t>& geometryRaw) {
+void ModelOutline::Builder::loadModel(const std::span<const uint8_t>& geometryRaw) {
     if (geometryRaw.size() < sizeof(FileHeader)) {
         throw std::runtime_error("Geometry raw buffer is too small for FileHeader");
     }

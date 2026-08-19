@@ -23,6 +23,9 @@ public:
     glm::mat4 getProjection() const { return m_projection; }
     glm::mat4 getView() const { return m_view; }
 
+    glm::vec3 getFront() const { return m_front; }
+    glm::vec3 getUp() const { return m_up; }
+
     void move(CameraDirection direction, float deltaTime);
 
     void update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta);
@@ -69,11 +72,15 @@ public:
     glm::mat4 getProjection() const { return m_projection; }
     glm::mat4 getView() const { return m_view; }
 
+    glm::vec3 getFront() const { return m_front; }
+
     float getPhi() const { return m_phi; }
 
     void update(float aspect, const glm::vec2& mouseDelta, const glm::vec2& scrollDelta);
 
 private:
+    glm::vec3 m_front{0.0f};
+
     float m_sensitivity = 0.01f;
     float m_zoomSpeed = 2.0f;
     float m_maxRadius = 40.0f;

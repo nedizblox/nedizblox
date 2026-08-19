@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 set(NEDIZBLOX_VERSION_MAJOR 0)
 set(NEDIZBLOX_VERSION_MINOR 7)
-set(NEDIZBLOX_VERSION_PATCH 0)
+set(NEDIZBLOX_VERSION_PATCH 1)
 
 project(nedizblox 
     VERSION ${NEDIZBLOX_VERSION_MAJOR}.${NEDIZBLOX_VERSION_MINOR}.${NEDIZBLOX_VERSION_PATCH}
@@ -11,13 +11,16 @@ project(nedizblox
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(SERVER_BUILD "Build Nedizblox Server (without any graphics and audio backends)" OFF)
 if(SERVER_BUILD)
     message(STATUS "Building Nedizblox Server")
 else()
     message(STATUS "Building Nedizblox Client")
+endif()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-unsafe-buffer-usage -Wno-unsafe-buffer-usage-in-libc-call)
 endif()
 
 if(NOT SERVER_BUILD)
@@ -67,6 +70,8 @@ if(NOT SERVER_BUILD)
     set(SHADER_SOURCES
         shaders/model.vert
         shaders/model.frag
+        shaders/model_outline.vert
+        shaders/model_outline.frag
         shaders/text.vert
         shaders/text.frag
         shaders/billboard.vert
@@ -99,6 +104,7 @@ set(BASIC_MAIN_SOURCES
     src/core/signal_handler.cpp
     src/core/crypto.cpp
     src/scripting/script_engine.cpp
+    src/game/prefabs/rig.cpp
     src/game/utils/rbxl.cpp
     src/game/physics/physics.cpp
 )
@@ -107,7 +113,7 @@ set(CLIENT_MAIN_SOURCES
     ${BASIC_MAIN_SOURCES}
     src/core/camera.cpp
     src/core/msgbox.cpp
-    src/window/window.cpp
+    src/window/window_desktop.cpp
     src/graphics/vk/device.cpp
     src/graphics/vk/swapchain.cpp
     src/graphics/vk/buffer.cpp
@@ -115,11 +121,13 @@ set(CLIENT_MAIN_SOURCES
     src/graphics/vk/descriptors.cpp
     src/graphics/vk/pipeline.cpp
     src/graphics/vk/renderer.cpp
+    src/graphics/geometries.cpp
     src/graphics/model.cpp
+    src/graphics/model_outline.cpp
     src/graphics/texture.cpp
     src/graphics/cubemap.cpp
     src/graphics/skybox.cpp
-    src/graphics/billboard.cpp
+    src/graphics/billboards/text.cpp
     src/graphics/ui/text.cpp
     src/graphics/ui/imgui.cpp
     src/graphics/managers/bindless_manager.cpp
@@ -137,7 +145,6 @@ set(CLIENT_MAIN_SOURCES
     src/game/managers/instance_manager.cpp
     src/game/managers/asset_manager.cpp
     src/game/managers/render_manager.cpp
-    src/game/prefabs/rig.cpp
     src/game/render_context.cpp
     src/game/game_client.cpp
     src/client_main.cpp

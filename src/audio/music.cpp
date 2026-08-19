@@ -2,16 +2,13 @@
 
 #include <stb/stb_vorbis.c>
 
-#include "core/logger.hpp"
-
 #include <vector>
-#include <format>
 
 namespace audio {
 
 Music::Music() {
     alGenSources(1, &m_source);
-    alGenBuffers(NUM_BUFFERS, m_buffers);
+    alGenBuffers(kNumBuffers, m_buffers);
 
     alSourcei(m_source, AL_SOURCE_RELATIVE, AL_TRUE);
     alSource3f(m_source, AL_POSITION, 0.0f, 0.0f, 0.0f);
@@ -23,14 +20,13 @@ Music::~Music() {
     if (m_oggStream) stb_vorbis_close(m_oggStream);
 
     alDeleteSources(1, &m_source);
-    alDeleteBuffers(NUM_BUFFERS, m_buffers);
+    alDeleteBuffers(kNumBuffers, m_buffers);
 }
 
-bool Music::open(const std::string& filename) {
+bool Music::load(const std::string& filename) {
     int error;
     m_oggStream = stb_vorbis_open_filename(filename.c_str(), &error, nullptr);
     if (!m_oggStream) {
-        core::logger::err(std::format("Failed to open OGG file: {} (Error: {})", filename, error));
         return false;
     }
 
@@ -38,7 +34,7 @@ bool Music::open(const std::string& filename) {
     m_sampleRate = info.sample_rate;
     m_format = (info.channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
 
-    for (size_t i = 0; i < NUM_BUFFERS; ++i) {
+    for (size_t i = 0; i < kNumBuffers; ++i) {
         if (!streamChunk(m_buffers[i])) break;
 
         alSourceQueueBuffers(m_source, 1, &m_buffers[i]);
@@ -47,8 +43,28 @@ bool Music::open(const std::string& filename) {
     return true;
 }
 
+void Music::setPosition(const glm::vec3& position) {
+    alSourcefv(m_source, AL_POSITION, &position.x);
+}
+
+void Music::setBackground(bool background) {
+    alSourcei(m_source, AL_SOURCE_RELATIVE, background ? AL_TRUE : AL_FALSE);
+}
+
+void Music::setLooping(bool loop) {
+    m_isLooping = loop;
+}
+
+void Music::setPitch(float pitch) {
+    alSourcef(m_source, AL_PITCH, pitch);
+}
+
+void Music::setVolume(float volume) {
+    alSourcef(m_source, AL_GAIN, volume);   
+}
+
 bool Music::streamChunk(ALuint buffer) {
-    std::vector<short> pcmData(BUFFER_SIZE / sizeof(short));
+    std::vector<short> pcmData(kBufferSize / sizeof(short));
     
     int channels = stb_vorbis_get_info(m_oggStream).channels;
     int samplesRead = stb_vorbis_get_samples_short_interleaved(m_oggStream, channels, pcmData.data(), pcmData.size());

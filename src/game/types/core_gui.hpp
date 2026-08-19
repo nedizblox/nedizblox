@@ -4,9 +4,9 @@
 
 namespace game::types {
 
-class CoreGui : public Instance {
+class CoreGui : public TypedInstance<CoreGui> {
 public:
-    CoreGui() : Instance(enums::InstanceType::CoreGui, "CoreGui") {}
+    CoreGui() : TypedInstance<CoreGui>(enums::InstanceType::CoreGui, "CoreGui") {}
 };
 
 } // namespace game::types

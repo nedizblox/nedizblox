@@ -32,7 +32,7 @@ void GameServer::createServices() {
 
     // m_coreGui = std::make_shared<types::CoreGui>();
 
-    m_physics = std::make_unique<physics::Physics>(m_workspace->getGravity());
+    m_physics = std::make_unique<physics::Physics>(m_workspace);
 }
 
 void GameServer::createServer(uint16_t port) {
@@ -79,7 +79,7 @@ void GameServer::buildMap(const std::string& rbxlMapPath) {
             instance->setParent(m_workspace);
         }
 
-        if (auto part = std::dynamic_pointer_cast<types::Part>(instance)) {
+        if (auto part = std::static_pointer_cast<types::Part>(instance)) {
             m_physics->createRigidBodyPart(part.get());
 
             {

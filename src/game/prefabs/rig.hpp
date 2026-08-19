@@ -27,8 +27,8 @@ public:
     glm::vec3 getSpawnPosition() const { return m_spawnPosition; }
     void setSpawnPosition(const glm::vec3& spawnPosition) { m_spawnPosition = spawnPosition; }
 
-    void setPivot(const glm::mat4& pivot, bool silent = false) override;
-    void setPivotPosition(const glm::vec3& position, bool silent = false) override;
+    void setPivot(const glm::mat4& pivot, bool silent = true) override;
+    void setPivotPosition(const glm::vec3& position, bool silent = true) override;
 
     void move(enums::RigMoveDirection direction, float phi);
     void jump();

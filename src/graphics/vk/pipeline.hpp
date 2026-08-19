@@ -48,6 +48,8 @@ public:
         Builder& disableDepthWrite();
         Builder& setDepthCompareOp(VkCompareOp op);
 
+        Builder& setDepthBias(float constantFactor, float clamp, float slopeFactor);
+
         Builder& setCullMode(VkCullModeFlags mode);
 
         Builder& enableAlphaBlending();

@@ -5,14 +5,16 @@
 
 namespace game::physics {
 
-Physics::Physics(float gravity) {
+Physics::Physics(const std::shared_ptr<types::Workspace>& workspace) {
     m_collisionConfiguration = new btDefaultCollisionConfiguration();
     m_dispatcher = new btCollisionDispatcher(m_collisionConfiguration);
     m_overlappingPairCache = new btDbvtBroadphase();
     m_solver = new btSequentialImpulseConstraintSolver();
 
     m_dynamicsWorld = new btDiscreteDynamicsWorld(m_dispatcher, m_overlappingPairCache, m_solver, m_collisionConfiguration);
-    m_dynamicsWorld->setGravity(btVector3(0.0f, gravity, 0.0f));
+    m_dynamicsWorld->setGravity(btVector3(0.0f, workspace->getGravity(), 0.0f));
+
+    bindToWorkspace(workspace);
 }
 
 Physics::~Physics() {
@@ -22,6 +24,42 @@ Physics::~Physics() {
     delete m_overlappingPairCache;
     delete m_dispatcher;
     delete m_collisionConfiguration;
+}
+
+void Physics::bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace) {
+    workspace->onPropertyChanged([this](std::shared_ptr<types::Workspace> changed) {
+        m_dynamicsWorld->setGravity(btVector3(0.0f, changed->getGravity(), 0.0f));
+    });
+
+    workspace->onDescendantDestroy([this](std::shared_ptr<types::Instance> destroyed) {
+        if (destroyed->getType() == enums::InstanceType::Part) {
+            auto part = std::static_pointer_cast<types::Part>(destroyed);
+            
+            if (auto rigidBody = part->getRigidBody()) {
+                m_dynamicsWorld->removeRigidBody(rigidBody);
+
+                {
+                    std::lock_guard<std::mutex> lock(m_bodiesMutex);
+                    m_bodies.erase(part->getNetworkId());
+                    m_bodyMasses.erase(rigidBody);
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+                    m_networkTargets.erase(part->getNetworkId());
+                }
+
+                if (auto* ms = static_cast<PartMotionState*>(rigidBody->getMotionState())) {
+                    ms->detachPart();
+                }
+
+                part->setRigidBody(nullptr);
+
+                delete rigidBody->getMotionState();
+                delete rigidBody;
+            }
+        }
+    });
 }
 
 btCylinderShape* Physics::createCylinderShape(types::Part* part) {
@@ -117,36 +155,6 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
         m_bodyMasses[body] = mass;
     }
 
-    part->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
-        auto obj = std::static_pointer_cast<types::Part>(destroying);
-        auto rigidBody = obj->getRigidBody();
-
-        if (!rigidBody)
-            return;
-
-        m_dynamicsWorld->removeRigidBody(rigidBody);
-
-        {
-            std::lock_guard<std::mutex> lock(m_bodiesMutex);
-            m_bodies.erase(obj->getNetworkId());
-            m_bodyMasses.erase(rigidBody);
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
-            m_networkTargets.erase(obj->getNetworkId());
-        }
-
-        if (auto* ms = dynamic_cast<PartMotionState*>(rigidBody->getMotionState())) {
-            ms->detachPart();
-        }
-
-        obj->setRigidBody(nullptr);
-
-        delete rigidBody->getMotionState();
-        delete rigidBody;
-    });
-
     return body;
 }
 
@@ -191,36 +199,6 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
         m_bodies[rootPart->getNetworkId()] = body;
         m_bodyMasses[body] = mass;
     }
-
-    rootPart->onDestroy([this](std::shared_ptr<types::Instance> destroying) {
-        auto obj = std::static_pointer_cast<types::Part>(destroying);
-        auto rigidBody = obj->getRigidBody();
-
-        if (!rigidBody)
-            return;
-
-        m_dynamicsWorld->removeRigidBody(rigidBody);
-
-        {
-            std::lock_guard<std::mutex> lock(m_bodiesMutex);
-            m_bodies.erase(obj->getNetworkId());
-            m_bodyMasses.erase(rigidBody);
-        }
-
-        {
-            std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
-            m_networkTargets.erase(obj->getNetworkId());
-        }
-
-        if (auto* ms = dynamic_cast<ModelMotionState*>(rigidBody->getMotionState())) {
-            ms->detachModel();
-        }
-
-        obj->setRigidBody(nullptr);
-
-        delete rigidBody->getMotionState();
-        delete rigidBody;
-    });
 
     return body;
 }
@@ -425,14 +403,14 @@ void Physics::step(float deltaTime) {
             if (!body)
                 continue;
 
-            if (auto* motionState = dynamic_cast<PartMotionState*>(body->getMotionState())) {
+            if (auto* motionState = static_cast<PartMotionState*>(body->getMotionState())) {
                 if (motionState->isPendingDestroy()) {
                     if (types::Part* part = motionState->getPart()) {
                         fallenParts.push_back(part);
                         motionState->detachPart();
                     }
                 }
-            } else if (auto* motionState = dynamic_cast<ModelMotionState*>(body->getMotionState())) {
+            } else if (auto* motionState = static_cast<ModelMotionState*>(body->getMotionState())) {
                 if (motionState->isPendingDestroy()) {
                     if (types::Model* model = motionState->getModel()) {
                         fallenModels.push_back(model);

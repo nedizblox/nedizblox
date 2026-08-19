@@ -11,13 +11,15 @@
 #include "managers/billboard_manager.hpp"
 #include "managers/ui_manager.hpp"
 
-#include "cubemap.hpp"
+#include "geometries.hpp"
 #include "model.hpp"
+#include "model_outline.hpp"
 #include "skybox.hpp"
+#include "cubemap.hpp"
 #include "texture.hpp"
 
 #include "ui/text.hpp"
 #include "ui/imgui.hpp"
 
-#include "billboard.hpp"
+#include "billboards/text.hpp"
 // IWYU pragma: end_exports

@@ -23,24 +23,81 @@ AudioManager::~AudioManager() {
     alcCloseDevice(m_device);
 }
 
-void AudioManager::addSound(const std::string& name, std::unique_ptr<Sound> sound) {
+void AudioManager::addSound(const std::string& name, const Properties& properties) {
+    if (properties.fileName.empty() || m_sounds.contains(name))
+        return;
+
+    std::unique_ptr<Sound> sound = std::make_unique<Sound>();
+    if (!sound->load(properties.fileName)) {
+        throw std::runtime_error("Failed to load sound: " + properties.fileName);
+    }
+
+    sound->setPosition(properties.position);
+    sound->setBackground(properties.background);
+
+    sound->setLooping(properties.loop);
+
+    sound->setPitch(properties.pitch);
+    sound->setVolume(properties.volume);
+
     m_sounds[name] = std::move(sound);
 }
 
-void AudioManager::addMusic(const std::string& name, std::unique_ptr<Music> music) {
+void AudioManager::addMusic(const std::string& name, const Properties& properties) {
+    if (properties.fileName.empty() || m_music.contains(name))
+        return;
+
+    std::unique_ptr<Music> music = std::make_unique<Music>();
+    if (!music->load(properties.fileName)) {
+        throw std::runtime_error("Failed to load music: " + properties.fileName);
+    }
+
+    music->setPosition(properties.position);
+    music->setBackground(properties.background);
+
+    music->setLooping(properties.loop);
+
+    music->setPitch(properties.pitch);
+    music->setVolume(properties.volume);
+
     m_music[name] = std::move(music);
 }
 
-void AudioManager::moveListener(const core::camera::SphericalCamera& camera) {
-    glm::vec3 position = camera.getPosition();
-
+void AudioManager::moveListener(const glm::vec3& position, const glm::vec3& at, const glm::vec3& up) {
     alListenerfv(AL_POSITION, &position.x);
-
-    glm::vec3 at = glm::normalize(camera.getTarget() - position);
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
     float orientation[6] = {at.x, at.y, at.z, up.x, up.y, up.z};
     alListenerfv(AL_ORIENTATION, orientation);
+}
+
+void AudioManager::changeSoundProperties(const std::string& name, const Properties& properties) {
+    if (!m_sounds.contains(name))
+        throw std::runtime_error("Failed to find sound \"" + name + "\"");
+
+    auto& sound = m_sounds[name];
+
+    sound->setPosition(properties.position);
+    sound->setBackground(properties.background);
+
+    sound->setLooping(properties.loop);
+
+    sound->setPitch(properties.pitch);
+    sound->setVolume(properties.volume);
+}
+
+void AudioManager::changeMusicProperties(const std::string& name, const Properties& properties) {
+    if (!m_music.contains(name))
+        throw std::runtime_error("Failed to find music \"" + name + "\"");
+
+    auto& music = m_music[name];
+
+    music->setPosition(properties.position);
+    music->setBackground(properties.background);
+
+    music->setLooping(properties.loop);
+
+    music->setPitch(properties.pitch);
+    music->setVolume(properties.volume);
 }
 
 void AudioManager::update() {

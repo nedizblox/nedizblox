@@ -6,9 +6,9 @@
 
 namespace game::types {
 
-class Model : public Instance {
+class Model : public TypedInstance<Model> {
 public:
-    Model(const std::string& name = "Model") : Instance(enums::InstanceType::Model, name) {}
+    Model(const std::string& name = "Model") : TypedInstance<Model>(enums::InstanceType::Model, name) {}
 
     glm::mat4 getPivot() const { return m_pivot; }
     virtual void setPivot(const glm::mat4& pivot, bool silent = false) {
@@ -37,7 +37,7 @@ private:
     void updateChildrenTransforms(Instance* parent, const glm::mat4& delta) {
         for (const auto& child : parent->getChildren()) {
             if (child->getType() == enums::InstanceType::Part) {
-                auto part = std::dynamic_pointer_cast<Part>(child);
+                auto part = std::static_pointer_cast<Part>(child);
 
                 glm::vec4 newPos = delta * glm::vec4(part->getPosition(), 1.0f);
                 part->setPosition(glm::vec3(newPos));
@@ -45,7 +45,7 @@ private:
                 glm::quat deltaRotation = glm::toQuat(delta);
                 part->setOrientation(deltaRotation * part->getOrientation());
             } else if (child->getType() == enums::InstanceType::Model) {
-                auto subModel = std::dynamic_pointer_cast<Model>(child);
+                auto subModel = std::static_pointer_cast<Model>(child);
 
                 subModel->m_pivot = delta * subModel->m_pivot;
 
