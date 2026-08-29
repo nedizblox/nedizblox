@@ -8,7 +8,7 @@ Ownership::Ownership(physics::Physics& physics, net::Client& client) :
     m_physics(physics), m_client(client) {}
 
 std::vector<net::packets::PhysicalObjectState> Ownership::update(
-    const std::shared_ptr<prefabs::Rig>& localRig,
+    float dt, const std::shared_ptr<prefabs::Rig>& localRig,
     const std::unordered_map<uint32_t, std::shared_ptr<types::Part>>& networkParts) {
 
     std::vector<net::packets::PhysicalObjectState> outgoingStates;
@@ -89,6 +89,13 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
             m_ownershipOrder.push_back(netId);
         }
     }
+
+    m_netSendAccumulator += dt;
+    if (m_netSendAccumulator < kNetSendInterval) {
+        return outgoingStates;
+    }
+
+    m_netSendAccumulator -= kNetSendInterval;
 
     std::vector<uint32_t> activeOwnerships(m_ownershipOrder.begin(), m_ownershipOrder.end());
 

@@ -10,6 +10,10 @@ class Text : public TypedInstance<Text> {
 public:
     Text(const std::string& name = "Text") : TypedInstance<Text>(enums::InstanceType::Text, name) {}
 
+    static std::shared_ptr<Text> create(const std::string& name = "Text") {
+        return std::make_shared<Text>(name);
+    }
+
     std::vector<PropertyDescriptor> getProperties() override {
         std::weak_ptr<Text> self = std::static_pointer_cast<Text>(shared_from_this());
 

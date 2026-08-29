@@ -8,7 +8,12 @@ namespace game::types {
 
 class SelectionBox : public TypedInstance<SelectionBox> {
 public:
-    SelectionBox(const std::string& name = "Outline") : TypedInstance<SelectionBox>(enums::InstanceType::SelectionBox, name) {}
+    SelectionBox(const std::string& name = "Outline") :
+        TypedInstance<SelectionBox>(enums::InstanceType::SelectionBox, name) {}
+
+    static std::shared_ptr<SelectionBox> create(const std::string& name = "SelectionBox") {
+        return std::make_shared<SelectionBox>(name);
+    }
 
     std::vector<PropertyDescriptor> getProperties() override {
         std::weak_ptr<SelectionBox> self = std::static_pointer_cast<SelectionBox>(shared_from_this());

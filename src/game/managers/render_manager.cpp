@@ -31,7 +31,7 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
                                 .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
                                 .build();
 
-    m_pipelines["modelOpaque"]
+    m_pipelines["model_opaque"]
         = gfx::vk::Pipeline::Builder(m_device)
               .setVertShaderPath("shaders/model.vert.spv")
               .setFragShaderPath("shaders/model.frag.spv")
@@ -44,7 +44,7 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
               .enableDepthTest()
               .build();
 
-    m_pipelines["modelTransparent"]
+    m_pipelines["model_transparent"]
         = gfx::vk::Pipeline::Builder(m_device)
               .setVertShaderPath("shaders/model.vert.spv")
               .setFragShaderPath("shaders/model.frag.spv")
@@ -59,7 +59,7 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
               .enableAlphaBlending()
               .build();
 
-    m_pipelines["modelOutlineOpaque"]
+    m_pipelines["model_outline_opaque"]
         = gfx::vk::Pipeline::Builder(m_device)
               .setVertShaderPath("shaders/model_outline.vert.spv")
               .setFragShaderPath("shaders/model_outline.frag.spv")
@@ -73,7 +73,7 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
               .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
               .build();
 
-    m_pipelines["modelOutlineTransparent"]
+    m_pipelines["model_outline_transparent"]
         = gfx::vk::Pipeline::Builder(m_device)
               .setVertShaderPath("shaders/model_outline.vert.spv")
               .setFragShaderPath("shaders/model_outline.frag.spv")
@@ -100,15 +100,29 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
                               .enableAlphaBlending()
                               .build();
 
-    m_pipelines["billboard"]
+    m_pipelines["billboard_text"]
         = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/billboard.vert.spv")
+              .setVertShaderPath("shaders/billboard_text.vert.spv")
               .setFragShaderPath("shaders/text.frag.spv")
               .setConstantSize(sizeof(gfx::billb::Text::PushConstantObject))
               .setDescriptorLayouts({setLayout})
               .setRenderPass(m_renderer.getRenderPass())
               .setBindingDescriptions(gfx::billb::Text::Vertex::getBindingDescriptions())
               .setAttributeDescriptions(gfx::billb::Text::Vertex::getAttributeDescriptions())
+              .enableDepthTest()
+              .disableDepthWrite()
+              .enableAlphaBlending()
+              .build();
+
+    m_pipelines["billboard_image"]
+        = gfx::vk::Pipeline::Builder(m_device)
+              .setVertShaderPath("shaders/billboard_image.vert.spv")
+              .setFragShaderPath("shaders/image.frag.spv")
+              .setConstantSize(sizeof(gfx::billb::Image::PushConstantObject))
+              .setDescriptorLayouts({setLayout})
+              .setRenderPass(m_renderer.getRenderPass())
+              .setBindingDescriptions(gfx::billb::Image::Vertex::getBindingDescriptions())
+              .setAttributeDescriptions(gfx::billb::Image::Vertex::getAttributeDescriptions())
               .enableDepthTest()
               .disableDepthWrite()
               .enableAlphaBlending()
@@ -129,7 +143,7 @@ void RenderManager::initPipelines(VkDescriptorSetLayout setLayout) {
 void RenderManager::renderModelsOpaque(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
-    auto& pipeline = m_pipelines["modelOpaque"];
+    auto& pipeline = m_pipelines["model_opaque"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -144,7 +158,7 @@ void RenderManager::renderModelsOpaque(
 void RenderManager::renderModelOutlinesOpaque(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData) {
-    auto& pipeline = m_pipelines["modelOutlineOpaque"];
+    auto& pipeline = m_pipelines["model_outline_opaque"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -172,7 +186,7 @@ void RenderManager::renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4&
 void RenderManager::renderModelsTransparent(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
-    auto& pipeline = m_pipelines["modelTransparent"];
+    auto& pipeline = m_pipelines["model_transparent"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -187,7 +201,7 @@ void RenderManager::renderModelsTransparent(
 void RenderManager::renderModelOutlinesTransparent(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
     const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData) {
-    auto& pipeline = m_pipelines["modelOutlineTransparent"];
+    auto& pipeline = m_pipelines["model_outline_transparent"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -202,7 +216,7 @@ void RenderManager::renderModelOutlinesTransparent(
 void RenderManager::renderBillboardTexts(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
     const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData) {
-    auto& pipeline = m_pipelines["billboard"];
+    auto& pipeline = m_pipelines["billboard_text"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
@@ -217,6 +231,27 @@ void RenderManager::renderBillboardTexts(
 
         pipeline->pushConstant(commandBuffer, push);
         m_billboardManager.drawText(commandBuffer, instances);
+    }
+}
+
+void RenderManager::renderBillboardImages(
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    const std::unordered_map<std::string, std::vector<gfx::billb::Image::InstanceData>>& instancesData) {
+    auto& pipeline = m_pipelines["billboard_image"];
+    pipeline->bind(commandBuffer);
+    m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
+
+    for (const auto& [name, instances] : instancesData) {
+        if (instances.empty())
+            continue;
+
+        gfx::billb::Image::PushConstantObject push{};
+        push.view = view;
+        push.proj = proj;
+        push.texIndex = m_billboardManager.getTextureIndex(name);
+
+        pipeline->pushConstant(commandBuffer, push);
+        m_billboardManager.drawImage(commandBuffer, instances);
     }
 }
 

@@ -5,7 +5,9 @@
 
 #include <btBulletDynamicsCommon.h>
 
+#include <map>
 #include <mutex>
+#include <tuple>
 #include <unordered_map>
 
 namespace game::physics {
@@ -36,6 +38,8 @@ public:
     void step(float deltaTime);
 
 private:
+    using ShapeKey = std::tuple<enums::PartShape, float, float, float>;
+
     static constexpr float kNetworkInterpolationSpeed = 15.0f;
 
     btDefaultCollisionConfiguration* m_collisionConfiguration;
@@ -45,6 +49,8 @@ private:
 
     btDiscreteDynamicsWorld* m_dynamicsWorld;
 
+    std::map<ShapeKey, btCollisionShape*> m_shapeCache;
+
     std::mutex m_networkTargetsMutex;
     std::unordered_map<uint32_t, net::packets::PhysicalObjectState> m_networkTargets;
 
@@ -53,8 +59,10 @@ private:
 
     std::unordered_map<btRigidBody*, float> m_bodyMasses;
 
-    btCylinderShape* createCylinderShape(types::Part* part);
-    btConvexHullShape* createWedgeShape(types::Part* part);
+    btCylinderShape* createCylinderShape(const glm::vec3& size);
+    btConvexHullShape* createWedgeShape(const glm::vec3& size);
+
+    btCollisionShape* getOrCreateShape(enums::PartShape shape, const glm::vec3& size);
 
     void bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace);
 };

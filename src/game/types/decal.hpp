@@ -6,7 +6,12 @@ namespace game::types {
 
 class Decal : public TypedInstance<Decal> {
 public:
-    Decal(const std::string& name = "Decal") : TypedInstance<Decal>(enums::InstanceType::Decal, name) {}
+    Decal(const std::string& name = "Decal") :
+        TypedInstance<Decal>(enums::InstanceType::Decal, name) {}
+
+    static std::shared_ptr<Decal> create(const std::string& name = "Decal") {
+        return std::make_shared<Decal>(name);
+    }
 
     std::vector<PropertyDescriptor> getProperties() override {
         std::weak_ptr<Decal> self = std::static_pointer_cast<Decal>(shared_from_this());

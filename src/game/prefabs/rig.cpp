@@ -11,15 +11,15 @@ std::shared_ptr<Rig> Rig::create(game::physics::Physics& physics, const std::str
 void Rig::createBodyParts() {
     auto self = shared_from_this();
 
-    m_head = std::make_shared<types::Part>("Head");
-    auto torso = std::make_shared<types::Part>("Torso");
-    auto rootPart = std::make_shared<types::Part>("RootPart");
-    auto leftArm = std::make_shared<types::Part>("LeftArm");
-    auto rightArm = std::make_shared<types::Part>("RightArm");
-    auto leftLeg = std::make_shared<types::Part>("LeftLeg");
-    auto rightLeg = std::make_shared<types::Part>("RightLeg");
+    auto head = types::Part::create("Head");
+    auto torso = types::Part::create("Torso");
+    auto rootPart = types::Part::create("RootPart");
+    auto leftArm = types::Part::create("LeftArm");
+    auto rightArm = types::Part::create("RightArm");
+    auto leftLeg = types::Part::create("LeftLeg");
+    auto rightLeg = types::Part::create("RightLeg");
 
-    m_head->setSize(glm::vec3(1.0f, 1.0f, 1.0f));
+    head->setSize(glm::vec3(1.0f, 1.0f, 1.0f));
     torso->setSize(glm::vec3(2.0f, 2.0f, 1.0f));
     rootPart->setSize(glm::vec3(2.0f, 6.0f, 1.0f));
     leftArm->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
@@ -27,7 +27,7 @@ void Rig::createBodyParts() {
     leftLeg->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
     rightLeg->setSize(glm::vec3(1.0f, 2.0f, 1.0f));
 
-    m_head->setColor(glm::u8vec3(255, 255, 0));
+    head->setColor(glm::u8vec3(255, 255, 0));
     torso->setColor(glm::u8vec3(0, 13, 255));
     leftArm->setColor(glm::u8vec3(255, 255, 0));
     rightArm->setColor(glm::u8vec3(255, 255, 0));
@@ -37,14 +37,14 @@ void Rig::createBodyParts() {
     rootPart->setTransparency(1.0f);
     rootPart->setNetworkId(getNetworkId());
 
-    m_head->setShape(enums::PartType::Head);
+    head->setShape(enums::PartShape::Head);
 
-    auto face = std::make_shared<types::Decal>("face");
+    auto face = types::Decal::create("face");
     face->setSource("headFace");
     face->setFace(enums::Face::Front);
-    face->setParent(m_head);
+    face->setParent(head);
 
-    auto tshirt = std::make_shared<types::Decal>("tshirt");
+    auto tshirt = types::Decal::create("tshirt");
     tshirt->setSource("nedizbloxTshirt");
     tshirt->setFace(enums::Face::Front);
     tshirt->setParent(torso);
@@ -55,7 +55,7 @@ void Rig::createBodyParts() {
 
     glm::quat identityRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    m_bones.push_back({m_head, glm::vec3(0.0f, 1.5f, 0.0f), identityRot});
+    m_bones.push_back({head, glm::vec3(0.0f, 1.5f, 0.0f), identityRot});
     m_bones.push_back({torso, glm::vec3(0.0f, 0.0f, 0.0f), identityRot});
     m_bones.push_back({leftArm, glm::vec3(-1.5f, 0.0f, 0.0f), identityRot});
     m_bones.push_back({rightArm, glm::vec3(1.5f, 0.0f, 0.0f), identityRot});
@@ -68,14 +68,14 @@ void Rig::createBodyParts() {
         bone.part->setParent(self);
     }
 
-    m_nickname = std::make_shared<types::BillboardText>();
-    m_nickname->setText(getName());
-    m_nickname->setOffset(glm::vec3(0.0f, 2.3f, 0.0f));
-    m_nickname->setParent(m_head);
-
-    syncParts();
+    auto nickname = types::BillboardText::create("nickname");
+    nickname->setText(getName());
+    nickname->setOffset(glm::vec3(0.0f, 0.8f, 0.0f));
+    nickname->setParent(head);
 
     setPivotPosition(m_spawnPosition);
+
+    syncParts();
 }
 
 void Rig::syncParts() {
@@ -87,32 +87,6 @@ void Rig::syncParts() {
 
         bone.part->setPosition(glm::vec3(worldPos), true);
         bone.part->setOrientation(modelOrientation * bone.localOrientation, true);
-    }
-}
-
-void Rig::setPivot(const glm::mat4& pivot, bool silent) {
-    types::Model::setPivot(pivot, silent);
-
-    if (m_rigidBody) {
-        glm::vec3 position = getPivotPosition();
-        
-        btTransform trans = m_rigidBody->getWorldTransform();
-        trans.setOrigin(btVector3(position.x, position.y, position.z));
-        m_rigidBody->setWorldTransform(trans);
-
-        m_rigidBody->activate(true);
-    }
-}
-
-void Rig::setPivotPosition(const glm::vec3& position, bool silent) {
-    types::Model::setPivotPosition(position, silent);
-
-    if (m_rigidBody) {
-        btTransform trans = m_rigidBody->getWorldTransform();
-        trans.setOrigin(btVector3(position.x, position.y, position.z));
-        m_rigidBody->setWorldTransform(trans);
-
-        m_rigidBody->activate(true);
     }
 }
 

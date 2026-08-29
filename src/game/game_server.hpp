@@ -1,8 +1,8 @@
 #pragma once
 
 #include "network/network.hpp"
-
 #include "types/types.hpp"
+#include "managers/managers.hpp"
 
 #include "physics/physics.hpp"
 
@@ -31,6 +31,8 @@ private:
 
     std::shared_ptr<types::Workspace> m_workspace;
     // std::shared_ptr<types::CoreGui> m_coreGui;
+
+    std::unique_ptr<mngrs::ServerInstanceManager> m_instanceManager;
 
     std::mutex m_networkPartsMutex;
     std::unordered_map<uint32_t, std::shared_ptr<types::Part>> m_networkParts;

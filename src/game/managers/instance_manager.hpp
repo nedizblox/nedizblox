@@ -18,6 +18,9 @@ public:
     InstanceManager(const InstanceManager&) = delete;
     InstanceManager& operator=(const InstanceManager&) = delete;
 
+    size_t getMapRebuildCount() const { return m_mapRebuildCount; }
+    size_t getGuiRebuildCount() const { return m_guiRebuildCount; }
+
     void rebuildMap(const std::shared_ptr<types::Instance>& root);
     void rebuildGui(const std::shared_ptr<types::Instance>& root);
 
@@ -25,25 +28,34 @@ public:
 
     void sortTransparentInstances(const glm::vec3& cameraPos);
 
-    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& getOpaqueModelInstancesData() const {
+    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>&
+    getOpaqueModelInstancesData() const {
         return m_opaqueModelInstancesData;
     }
 
-    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& getOpaqueModelOutlineInstancesData() const {
+    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+    getOpaqueModelOutlineInstancesData() const {
         return m_opaqueModelOutlineInstancesData;
     }
 
-    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& getTransparentModelInstancesData() const {
+    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>&
+    getTransparentModelInstancesData() const {
         return m_transparentModelInstancesData;
     }
 
-    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& getTransparentModelOutlineInstancesData() const {
+    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+    getTransparentModelOutlineInstancesData() const {
         return m_transparentModelOutlineInstancesData;
     }
 
     const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>&
     getBillbTextInstancesContent() const {
         return m_billbTextInstancesContent;
+    }
+
+    const std::unordered_map<std::string, std::vector<gfx::billb::Image::InstanceData>>&
+    getBillbImageInstancesData() const {
+        return m_billbImageInstancesData;
     }
 
     const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>&
@@ -58,6 +70,9 @@ public:
     bool isGuiDirty() const { return m_guiHierarchyDirty; }
 
 private:
+    size_t m_mapRebuildCount = 0;
+    size_t m_guiRebuildCount = 0;
+
     AssetManager& m_assetManager;
 
     template <typename T>
@@ -76,27 +91,35 @@ private:
     std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>> m_transparentModelOutlineInstancesData;
 
     std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>> m_billbTextInstancesContent;
+    std::unordered_map<std::string, std::vector<gfx::billb::Image::InstanceData>> m_billbImageInstancesData;
     std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>> m_textInstancesContent;
 
     std::vector<DynamicTarget<types::Part>> m_partDynamicTargets;
     std::vector<DynamicTarget<types::SelectionBox>> m_selectionBoxDynamicTargets;
     std::vector<DynamicTarget<types::BillboardText>> m_billbTextDynamicTargets;
+    std::vector<DynamicTarget<types::BillboardImage>> m_billbImageDynamicTargets;
     std::vector<DynamicTarget<types::Text>> m_textDynamicTargets;
 
     std::weak_ptr<types::Instance> m_currentRoot;
-    types::Instance::CallbackId m_rootSubscriptionId = 0;
+    types::Instance::CallbackId m_propSubId = 0;
+    types::Instance::CallbackId m_childrenSubId = 0;
+    types::Instance::CallbackId m_descendantChildrenSubId = 0;
 
     bool m_mapHierarchyDirty = true;
     bool m_guiHierarchyDirty = true;
 
     glm::uvec3 packTexTiles(const glm::vec2* texTiles);
-    std::string getModelBucketFromShape(enums::PartType shape);
+    std::string getModelBucketFromShape(enums::PartShape shape);
 
     void collectMapInstances(const std::shared_ptr<types::Instance>& parent);
     void collectGuiInstances(const std::shared_ptr<types::Instance>& parent);
 
-    void sortInstances(const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances, std::vector<DynamicTarget<types::Part>>& targets, const std::string& bucketName);
-    void sortInstances(const glm::vec3& cameraPos, std::vector<gfx::ModelOutline::InstanceData>& instances, std::vector<DynamicTarget<types::SelectionBox>>& targets, const std::string& bucketName);
+    void sortInstances(
+        const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances,
+        std::vector<DynamicTarget<types::Part>>& targets, const std::string& bucketName);
+    void sortInstances(
+        const glm::vec3& cameraPos, std::vector<gfx::ModelOutline::InstanceData>& instances,
+        std::vector<DynamicTarget<types::SelectionBox>>& targets, const std::string& bucketName);
 };
 
 } // namespace game::mngrs

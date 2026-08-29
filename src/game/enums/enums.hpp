@@ -10,11 +10,14 @@ enum class InstanceType {
     Workspace = 1,
     CoreGui = 2,
     Model = 3,
-    Part = 4,
-    SelectionBox = 5,
-    Decal = 6,
-    BillboardText = 7,
-    Text = 8
+    Folder = 4,
+    Part = 5,
+    SelectionBox = 6,
+    Decal = 7,
+    BillboardText = 8,
+    BillboardImage = 9,
+    Text = 10,
+    Image = 11
 };
 
 enum class PropertyType {
@@ -30,7 +33,9 @@ enum class PropertyType {
     Enum = 9,
 };
 
-enum class PartType { Ball = 0, Block = 1, Cylinder = 2, Wedge = 3, Head = 4 };
+enum class PartType { Part = 0, MeshPart = 1, SpawnLocation = 2 };
+
+enum class PartShape { Ball = 0, Block = 1, Cylinder = 2, Wedge = 3, Head = 4 };
 
 enum class Face { Top = 0, Bottom = 1, Left = 2, Right = 3, Front = 4, Back = 5 };
 
@@ -47,11 +52,16 @@ std::vector<std::string> getStringsFromEnums();
  
 template <>
 inline std::vector<std::string> getStringsFromEnums<InstanceType>() {
-    return {"Game", "Workspace", "CoreGui", "Model", "Part", "SelectionBox", "Decal", "BillboardText", "Text"};
+    return {"Game", "Workspace", "CoreGui", "Model", "Folder", "Part", "SelectionBox", "Decal", "BillboardText", "BillboardImage", "Text", "Image"};
 }
- 
+
 template <>
 inline std::vector<std::string> getStringsFromEnums<PartType>() {
+    return {"Part", "MeshPart", "SpawnLocation"};
+}
+
+template <>
+inline std::vector<std::string> getStringsFromEnums<PartShape>() {
     return {"Ball", "Block", "Cylinder", "Wedge", "Head"};
 }
  

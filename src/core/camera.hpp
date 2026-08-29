@@ -67,6 +67,9 @@ public:
     glm::vec3 getTarget() const { return m_target; }
     void setTarget(const glm::vec3& target) { m_target = target; }
 
+    glm::vec3 getOffset() const { return m_offset; }
+    void setOffset(const glm::vec3& offset) { m_offset = offset; }
+
     glm::vec3 getPosition() const { return m_position; }
 
     glm::mat4 getProjection() const { return m_projection; }
@@ -93,6 +96,7 @@ private:
 
     glm::vec3 m_position{0.0f};
     glm::vec3 m_target{0.0f};
+    glm::vec3 m_offset{0.0f, 1.5f, 0.0f};
 
     glm::mat4 m_projection{1.0f};
     glm::mat4 m_view{1.0f};

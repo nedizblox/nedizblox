@@ -57,6 +57,8 @@ void SphericalCamera::update(float aspect, const glm::vec2& mouseDelta, const gl
 
     m_front = front;
 
+    m_target += m_offset;
+
     m_position = m_target + m_front;
 
     m_projection = glm::perspective(glm::radians(m_fov), aspect, 0.1f, 1000.0f);

@@ -14,6 +14,8 @@ GameClient::GameClient(const std::string& server, uint16_t port, const std::stri
 
     createClient(server, port, nickname);
 
+    createTools();
+
     createLocalRig(nickname);
     createCamera();
 
@@ -94,6 +96,8 @@ void GameClient::loadUis() {
     m_uiManager->loadText("nunito", m_assetManager->getSampler("ui"), "assets/fonts/Nunito.ttf", 50);
 
     m_billboardManager->loadText("nunito", m_assetManager->getSampler("repeat"), "assets/fonts/Nunito.ttf", 32);
+
+    m_billboardManager->loadImage("logo", m_assetManager->getSampler("repeat"), "assets/textures/logo.png");
 }
 
 void GameClient::createCamera() {
@@ -112,7 +116,9 @@ void GameClient::buildMap(const std::string& rbxlPath) {
             instance->setParent(m_workspace);
         }
 
-        if (auto part = std::static_pointer_cast<types::Part>(instance)) {
+        if (instance->getType() == enums::InstanceType::Part) {
+            auto part = std::static_pointer_cast<types::Part>(instance);
+
             m_physics->createRigidBodyPart(part.get());
         }
     }
@@ -122,18 +128,23 @@ void GameClient::createServices() {
     m_game = std::make_shared<types::Game>();
 
     m_workspace = std::make_shared<types::Workspace>();
-    m_workspace->onChildrenChanged(
+    m_workspace->onDescendantChildrenChanged(
         [this](std::shared_ptr<types::Workspace> newChild) { m_instanceManager->markMapDirty(); });
     m_workspace->setParent(m_game);
 
     m_coreGui = std::make_shared<types::CoreGui>();
-    m_coreGui->onChildrenChanged(
+    m_coreGui->onDescendantChildrenChanged(
         [this](std::shared_ptr<types::CoreGui> newChild) { m_instanceManager->markGuiDirty(); });
     m_workspace->setParent(m_game);
 
     m_physics = std::make_unique<physics::Physics>(m_workspace);
+}
 
+void GameClient::createTools() {
     m_devTools = std::make_unique<utils::DevTools>(*m_imgui, m_game);
+
+    m_debugTools
+        = std::make_unique<utils::DebugTools>(*m_imgui, *m_instanceManager, m_replicator->getClient());
 }
 
 void GameClient::createLocalRig(const std::string& nickname) {
@@ -173,11 +184,10 @@ void GameClient::run() {
         m_localRig->update(dt);
         m_replicator->updateNetworkRigs(dt);
 
-        auto head = m_localRig->getHead();
-        if (head)
-            m_sphericalCamera->setTarget(head->getPosition());
+        if (m_localRig)
+            m_sphericalCamera->setTarget(m_localRig->getPivotPosition());
 
-        auto outgoingStates = m_ownership->update(m_localRig, m_replicator->getNetworkParts());
+        auto outgoingStates = m_ownership->update(dt, m_localRig, m_replicator->getNetworkParts());
         m_replicator->sendPhysicsState(outgoingStates);
 
         if (VkCommandBuffer cmd = renderer.beginFrame()) {
@@ -211,15 +221,22 @@ void GameClient::run() {
 
             m_instanceManager->sortTransparentInstances(position);
 
-            m_renderManager->renderModelsOpaque(cmd, projection, view, position, m_instanceManager->getOpaqueModelInstancesData());
-            m_renderManager->renderModelOutlinesOpaque(cmd, projection, view, position, m_instanceManager->getOpaqueModelOutlineInstancesData());
+            m_renderManager->renderModelsOpaque(
+                cmd, projection, view, position, m_instanceManager->getOpaqueModelInstancesData());
+            m_renderManager->renderModelOutlinesOpaque(
+                cmd, projection, view, position, m_instanceManager->getOpaqueModelOutlineInstancesData());
 
             m_renderManager->renderSkybox(cmd, projection, view, m_assetManager->getCubemapId("skybox"));
 
-            m_renderManager->renderModelsTransparent(cmd, projection, view, position, m_instanceManager->getTransparentModelInstancesData());
-            m_renderManager->renderModelOutlinesTransparent(cmd, projection, view, position, m_instanceManager->getTransparentModelOutlineInstancesData());
+            m_renderManager->renderModelsTransparent(
+                cmd, projection, view, position, m_instanceManager->getTransparentModelInstancesData());
+            m_renderManager->renderModelOutlinesTransparent(
+                cmd, projection, view, position, m_instanceManager->getTransparentModelOutlineInstancesData());
 
-            m_renderManager->renderBillboardTexts(cmd, projection, view, m_instanceManager->getBillbTextInstancesContent());
+            m_renderManager->renderBillboardTexts(
+                cmd, projection, view, m_instanceManager->getBillbTextInstancesContent());
+            m_renderManager->renderBillboardImages(
+                cmd, projection, view, m_instanceManager->getBillbImageInstancesData());
 
             m_renderManager->renderTexts(cmd, window, m_instanceManager->getTextInstancesContent());
 

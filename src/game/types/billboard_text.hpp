@@ -11,6 +11,10 @@ public:
     BillboardText(const std::string& name = "BillboardText") :
         TypedInstance<BillboardText>(enums::InstanceType::BillboardText, name) {}
 
+    static std::shared_ptr<BillboardText> create(const std::string& name = "BillboardText") {
+        return std::make_shared<BillboardText>(name);
+    }
+
     std::vector<PropertyDescriptor> getProperties() override {
         std::weak_ptr<BillboardText> self = std::static_pointer_cast<BillboardText>(shared_from_this());
 

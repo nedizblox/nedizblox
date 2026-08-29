@@ -7,7 +7,7 @@ namespace game::types {
 
 class SpawnLocation : public Part {
 public:
-    SpawnLocation(const std::string& name = "SpawnLocation") : Part(name) {
+    SpawnLocation(const std::string& name = "SpawnLocation") : Part(name, enums::PartType::SpawnLocation) {
         setSize(glm::vec3(5.0f, 1.0f, 5.0f));
         setSurfaceTop(enums::SurfaceType::Smooth);
         setSurfaceBottom(enums::SurfaceType::Smooth);

@@ -107,14 +107,20 @@ void Server::update() {
         return;
     }
 
-    size_t expectedSize = sizeof(packets::PhysicsStepPacket)
-                          + (static_cast<size_t>(header.objectCount) * sizeof(packets::PhysicalObjectState));
+    size_t expectedSize
+        = sizeof(packets::PhysicsStepPacket)
+          + (static_cast<size_t>(header.objectCount) * sizeof(packets::PhysicalObjectStateWire));
     if (bytes != expectedSize)
         return;
 
-    const packets::PhysicalObjectState* statesPtr
-        = reinterpret_cast<const packets::PhysicalObjectState*>(udpBuffer.data() + sizeof(header));
-    std::vector<packets::PhysicalObjectState> objects(statesPtr, statesPtr + header.objectCount);
+    const packets::PhysicalObjectStateWire* wirePtr
+        = reinterpret_cast<const packets::PhysicalObjectStateWire*>(udpBuffer.data() + sizeof(header));
+
+    std::vector<packets::PhysicalObjectState> objects;
+    objects.reserve(header.objectCount);
+    for (uint32_t i = 0; i < header.objectCount; i++) {
+        objects.push_back(packets::fromWire(wirePtr[i]));
+    }
 
     {
         std::lock_guard<std::mutex> lock(m_objectOwnersMutex);
@@ -131,6 +137,9 @@ void Server::update() {
     {
         std::lock_guard<std::mutex> lock(m_clientsMutex);
         for (const auto& clientEndpoint : m_clients) {
+            if (clientEndpoint == remote)
+                continue;
+
             boost::system::error_code ec;
             m_udpSocket.send_to(boost::asio::buffer(udpBuffer.data(), bytes), clientEndpoint, 0, ec);
             if (!ec) {
@@ -193,22 +202,28 @@ bool Server::isOwned(uint32_t networkId) const {
 
 void Server::broadcastPhysicsState(const std::vector<packets::PhysicalObjectState>& objects) {
     constexpr size_t kMaxObjectsPerPacket = (kMaxUdpDatagramSize - sizeof(packets::PhysicsStepPacket))
-                                            / sizeof(packets::PhysicalObjectState);
+                                            / sizeof(packets::PhysicalObjectStateWire);
 
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     if (m_clients.empty())
         return;
 
-    for (size_t offset = 0; offset < objects.size(); offset += kMaxObjectsPerPacket) {
-        size_t count = std::min(kMaxObjectsPerPacket, objects.size() - offset);
+    std::vector<packets::PhysicalObjectStateWire> wireObjects;
+    wireObjects.reserve(objects.size());
+    for (const auto& object : objects) {
+        wireObjects.push_back(packets::toWire(object));
+    }
+
+    for (size_t offset = 0; offset < wireObjects.size(); offset += kMaxObjectsPerPacket) {
+        size_t count = std::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
 
         packets::PhysicsStepPacket header{};
         header.senderPlayerId = 0;
         header.objectCount = static_cast<uint32_t>(count);
 
-        std::vector<uint8_t> buffer(sizeof(header) + count * sizeof(packets::PhysicalObjectState));
+        std::vector<uint8_t> buffer(sizeof(header) + count * sizeof(packets::PhysicalObjectStateWire));
         std::memcpy(buffer.data(), &header, sizeof(header));
-        std::memcpy(buffer.data() + sizeof(header), objects.data() + offset, count * sizeof(packets::PhysicalObjectState));
+        std::memcpy(buffer.data() + sizeof(header), wireObjects.data() + offset, count * sizeof(packets::PhysicalObjectStateWire));
 
         for (const auto& clientEndpoint : m_clients) {
             boost::system::error_code ec;

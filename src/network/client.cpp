@@ -14,9 +14,13 @@
 namespace net {
 
 Client::Client(const std::string& host, uint16_t port, const std::string& nickname) :
-    m_udpSocket(m_ioContext, udp::v4()), m_tcpSocket(m_ioContext) {
+    m_serverAddress(host),
+    m_serverPort(port),
+    m_playerNickname(nickname),
+    m_udpSocket(m_ioContext, udp::v4()),
+    m_tcpSocket(m_ioContext) {
     tcp::resolver tcpResolver(m_ioContext);
-    auto tcpEndpoints = tcpResolver.resolve(host, std::to_string(port));
+    auto tcpEndpoints = tcpResolver.resolve(m_serverAddress, std::to_string(m_serverPort));
 
     boost::system::error_code ec;
     boost::asio::connect(m_tcpSocket, tcpEndpoints, ec);
@@ -26,7 +30,7 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     }
 
     packets::PlayerInfoPacket info{};
-    std::strncpy(info.nickname, nickname.c_str(), sizeof(info.nickname) - 1);
+    std::strncpy(info.nickname, m_playerNickname.c_str(), sizeof(info.nickname) - 1);
     info.clientVersion
         = core::crypto::encodeVersion(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 
@@ -95,12 +99,12 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
 
     const uint8_t* mapPartsPtr = mapReply.data() + sizeof(packets::InitialMapPacket);
     size_t expectedMapSize
-        = sizeof(packets::InitialMapPacket) + (mapHeader.partCount * sizeof(packets::MapPartInfo));
+        = sizeof(packets::InitialMapPacket) + (mapHeader.partCount * sizeof(packets::PartInfo));
 
     if (mapReply.size() == expectedMapSize) {
         for (uint32_t i = 0; i < mapHeader.partCount; i++) {
-            packets::MapPartInfo mapPart{};
-            std::memcpy(&mapPart, mapPartsPtr + (i * sizeof(packets::MapPartInfo)), sizeof(mapPart));
+            packets::PartInfo mapPart{};
+            std::memcpy(&mapPart, mapPartsPtr + (i * sizeof(packets::PartInfo)), sizeof(mapPart));
 
             m_cachedMapParts.push_back(mapPart);
         }
@@ -127,21 +131,27 @@ Client::~Client() { stop(); }
 void Client::sendPhysicsState(const std::vector<packets::PhysicalObjectState>& objects) {
     static constexpr size_t kMaxUdpDatagramSize = 1400;
     constexpr size_t kMaxObjectsPerPacket = (kMaxUdpDatagramSize - sizeof(packets::PhysicsStepPacket))
-                                            / sizeof(packets::PhysicalObjectState);
+                                            / sizeof(packets::PhysicalObjectStateWire);
 
     if (objects.empty())
         return;
 
-    for (size_t offset = 0; offset < objects.size(); offset += kMaxObjectsPerPacket) {
-        size_t count = std::min(kMaxObjectsPerPacket, objects.size() - offset);
+    std::vector<packets::PhysicalObjectStateWire> wireObjects;
+    wireObjects.reserve(objects.size());
+    for (const auto& object : objects) {
+        wireObjects.push_back(packets::toWire(object));
+    }
+
+    for (size_t offset = 0; offset < wireObjects.size(); offset += kMaxObjectsPerPacket) {
+        size_t count = std::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
 
         packets::PhysicsStepPacket header{};
         header.senderPlayerId = m_playerId;
         header.objectCount = static_cast<uint32_t>(count);
 
-        std::vector<uint8_t> buffer(sizeof(header) + count * sizeof(packets::PhysicalObjectState));
+        std::vector<uint8_t> buffer(sizeof(header) + count * sizeof(packets::PhysicalObjectStateWire));
         std::memcpy(buffer.data(), &header, sizeof(header));
-        std::memcpy(buffer.data() + sizeof(header), objects.data() + offset, count * sizeof(packets::PhysicalObjectState));
+        std::memcpy(buffer.data() + sizeof(header), wireObjects.data() + offset, count * sizeof(packets::PhysicalObjectStateWire));
 
         boost::system::error_code ec;
         m_udpSocket.send_to(boost::asio::buffer(buffer), m_udpServer, 0, ec);
@@ -164,10 +174,9 @@ void Client::sendReliable(const void* data, size_t size) {
 
 void Client::sendPing() {
     packets::PingPacket ping{};
-    ping.clientTimeUs = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+    ping.clientTimeUs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                                  std::chrono::steady_clock::now().time_since_epoch())
+                                                  .count());
 
     boost::system::error_code ec;
     m_udpSocket.send_to(boost::asio::buffer(&ping, sizeof(ping)), m_udpServer, 0, ec);
@@ -301,10 +310,9 @@ void Client::udpUpdateLoop() {
             std::memcpy(&pong, buffer.data(), sizeof(pong));
 
             if (pong.magic == packets::kPongMagic) {
-                auto nowUs = static_cast<uint64_t>(
-                    std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::steady_clock::now().time_since_epoch())
-                        .count());
+                auto nowUs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                                       std::chrono::steady_clock::now().time_since_epoch())
+                                                       .count());
 
                 if (nowUs >= pong.clientTimeUs) {
                     m_pingMs = static_cast<uint32_t>((nowUs - pong.clientTimeUs) / 1000);
@@ -322,15 +330,20 @@ void Client::udpUpdateLoop() {
 
         size_t expectedSize
             = sizeof(packets::PhysicsStepPacket)
-              + (static_cast<size_t>(header.objectCount) * sizeof(packets::PhysicalObjectState));
+              + (static_cast<size_t>(header.objectCount) * sizeof(packets::PhysicalObjectStateWire));
         if (bytes != expectedSize) {
             continue;
         }
 
-        const auto* statesPtr
-            = reinterpret_cast<const packets::PhysicalObjectState*>(buffer.data() + sizeof(header));
+        const auto* wirePtr
+            = reinterpret_cast<const packets::PhysicalObjectStateWire*>(buffer.data() + sizeof(header));
 
-        std::vector<packets::PhysicalObjectState> objects(statesPtr, statesPtr + header.objectCount);
+        std::vector<packets::PhysicalObjectState> objects;
+        objects.reserve(header.objectCount);
+        for (uint32_t i = 0; i < header.objectCount; i++) {
+            objects.push_back(packets::fromWire(wirePtr[i]));
+        }
+
         for (const auto& object : objects) {
             m_objectStates[object.networkId] = object;
         }
@@ -368,7 +381,11 @@ void Client::statsLoop() {
         lastReceived = receivedNow;
         lastTime = now;
 
-        sendPing();
+        static int pingCounter = 0;
+        if (pingCounter++ >= 10) {
+            sendPing();
+            pingCounter = 0;
+        }
     }
 }
 

@@ -11,6 +11,8 @@
 
 #include "model.hpp"
 
+#include "folder.hpp"
+
 #include "part.hpp"
 
 #include "selection_box.hpp"
@@ -20,6 +22,8 @@
 #include "spawn_location.hpp"
 
 #include "billboard_text.hpp"
+
+#include "billboard_image.hpp"
 
 #include "text.hpp"
 // IWYU pragma: end_exports

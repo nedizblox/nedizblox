@@ -26,7 +26,7 @@ public:
     using PhysicsUpdateCallback
         = std::function<void(uint32_t, const std::vector<packets::PhysicalObjectState>&)>;
 
-    using MapCallback = std::function<void(const std::vector<packets::MapPartInfo>&)>;
+    using MapCallback = std::function<void(const std::vector<packets::PartInfo>&)>;
 
     using ReliableMessageCallback = std::function<void(const std::vector<uint8_t>&)>;
 
@@ -51,7 +51,11 @@ public:
         m_reliableMessageCallback = callback;
     }
 
+    std::string getServerAddress() const { return m_serverAddress; }
+    uint16_t getServerPort() const { return m_serverPort; }
+
     uint32_t getPlayerId() const { return m_playerId; }
+    std::string getPlayerNickname() const { return m_playerNickname; }
 
     void sendPhysicsState(const std::vector<packets::PhysicalObjectState>& objects);
 
@@ -75,6 +79,10 @@ private:
 
     boost::asio::io_context m_ioContext;
 
+    std::string m_serverAddress = "";
+    uint16_t m_serverPort = 0;
+    std::string m_playerNickname = "";
+
     tcp::socket m_tcpSocket;
     std::mutex m_tcpSendMutex;
 
@@ -91,7 +99,7 @@ private:
 
     std::unordered_map<uint32_t, packets::PhysicalObjectState> m_objectStates;
     std::vector<packets::OldPlayerInfo> m_cachedOldPlayers;
-    std::vector<packets::MapPartInfo> m_cachedMapParts;
+    std::vector<packets::PartInfo> m_cachedMapParts;
 
     OldPlayersCallback m_oldPlayersCallback;
     PlayerJoinedCallback m_playerJoinedCallback;

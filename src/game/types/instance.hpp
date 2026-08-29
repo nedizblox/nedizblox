@@ -21,9 +21,9 @@ public:
         enums::PropertyType type;
         void* ptr;
         bool readOnly = false;
- 
+
         std::function<void()> notifyChanged;
- 
+
         std::function<std::shared_ptr<Instance>()> getInstanceRef;
         std::function<void(const std::shared_ptr<Instance>&)> setInstanceRef;
 
@@ -48,7 +48,7 @@ public:
 
     virtual std::vector<PropertyDescriptor> getProperties() {
         auto self = weak_from_this();
- 
+
         return {
             {
                 "Name",
@@ -156,7 +156,13 @@ public:
 
     CallbackId onChildrenChanged(Callback callback) {
         CallbackId id = m_nextCallbackId++;
-        m_propertyChangedCallbacks.push_back({id, callback});
+        m_childrenChangedCallbacks.push_back({id, callback});
+        return id;
+    }
+
+    CallbackId onDescendantChildrenChanged(Callback callback) {
+        CallbackId id = m_nextCallbackId++;
+        m_descendantChildrenChangedCallbacks.push_back({id, callback});
         return id;
     }
 
@@ -185,33 +191,29 @@ public:
     }
 
     void removeChildrenChangedCallback(CallbackId id) {
-        std::erase_if(m_childrenChangedCallbacks, [id](const auto& item) {
-            return item.id == id;
-        });
+        std::erase_if(m_childrenChangedCallbacks, [id](const auto& item) { return item.id == id; });
+    }
+
+    void removeDescendantChildrenChangedCallback(CallbackId id) {
+        std::erase_if(
+            m_descendantChildrenChangedCallbacks, [id](const auto& item) { return item.id == id; });
     }
 
     void removePropertyChangedCallback(CallbackId id) {
-        std::erase_if(m_propertyChangedCallbacks, [id](const auto& item) {
-            return item.id == id;
-        });
+        std::erase_if(m_propertyChangedCallbacks, [id](const auto& item) { return item.id == id; });
     }
 
     void removeDescendantPropertyChangedCallback(CallbackId id) {
-        std::erase_if(m_descendantPropertyChangedCallbacks, [id](const auto& item) {
-            return item.id == id;
-        });
+        std::erase_if(
+            m_descendantPropertyChangedCallbacks, [id](const auto& item) { return item.id == id; });
     }
 
     void removeDestroyCallback(CallbackId id) {
-        std::erase_if(m_destroyCallbacks, [id](const auto& item) {
-            return item.id == id;
-        });
+        std::erase_if(m_destroyCallbacks, [id](const auto& item) { return item.id == id; });
     }
 
     void removeDescendantDestroyCallback(CallbackId id) {
-        std::erase_if(m_descendantDestroyCallbacks, [id](const auto& item) {
-            return item.id == id;
-        });
+        std::erase_if(m_descendantDestroyCallbacks, [id](const auto& item) { return item.id == id; });
     }
 
     void destroy() {
@@ -285,6 +287,18 @@ protected:
         }
     }
 
+    void descendantChildrenChanged(const std::shared_ptr<Instance>& changedInstance) {
+        for (const auto& entry : m_descendantChildrenChangedCallbacks) {
+            if (entry.callback) {
+                entry.callback(changedInstance);
+            }
+        }
+
+        if (auto parent = m_parent.lock()) {
+            parent->descendantChildrenChanged(changedInstance);
+        }
+    }
+
     void childrenChanged() {
         auto self = weak_from_this().lock();
 
@@ -293,6 +307,10 @@ protected:
                 if (entry.callback) {
                     entry.callback(self);
                 }
+            }
+
+            if (auto parent = m_parent.lock()) {
+                parent->descendantChildrenChanged(self);
             }
         }
     }
@@ -307,6 +325,7 @@ private:
     uint32_t m_networkId = 0;
 
     std::vector<CallbackEntry> m_childrenChangedCallbacks;
+    std::vector<CallbackEntry> m_descendantChildrenChangedCallbacks;
     std::vector<CallbackEntry> m_propertyChangedCallbacks;
     std::vector<CallbackEntry> m_descendantPropertyChangedCallbacks;
     std::vector<CallbackEntry> m_destroyCallbacks;
@@ -332,11 +351,16 @@ public:
     using Callback = std::function<void(std::shared_ptr<Derived>)>;
 
     using Instance::onChildrenChanged;
-    using Instance::onPropertyChanged;
+    using Instance::onDescendantChildrenChanged;
     using Instance::onDestroy;
+    using Instance::onPropertyChanged;
 
     CallbackId onChildrenChanged(Callback callback) {
         return Instance::onChildrenChanged(wrap(std::move(callback)));
+    }
+
+    CallbackId onDescendantChildrenChanged(Callback callback) {
+        return Instance::onDescendantChildrenChanged(wrap(std::move(callback)));
     }
 
     CallbackId onPropertyChanged(Callback callback) {

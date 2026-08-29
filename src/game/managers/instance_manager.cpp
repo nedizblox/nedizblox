@@ -6,8 +6,7 @@
 
 namespace game::mngrs {
 
-InstanceManager::InstanceManager(AssetManager& assetManager) :
-    m_assetManager(assetManager) {}
+InstanceManager::InstanceManager(AssetManager& assetManager) : m_assetManager(assetManager) {}
 
 InstanceManager::~InstanceManager() {}
 
@@ -19,17 +18,17 @@ glm::uvec3 InstanceManager::packTexTiles(const glm::vec2* texTiles) {
     return packed;
 }
 
-std::string InstanceManager::getModelBucketFromShape(enums::PartType shape) {
+std::string InstanceManager::getModelBucketFromShape(enums::PartShape shape) {
     switch (shape) {
-    case enums::PartType::Block:
+    case enums::PartShape::Block:
         return "cube";
-    case enums::PartType::Ball:
+    case enums::PartShape::Ball:
         return "sphere";
-    case enums::PartType::Cylinder:
+    case enums::PartShape::Cylinder:
         return "cylinder";
-    case enums::PartType::Wedge:
+    case enums::PartShape::Wedge:
         return "wedge";
-    case enums::PartType::Head:
+    case enums::PartShape::Head:
         return "head";
     default:
         return "cube";
@@ -39,13 +38,19 @@ std::string InstanceManager::getModelBucketFromShape(enums::PartType shape) {
 void InstanceManager::rebuildMap(const std::shared_ptr<types::Instance>& root) {
     if (m_currentRoot.lock() != root) {
         if (auto oldRoot = m_currentRoot.lock()) {
-            oldRoot->removeDescendantPropertyChangedCallback(m_rootSubscriptionId);
+            oldRoot->removeDescendantPropertyChangedCallback(m_propSubId);
+            oldRoot->removeChildrenChangedCallback(m_childrenSubId);
+            oldRoot->removeDescendantChildrenChangedCallback(m_descendantChildrenSubId);
         }
 
         m_currentRoot = root;
         if (root) {
-            m_rootSubscriptionId = root->onDescendantPropertyChanged(
-                [this](std::shared_ptr<types::Instance> changed) { this->markMapDirty(); });
+            m_propSubId = root->onDescendantPropertyChanged([this](auto) { markMapDirty(); });
+
+            m_childrenSubId = root->onChildrenChanged([this](auto) { markMapDirty(); });
+
+            m_descendantChildrenSubId
+                = root->onDescendantChildrenChanged([this](auto) { markMapDirty(); });
         }
     }
 
@@ -61,14 +66,19 @@ void InstanceManager::rebuildMap(const std::shared_ptr<types::Instance>& root) {
 
     for (auto& [name, vec] : m_billbTextInstancesContent)
         vec.clear();
+    for (auto& [name, vec] : m_billbImageInstancesData)
+        vec.clear();
 
     m_partDynamicTargets.clear();
     m_selectionBoxDynamicTargets.clear();
+    m_billbTextDynamicTargets.clear();
     m_billbTextDynamicTargets.clear();
 
     collectMapInstances(root);
 
     m_mapHierarchyDirty = false;
+
+    m_mapRebuildCount++;
 }
 
 void InstanceManager::rebuildGui(const std::shared_ptr<types::Instance>& root) {
@@ -80,6 +90,8 @@ void InstanceManager::rebuildGui(const std::shared_ptr<types::Instance>& root) {
     collectGuiInstances(root);
 
     m_guiHierarchyDirty = false;
+
+    m_guiRebuildCount++;
 }
 
 void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>& parent) {
@@ -109,7 +121,7 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
             uint32_t woodId = m_assetManager.getTextureId("wood");
 
             enums::MaterialType material = part->getMaterial();
-            enums::PartType shape = part->getShape();
+            enums::PartShape shape = part->getShape();
 
             auto getSurfTex = [&](enums::SurfaceType surface) -> uint32_t {
                 switch (surface) {
@@ -141,7 +153,7 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
 
             glm::uvec3 textures1{};
             glm::uvec3 textures2{};
-            if (shape == enums::PartType::Block) {
+            if (shape == enums::PartShape::Block) {
                 if (material == enums::MaterialType::SmoothPlastic) {
                     textures1
                         = {getSurfTex(part->getSurfaceLeft()), getSurfTex(part->getSurfaceRight()),
@@ -233,10 +245,28 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
             auto part = std::static_pointer_cast<types::Part>(parent);
 
             auto& vec = m_billbTextInstancesContent[bucket];
-            vec.push_back({billbText->getText(), part->getPosition() + billbText->getOffset(), billbText->getScale()});
+            vec.push_back(
+                {billbText->getText(), part->getPosition() + billbText->getOffset(), billbText->getScale()});
 
             if (!part->getAnchored()) {
                 m_billbTextDynamicTargets.push_back({billbText, bucket, vec.size() - 1, true, part});
+            }
+        } else if (type == enums::InstanceType::BillboardImage) {
+            auto billbImage = std::static_pointer_cast<types::BillboardImage>(obj);
+
+            auto parent = billbImage->getParent();
+            if (!parent || parent->getType() != enums::InstanceType::Part)
+                continue;
+
+            auto part = std::static_pointer_cast<types::Part>(parent);
+
+            std::string source = billbImage->getSource();
+
+            auto& vec = m_billbImageInstancesData[source];
+            vec.push_back({part->getPosition() + billbImage->getOffset(), billbImage->getScale()});
+
+            if (!part->getAnchored()) {
+                m_billbImageDynamicTargets.push_back({billbImage, source, vec.size() - 1, true, part});
             }
         } else if (type == enums::InstanceType::SelectionBox) {
             auto selectionBox = std::static_pointer_cast<types::SelectionBox>(obj);
@@ -252,7 +282,7 @@ void InstanceManager::collectMapInstances(const std::shared_ptr<types::Instance>
                 continue;
 
             bool isTransparent = transparency > 0.0f;
-            enums::PartType shape = part->getShape();
+            enums::PartShape shape = part->getShape();
             std::string bucket = getModelBucketFromShape(shape);
 
             float alpha = isTransparent ? (1.0f - transparency) : 1.0f;
@@ -402,6 +432,12 @@ void InstanceManager::updateDynamicTransforms() {
         content.position = target.parentPart->getPosition() + target.obj->getOffset();
         content.scale = target.obj->getScale();
         content.text = target.obj->getText();
+    }
+
+    for (const auto& target : m_billbImageDynamicTargets) {
+        auto& content = m_billbImageInstancesData[target.bucketName][target.index];
+        content.position = target.parentPart->getPosition() + target.obj->getOffset();
+        content.scale = target.obj->getScale();
     }
 
     for (const auto& target : m_textDynamicTargets) {

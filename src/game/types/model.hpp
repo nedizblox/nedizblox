@@ -8,7 +8,12 @@ namespace game::types {
 
 class Model : public TypedInstance<Model> {
 public:
-    Model(const std::string& name = "Model") : TypedInstance<Model>(enums::InstanceType::Model, name) {}
+    Model(const std::string& name = "Model") :
+        TypedInstance<Model>(enums::InstanceType::Model, name) {}
+
+    static std::shared_ptr<Model> create(const std::string& name = "Model") {
+        return std::make_shared<Model>(name);
+    }
 
     glm::mat4 getPivot() const { return m_pivot; }
     virtual void setPivot(const glm::mat4& pivot, bool silent = false) {
@@ -16,7 +21,7 @@ public:
 
         m_pivot = pivot;
 
-        updateChildrenTransforms(this, delta);
+        updateChildrenTransforms(this, delta, silent);
 
         if (!silent)
             propertyChanged();
@@ -34,22 +39,22 @@ public:
 private:
     glm::mat4 m_pivot{1.0f};
 
-    void updateChildrenTransforms(Instance* parent, const glm::mat4& delta) {
+    void updateChildrenTransforms(Instance* parent, const glm::mat4& delta, bool silent) {
         for (const auto& child : parent->getChildren()) {
             if (child->getType() == enums::InstanceType::Part) {
                 auto part = std::static_pointer_cast<Part>(child);
 
                 glm::vec4 newPos = delta * glm::vec4(part->getPosition(), 1.0f);
-                part->setPosition(glm::vec3(newPos));
+                part->setPosition(glm::vec3(newPos), silent);
 
                 glm::quat deltaRotation = glm::toQuat(delta);
-                part->setOrientation(deltaRotation * part->getOrientation());
+                part->setOrientation(deltaRotation * part->getOrientation(), silent);
             } else if (child->getType() == enums::InstanceType::Model) {
                 auto subModel = std::static_pointer_cast<Model>(child);
 
                 subModel->m_pivot = delta * subModel->m_pivot;
 
-                updateChildrenTransforms(subModel.get(), delta);
+                updateChildrenTransforms(subModel.get(), delta, silent);
             }
         }
     }

@@ -64,70 +64,32 @@ void GameServer::createServer(uint16_t port) {
 }
 
 void GameServer::buildMap(const std::string& rbxlMapPath) {
-    auto instance = utils::rbxl::parseRbxl(rbxlMapPath);
+    auto parsedRoot = utils::rbxl::parseRbxl(rbxlMapPath);
 
-    std::vector<net::packets::MapPartInfo> mapInfos;
-
-    for (auto& instance : instance) {
-        if (!instance)
-            continue;
-
-        uint32_t networkId = m_nextNetworkId.fetch_add(1);
-        instance->setNetworkId(networkId);
-
-        if (!instance->getParent()) {
-            instance->setParent(m_workspace);
-        }
-
-        if (auto part = std::static_pointer_cast<types::Part>(instance)) {
-            m_physics->createRigidBodyPart(part.get());
-
-            {
-                std::lock_guard<std::mutex> lock(m_networkPartsMutex);
-                m_networkParts[networkId] = part;
-            }
-
-            net::packets::MapPartInfo info{};
-            info.networkId = networkId;
-            info.parentNetworkId = part->getParent()->getNetworkId();
-            std::strncpy(info.name, part->getName().c_str(), sizeof(info.name) - 1);
-            info.position = part->getPosition();
-            info.rotation = part->getOrientation();
-            info.size = part->getSize();
-            info.color = part->getColor();
-            info.transparency = part->getTransparency();
-            info.anchored = part->getAnchored();
-            info.shape = static_cast<net::packets::PartShape>(part->getShape());
-
-            mapInfos.push_back(info);
+    for (auto& inst : parsedRoot) {
+        if (inst && !inst->getParent()) {
+            inst->setParent(m_workspace);
         }
     }
 
-    net::packets::InitialMapPacket header{};
-    header.partCount = static_cast<uint32_t>(mapInfos.size());
+    m_instanceManager = std::make_unique<mngrs::ServerInstanceManager>(*m_physics);
+    m_instanceManager->setRoot(m_workspace);
+    m_instanceManager->rebuildMap();
 
-    std::vector<uint8_t> buffer(sizeof(header) + mapInfos.size() * sizeof(net::packets::MapPartInfo));
-    std::memcpy(buffer.data(), &header, sizeof(header));
-    if (!mapInfos.empty()) {
-        std::memcpy(buffer.data() + sizeof(header), mapInfos.data(), mapInfos.size() * sizeof(net::packets::MapPartInfo));
-    }
-
-    m_server->setMapData(std::move(buffer));
+    m_server->setMapData(m_instanceManager->getMapBuffer());
 }
 
 void GameServer::physicsLoop() {
-    using clock = std::chrono::steady_clock;
-
     constexpr float kPhysicsInterval = 1.0f / 60.0f;
     constexpr float kBroadcastInterval = 1.0f / 20.0f;
 
-    auto lastStep = clock::now();
+    auto lastStep = std::chrono::steady_clock::now();
     auto lastBroadcast = lastStep;
 
     while (m_running) {
         std::this_thread::sleep_for(std::chrono::duration<float>(kPhysicsInterval));
 
-        auto now = clock::now();
+        auto now = std::chrono::steady_clock::now();
         float dt = std::chrono::duration<float>(now - lastStep).count();
         lastStep = now;
 
@@ -184,6 +146,11 @@ void GameServer::run() {
     m_physicsThread = std::thread(&GameServer::physicsLoop, this);
 
     while (!core::sighandler::shouldStop) {
+        if (m_instanceManager->isDirty()) {
+            m_instanceManager->rebuildMap();
+            m_server->setMapData(m_instanceManager->getMapBuffer());
+        }
+
         m_server->update();
     }
 

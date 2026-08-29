@@ -43,6 +43,10 @@ public:
         VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
         const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
 
+    void renderBillboardImages(
+        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+        const std::unordered_map<std::string, std::vector<gfx::billb::Image::InstanceData>>& instancesData);
+
     void renderTexts(
         VkCommandBuffer commandBuffer, win::Window& window,
         const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData);

@@ -22,6 +22,7 @@ public:
     Ownership& operator=(const Ownership&) = delete;
 
     std::vector<net::packets::PhysicalObjectState> update(
+        float dt,
         const std::shared_ptr<prefabs::Rig>& localRig,
         const std::unordered_map<uint32_t, std::shared_ptr<types::Part>>& networkParts);
 
@@ -34,6 +35,9 @@ private:
     static constexpr size_t kMaxLocallyOwnedObjects = 32;
     static constexpr int kMaxCollisionDepth = 3;
     static constexpr float kReleaseDistanceSq = 15.0f * 15.0f;
+
+    static constexpr float kNetSendInterval = 1.0f / 20.0f;
+    float m_netSendAccumulator = 0.0f;
 
     physics::Physics& m_physics;
     net::Client& m_client;

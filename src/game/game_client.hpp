@@ -46,6 +46,7 @@ private:
 
     std::unique_ptr<gfx::ui::Imgui> m_imgui;
     std::unique_ptr<utils::DevTools> m_devTools;
+    std::unique_ptr<utils::DebugTools> m_debugTools;
 
     std::unique_ptr<core::camera::SphericalCamera> m_sphericalCamera;
     std::unique_ptr<core::camera::FreeCamera> m_freeCamera;
@@ -68,6 +69,8 @@ private:
     void createCamera();
 
     void createServices();
+    void createTools();
+
     void createLocalRig(const std::string& nickname);
 
     void createClient(const std::string& server, uint16_t port, const std::string& nickname);

@@ -40,9 +40,15 @@ void Replicator::updateNetworkRigs(float dt) {
 }
 
 void Replicator::setupCallbacks() {
-    m_client->setMapCallback([this](const std::vector<net::packets::MapPartInfo>& parts) {
+    m_client->setMapCallback([this](const std::vector<net::packets::PartInfo>& parts) {
         for (const auto& info : parts) {
-            auto part = std::make_shared<types::Part>();
+            std::shared_ptr<types::Part> part;
+            if (info.type == net::packets::PartType::SpawnLocation) {
+                part = types::SpawnLocation::create();
+            } else {
+                part = types::Part::create();
+            }
+
             part->setNetworkId(info.networkId);
 
             std::string name(info.name);
@@ -55,7 +61,7 @@ void Replicator::setupCallbacks() {
             part->setColor(info.color);
             part->setTransparency(info.transparency);
             part->setAnchored(info.anchored);
-            part->setShape(static_cast<enums::PartType>(info.shape));
+            part->setShape(static_cast<enums::PartShape>(info.shape));
 
             btRigidBody* rigidBody = m_physics.createRigidBodyPart(part.get());
             m_physics.setBodyNetworkMode(rigidBody, false);
@@ -82,8 +88,6 @@ void Replicator::setupCallbacks() {
                 it->second->setParent(m_workspace);
             }
         }
-
-        m_instanceManager.markMapDirty();
     });
 
     m_client->setOldPlayersCallback([this](uint32_t playerId, const std::string& nickname, const glm::vec3& position) {
@@ -96,7 +100,6 @@ void Replicator::setupCallbacks() {
 
         m_physics.setBodyNetworkMode(rig->getRigidBody(), false);
         m_networkRigs[playerId] = std::move(rig);
-        m_instanceManager.markMapDirty();
     });
 
     m_client->setPlayerJoinedCallback([this](uint32_t playerId, const std::string& nickname) {
@@ -108,8 +111,6 @@ void Replicator::setupCallbacks() {
 
         m_physics.setBodyNetworkMode(rig->getRigidBody(), false);
         m_networkRigs[playerId] = std::move(rig);
-
-        m_instanceManager.markMapDirty();
     });
 
     m_client->setPlayerLeftCallback([this](uint32_t playerId) {
@@ -119,8 +120,6 @@ void Replicator::setupCallbacks() {
             auto& rig = it->second;
             rig->destroy();
             m_networkRigs.erase(playerId);
-
-            m_instanceManager.markMapDirty();
         }
     });
 
@@ -132,9 +131,8 @@ void Replicator::setupCallbacks() {
                 if (auto rigIt = m_networkRigs.find(object.networkId);
                     rigIt != m_networkRigs.end() && rigIt->second) {
                     body = rigIt->second->getRigidBody();
-                } else if (
-                    auto partIt = m_networkParts.find(object.networkId);
-                    partIt != m_networkParts.end() && partIt->second) {
+                } else if (auto partIt = m_networkParts.find(object.networkId);
+                           partIt != m_networkParts.end() && partIt->second) {
                     body = partIt->second->getRigidBody();
                 }
 

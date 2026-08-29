@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../billboards/text.hpp"
+#include "../billboards/image.hpp"
 
 #include <unordered_map>
 
@@ -17,14 +18,17 @@ public:
     uint32_t getTextureIndex(const std::string& name) const;
 
     void loadText(const std::string& name, vk::Sampler& sampler, const std::string& fontPath, uint32_t maxChars);
+    void loadImage(const std::string& name, vk::Sampler& sampler, const std::string& imagePath);
 
     void drawText(VkCommandBuffer commandBuffer, const std::vector<billb::Text::InstanceContent>& instancesData);
+    void drawImage(VkCommandBuffer commandBuffer, const std::vector<billb::Image::InstanceData>& instancesData);
 
 private:
     vk::Device& m_device;
     BindlessManager& m_bindlessManager;
 
     std::unordered_map<std::string, std::unique_ptr<billb::Text>> m_texts;
+    std::unordered_map<std::string, std::unique_ptr<billb::Image>> m_images;
 };
 
 } // namespace gfx::mngrs

@@ -5,6 +5,8 @@
 #include "controller.hpp"
 
 #include "devtools.hpp"
+
+#include "debug_tools.hpp"
 #endif
 
 #include "rbxl.hpp"

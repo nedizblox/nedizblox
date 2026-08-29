@@ -18,6 +18,24 @@ Physics::Physics(const std::shared_ptr<types::Workspace>& workspace) {
 }
 
 Physics::~Physics() {
+    if (m_dynamicsWorld) {
+        for (int i = m_dynamicsWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
+            btCollisionObject* obj = m_dynamicsWorld->getCollisionObjectArray()[i];
+            btRigidBody* body = btRigidBody::upcast(obj);
+
+            if (body && body->getMotionState()) {
+                delete body->getMotionState();
+            }
+
+            m_dynamicsWorld->removeCollisionObject(obj);
+            delete obj;
+        }
+    }
+
+    for (auto& [key, shape] : m_shapeCache) {
+        delete shape;
+    }
+
     delete m_dynamicsWorld;
 
     delete m_solver;
@@ -34,7 +52,7 @@ void Physics::bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace
     workspace->onDescendantDestroy([this](std::shared_ptr<types::Instance> destroyed) {
         if (destroyed->getType() == enums::InstanceType::Part) {
             auto part = std::static_pointer_cast<types::Part>(destroyed);
-            
+
             if (auto rigidBody = part->getRigidBody()) {
                 m_dynamicsWorld->removeRigidBody(rigidBody);
 
@@ -62,19 +80,15 @@ void Physics::bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace
     });
 }
 
-btCylinderShape* Physics::createCylinderShape(types::Part* part) {
-    auto size = part->getSize();
-
+btCylinderShape* Physics::createCylinderShape(const glm::vec3& size) {
     btScalar radius = size.x * 0.5f;
     btScalar halfHeight = size.y * 0.5f;
 
     return new btCylinderShape(btVector3(radius, halfHeight, radius));
 }
 
-btConvexHullShape* Physics::createWedgeShape(types::Part* part) {
+btConvexHullShape* Physics::createWedgeShape(const glm::vec3& size) {
     btConvexHullShape* wedgeShape = new btConvexHullShape();
-
-    auto size = part->getSize();
 
     btScalar halfW = size.x * 0.5f;
     btScalar halfH = size.y * 0.5f;
@@ -93,33 +107,46 @@ btConvexHullShape* Physics::createWedgeShape(types::Part* part) {
     return wedgeShape;
 }
 
-btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
-    btCollisionShape* shape = nullptr;
+btCollisionShape* Physics::getOrCreateShape(enums::PartShape shape, const glm::vec3& size) {
+    auto key = std::make_tuple(shape, size.x, size.y, size.z);
 
-    glm::vec3 size = part->getSize();
-    btVector3 halfExtents(size.x / 2.0f, size.y / 2.0f, size.z / 2.0f);
+    auto it = m_shapeCache.find(key);
+    if (it != m_shapeCache.end()) {
+        return it->second;
+    }
 
-    switch (part->getShape()) {
-    case enums::PartType::Block:
-        shape = new btBoxShape(halfExtents);
+    btCollisionShape* newShape = nullptr;
+    btVector3 halfExtents(size.x * 0.5f, size.y * 0.5f, size.z * 0.5f);
+
+    switch (shape) {
+    case enums::PartShape::Block:
+        newShape = new btBoxShape(halfExtents);
         break;
-    case enums::PartType::Ball:
-        shape = new btSphereShape(size.x / 2.0f);
+    case enums::PartShape::Ball:
+        newShape = new btSphereShape(size.x / 2.0f);
         break;
-    case enums::PartType::Cylinder:
-        shape = createCylinderShape(part);
+    case enums::PartShape::Cylinder:
+        newShape = createCylinderShape(size);
         break;
-    case enums::PartType::Wedge:
-        shape = createWedgeShape(part);
+    case enums::PartShape::Wedge:
+        newShape = createWedgeShape(size);
         break;
-    case enums::PartType::Head:
-        shape = createCylinderShape(part);
+    case enums::PartShape::Head:
+        newShape = createCylinderShape(size);
         break;
     default:
-        shape = new btBoxShape(halfExtents);
+        newShape = new btBoxShape(halfExtents);
         break;
     }
 
+    m_shapeCache[key] = newShape;
+    return newShape;
+}
+
+btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
+    glm::vec3 size = part->getSize();
+
+    btCollisionShape* shape = getOrCreateShape(part->getShape(), size);
     shape->setLocalScaling(btVector3(1.0f, 1.0f, 1.0f));
 
     float mass = part->getAnchored() ? 0.0f : (size.x * size.y * size.z);
@@ -143,7 +170,7 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
     btRigidBody* body = new btRigidBody(ci);
 
     body->setSleepingThresholds(0.6f, 0.8f);
-    body->setDeactivationTime(1.0f);
+    body->setDeactivationTime(0.1f);
 
     m_dynamicsWorld->addRigidBody(body);
 
@@ -159,12 +186,9 @@ btRigidBody* Physics::createRigidBodyPart(types::Part* part) {
 }
 
 btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* rootPart) {
-    btCollisionShape* shape = nullptr;
-
     glm::vec3 size = rootPart->getSize();
-    btVector3 halfExtents(size.x / 2.0f, size.y / 2.0f, size.z / 2.0f);
 
-    shape = new btBoxShape(halfExtents);
+    btCollisionShape* shape = getOrCreateShape(rootPart->getShape(), size);
     shape->setLocalScaling(btVector3(1.0f, 1.0f, 1.0f));
 
     float mass = 10.0f;
@@ -188,7 +212,7 @@ btRigidBody* Physics::createRigidBodyModel(types::Model* model, types::Part* roo
     btRigidBody* body = new btRigidBody(ci);
 
     body->setSleepingThresholds(0.6f, 0.8f);
-    body->setDeactivationTime(1.0f);
+    body->setDeactivationTime(0.1f);
 
     m_dynamicsWorld->addRigidBody(body);
 

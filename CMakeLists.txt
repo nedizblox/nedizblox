@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(NEDIZBLOX_VERSION_MAJOR 0)
-set(NEDIZBLOX_VERSION_MINOR 7)
-set(NEDIZBLOX_VERSION_PATCH 1)
+set(NEDIZBLOX_VERSION_MINOR 8)
+set(NEDIZBLOX_VERSION_PATCH 0)
 
 project(nedizblox 
     VERSION ${NEDIZBLOX_VERSION_MAJOR}.${NEDIZBLOX_VERSION_MINOR}.${NEDIZBLOX_VERSION_PATCH}
@@ -17,6 +17,12 @@ if(SERVER_BUILD)
     message(STATUS "Building Nedizblox Server")
 else()
     message(STATUS "Building Nedizblox Client")
+endif()
+
+option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer for debugging" OFF)
+if(ENABLE_ADDRESS_SANITIZER)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+    set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -74,7 +80,9 @@ if(NOT SERVER_BUILD)
         shaders/model_outline.frag
         shaders/text.vert
         shaders/text.frag
-        shaders/billboard.vert
+        shaders/image.frag
+        shaders/billboard_text.vert
+        shaders/billboard_image.vert
         shaders/imgui.vert
         shaders/imgui.frag
         shaders/skybox.vert
@@ -128,7 +136,9 @@ set(CLIENT_MAIN_SOURCES
     src/graphics/cubemap.cpp
     src/graphics/skybox.cpp
     src/graphics/billboards/text.cpp
+    src/graphics/billboards/image.cpp
     src/graphics/ui/text.cpp
+    src/graphics/ui/image.cpp
     src/graphics/ui/imgui.cpp
     src/graphics/managers/bindless_manager.cpp
     src/graphics/managers/model_manager.cpp
@@ -140,6 +150,7 @@ set(CLIENT_MAIN_SOURCES
     src/network/client.cpp
     src/game/utils/controller.cpp
     src/game/utils/devtools.cpp
+    src/game/utils/debug_tools.cpp
     src/game/multiplayer/replicator.cpp
     src/game/multiplayer/ownership.cpp
     src/game/managers/instance_manager.cpp
@@ -153,6 +164,7 @@ set(CLIENT_MAIN_SOURCES
 set(SERVER_MAIN_SOURCES
     ${BASIC_MAIN_SOURCES}
     src/network/server.cpp
+    src/game/managers/server_instance_manager.cpp
     src/game/game_server.cpp
     src/server_main.cpp
 )
@@ -189,8 +201,6 @@ set(SERVER_EXTERN_SOURCES
 if(SERVER_BUILD)
     set(EXECUTABLE_NAME nedizblox-server)
     add_executable(${EXECUTABLE_NAME} ${SERVER_EXTERN_SOURCES} ${SERVER_MAIN_SOURCES})
-
-    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SERVER_BUILD)
 else()
     set(EXECUTABLE_NAME nedizblox-client)
     add_executable(${EXECUTABLE_NAME} ${CLIENT_EXTERN_SOURCES} ${SPIRV_BINARY_FILES} ${CLIENT_MAIN_SOURCES})
