@@ -15,9 +15,7 @@ enum class InstanceType {
     SelectionBox = 6,
     Decal = 7,
     BillboardText = 8,
-    BillboardImage = 9,
-    Text = 10,
-    Image = 11
+    Text = 9
 };
 
 enum class PropertyType {
@@ -52,7 +50,7 @@ std::vector<std::string> getStringsFromEnums();
  
 template <>
 inline std::vector<std::string> getStringsFromEnums<InstanceType>() {
-    return {"Game", "Workspace", "CoreGui", "Model", "Folder", "Part", "SelectionBox", "Decal", "BillboardText", "BillboardImage", "Text", "Image"};
+    return {"Game", "Workspace", "CoreGui", "Model", "Folder", "Part", "SelectionBox", "Decal", "BillboardText", "Text"};
 }
 
 template <>

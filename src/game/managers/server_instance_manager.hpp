@@ -1,9 +1,9 @@
 #pragma once
 
-#include "network/packets.hpp"
-
 #include "../physics/physics.hpp"
 #include "../types/types.hpp"
+
+#include "network/serializer.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -53,7 +53,9 @@ private:
 
     bool m_dirty = true;
 
-    void collectInstances(const std::shared_ptr<types::Instance>& parent, std::vector<net::packets::PartInfo>& outInfos);
+    uint32_t countSerializableInstances(const std::shared_ptr<types::Instance>& parent) const;
+
+    void collectInstances(const std::shared_ptr<types::Instance>& parent, net::serializer::BinaryWriter& writer);
 };
 
 } // namespace game::mngrs

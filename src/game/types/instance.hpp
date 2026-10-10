@@ -2,6 +2,8 @@
 
 #include "../enums/enums.hpp"
 
+#include "network/serializer.hpp"
+
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -37,14 +39,17 @@ public:
 
     void setName(const std::string& name) {
         m_name = name;
-        propertyChanged();
     }
 
     enums::InstanceType getType() const { return m_type; }
 
-    uint32_t getNetworkId() const { return m_networkId; }
+    uint32_t getId() const { return m_id; }
+    void setId(uint32_t id) { m_id = id; }
 
+    uint32_t getNetworkId() const { return m_networkId; }
     void setNetworkId(uint32_t networkId) { m_networkId = networkId; }
+
+    uint32_t getParentId() const { return m_parentId; }
 
     virtual std::vector<PropertyDescriptor> getProperties() {
         auto self = weak_from_this();
@@ -62,8 +67,16 @@ public:
                 },
             },
             {
+                "Id",
+                "Global object identifier",
+                enums::PropertyType::UInt32,
+                static_cast<void*>(&m_id),
+                true,
+                nullptr,
+            },
+            {
                 "NetworkId",
-                "Network identifier",
+                "Network object identifier",
                 enums::PropertyType::UInt32,
                 static_cast<void*>(&m_networkId),
                 true,
@@ -85,8 +98,28 @@ public:
                     if (auto instance = self.lock())
                         instance->setParent(newParent);
                 },
-            }
-        };
+            }};
+    }
+
+    virtual void serialize(net::serializer::BinaryWriter& writer) const {
+        writer.write<enums::InstanceType>(m_type);
+
+        writer.write<uint32_t>(m_id);
+        writer.write<uint32_t>(m_networkId);
+
+        auto parent = m_parent.lock();
+        writer.write<uint32_t>(parent ? parent->getId() : 0);
+
+        writer.writeString(m_name);
+    }
+
+    virtual void deserialize(net::serializer::BinaryReader& reader) {
+        m_id = reader.read<uint32_t>();
+        m_networkId = reader.read<uint32_t>();
+
+        m_parentId = reader.read<uint32_t>();
+
+        m_name = reader.readString();
     }
 
     template <typename T = Instance>
@@ -95,21 +128,29 @@ public:
     }
 
     void setParent(const std::shared_ptr<Instance>& newParent) {
-        auto currentParent = m_parent.lock();
-        if (currentParent == newParent)
+        auto oldParent = m_parent.lock();
+        if (oldParent == newParent)
             return;
+
+        auto ancestor = newParent;
+        while (ancestor) {
+            if (ancestor.get() == this) {
+                return;
+            }
+            ancestor = ancestor->getParent();
+        }
 
         auto self = shared_from_this();
 
-        if (currentParent) {
-            auto& siblings = currentParent->m_children;
+        if (oldParent) {
+            auto& siblings = oldParent->m_children;
             siblings.erase(
                 std::remove_if(
                     siblings.begin(), siblings.end(),
                     [this](const std::shared_ptr<Instance>& child) { return child.get() == this; }),
                 siblings.end());
 
-            currentParent->childrenChanged();
+            oldParent->childrenChanged();
         }
 
         if (newParent) {
@@ -322,7 +363,9 @@ private:
     std::weak_ptr<Instance> m_parent;
     std::vector<std::shared_ptr<Instance>> m_children;
 
+    uint32_t m_id = 0;
     uint32_t m_networkId = 0;
+    uint32_t m_parentId = 0;
 
     std::vector<CallbackEntry> m_childrenChangedCallbacks;
     std::vector<CallbackEntry> m_descendantChildrenChangedCallbacks;

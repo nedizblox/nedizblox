@@ -428,7 +428,6 @@ void Server::acceptLoop() {
                 packets::OldPlayerInfo oldInfo{};
                 oldInfo.playerId = oldClient.playerId;
                 std::strncpy(oldInfo.nickname, oldClient.nickname.c_str(), sizeof(oldInfo.nickname) - 1);
-                oldInfo.position = oldClient.lastPosition;
 
                 std::memcpy(stateBuffer.data() + offset, &oldInfo, sizeof(oldInfo));
                 offset += sizeof(oldInfo);

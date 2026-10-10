@@ -1,8 +1,8 @@
 #pragma once
 
+#include "managers/managers.hpp"
 #include "network/network.hpp"
 #include "types/types.hpp"
-#include "managers/managers.hpp"
 
 #include "physics/physics.hpp"
 
@@ -36,7 +36,6 @@ private:
 
     std::mutex m_networkPartsMutex;
     std::unordered_map<uint32_t, std::shared_ptr<types::Part>> m_networkParts;
-    std::atomic<uint32_t> m_nextNetworkId{1000};
 
     std::unordered_set<uint32_t> m_reportedAsleep;
 
@@ -52,6 +51,8 @@ private:
 
     void physicsLoop();
     void broadcastUnownedObjects();
+
+    void syncNetworkParts();
 };
 
 } // namespace game

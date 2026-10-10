@@ -16,10 +16,6 @@ enum class PacketType : uint8_t {
     PlayerKick = 5
 };
 
-enum class PartType : uint8_t { Part = 0, MeshPart = 1, SpawnLocation = 2 };
-
-enum class PartShape : uint8_t { Ball = 0, Block = 1, Cylinder = 2, Wedge = 3, Head = 4 };
-
 #pragma pack(push, 1)
 
 // TCP
@@ -43,7 +39,6 @@ struct PlayerAcceptPacket {
 struct OldPlayerInfo {
     uint32_t playerId = 0;
     char nickname[16] = {};
-    glm::vec3 position{0.0f};
 };
 
 struct InitialStatePacket {
@@ -69,34 +64,6 @@ struct PlayerKickPacket {
 struct TcpMessageHeader {
     uint32_t size = 0;
 };
-
-// end TCP
-
-// map TCP
-
-struct PartInfo {
-    uint32_t networkId = 0;
-    uint32_t parentNetworkId = 0;
-    char name[100] = {};
-    glm::vec3 position{0.0f};
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 size{4.0f, 1.0f, 2.0f};
-    glm::u8vec3 color{160, 165, 169};
-    float transparency = 0.0f;
-    bool anchored = false;
-    PartType type = PartType::Part;
-    PartShape shape = PartShape::Block;
-};
-
-struct InitialMapPacket {
-    uint32_t partCount = 0;
-};
-
-struct DestroyInstancePacket {
-    uint32_t networkId;
-};
-
-// end map TCP
 
 // UDP
 

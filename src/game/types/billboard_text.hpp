@@ -20,61 +20,52 @@ public:
 
         auto instanceProps = Instance::getProperties();
         std::vector<PropertyDescriptor> billbTextProps = {
-            {
-                "Offset",
-                "Billboard Text 3D offset of position",
-                enums::PropertyType::Vector3,
-                static_cast<void*>(&m_offset),
-                false,
-                [self]() {
-                    if (auto instance = self.lock())
-                        instance->propertyChanged();
-                }
-            },
-            {
-                "Scale",
-                "Billboard Text 2D scale",
-                enums::PropertyType::Vector2,
-                static_cast<void*>(&m_scale),
-                false,
-                [self]() {
-                    if (auto instance = self.lock())
-                        instance->propertyChanged();
-                }
-            },
-            {
-                "Text",
-                "Billboard Text content",
-                enums::PropertyType::String,
-                static_cast<void*>(&m_text),
-                false,
-                [self]() {
-                    if (auto instance = self.lock())
-                        instance->propertyChanged();
-                }
-            },
-            {
-                "TextFont",
-                "Billboard Text font",
-                enums::PropertyType::Enum,
-                static_cast<void*>(&m_textFont),
-                false,
-                [self]() {
-                    if (auto instance = self.lock())
-                        instance->propertyChanged();
-                },
-                nullptr,
-                nullptr,
-                enums::getStringsFromEnums<enums::TextFont>()
-            }
-        };
+            {"Offset", "Billboard Text 3D offset of position", enums::PropertyType::Vector3,
+             static_cast<void*>(&m_offset), false,
+             [self]() {
+                 if (auto instance = self.lock())
+                     instance->propertyChanged();
+             }},
+            {"Scale", "Billboard Text 2D scale", enums::PropertyType::Vector2, static_cast<void*>(&m_scale), false,
+             [self]() {
+                 if (auto instance = self.lock())
+                     instance->propertyChanged();
+             }},
+            {"Text", "Billboard Text content", enums::PropertyType::String, static_cast<void*>(&m_text), false,
+             [self]() {
+                 if (auto instance = self.lock())
+                     instance->propertyChanged();
+             }},
+            {"TextFont", "Billboard Text font", enums::PropertyType::Enum, static_cast<void*>(&m_textFont), false,
+             [self]() {
+                 if (auto instance = self.lock())
+                     instance->propertyChanged();
+             },
+             nullptr, nullptr, enums::getStringsFromEnums<enums::TextFont>()}};
 
         instanceProps.insert(
-            instanceProps.end(),
-            std::make_move_iterator(billbTextProps.begin()),
+            instanceProps.end(), std::make_move_iterator(billbTextProps.begin()),
             std::make_move_iterator(billbTextProps.end()));
 
         return instanceProps;
+    }
+
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Instance::serialize(writer);
+
+        writer.write<glm::vec3>(m_offset);
+        writer.write<glm::vec2>(m_scale);
+        writer.writeString(m_text);
+        writer.write<enums::TextFont>(m_textFont);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override {
+        Instance::deserialize(reader);
+
+        m_offset = reader.read<glm::vec3>();
+        m_scale = reader.read<glm::vec2>();
+        m_text = reader.readString();
+        m_textFont = reader.read<enums::TextFont>();
     }
 
     glm::vec3 getOffset() const { return m_offset; }

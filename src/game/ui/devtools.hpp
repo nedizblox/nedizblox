@@ -2,20 +2,24 @@
 
 #include "../types/types.hpp"
 
-#include "graphics/ui/imgui.hpp"
+#include "graphics/managers/ui_manager.hpp"
 
-namespace game::utils {
+#include "../utils/controller.hpp"
+
+#include <imgui/ImGuizmo.h>
+
+namespace game::ui {
 
 class DevTools {
 public:
-    DevTools(gfx::ui::Imgui& imgui, std::shared_ptr<types::Game>& root);
+    DevTools(gfx::mngrs::UiManager& uiManager, std::shared_ptr<types::Game>& root, utils::Controller& controller);
     ~DevTools();
 
     DevTools(const DevTools&) = delete;
     DevTools& operator=(const DevTools&) = delete;
 
 private:
-    using CreatorFunc = std::shared_ptr<types::Instance>(*)(const std::string&);
+    using CreatorFunc = std::shared_ptr<types::Instance> (*)(const std::string&);
 
     struct InstanceTypeOption {
         enums::InstanceType type;
@@ -35,28 +39,31 @@ private:
         {enums::InstanceType::SelectionBox, "SelectionBox", &createInstance<types::SelectionBox>},
         {enums::InstanceType::Decal, "Decal", &createInstance<types::Decal>},
         {enums::InstanceType::BillboardText, "BillboardText", &createInstance<types::BillboardText>},
-        {enums::InstanceType::BillboardImage, "BillboardImage", &createInstance<types::BillboardImage>},
         {enums::InstanceType::Text, "Text", &createInstance<types::Text>},
         //{enums::InstanceType::Image, "Image", &createInstance<types::Image>},
     };
 
-    gfx::ui::Imgui& m_imgui;
-
     std::shared_ptr<types::Game>& m_root;
+
+    utils::Controller& m_controller;
 
     std::shared_ptr<types::Instance> m_selectedInstance = nullptr;
 
     std::shared_ptr<types::Instance> m_newInstanceParent = nullptr;
     bool m_openCreateInstancePopup = false;
 
-    void createGUIs();
+    ImGuizmo::OPERATION m_gizmoOperation = ImGuizmo::TRANSLATE;
 
-    void drawNode(const std::shared_ptr<types::Instance>& node);
+    void createGUIs(gfx::mngrs::UiManager& uiManager);
+
+    void drawNode(const std::shared_ptr<types::Instance>& node, bool defaultOpen = false);
 
     void drawPropertiesPanel();
     void drawProperty(types::Instance::PropertyDescriptor& prop);
 
     void drawCreateInstancePopup();
+
+    void drawGizmo();
 };
 
-} // namespace game::utils
+} // namespace game::ui

@@ -10,10 +10,10 @@ namespace gfx::ui {
 
 Text::Text(
     vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager,
-    const std::string& fontPath, uint32_t maxChars) :
+    const std::string& fontPath) :
     m_device(device) {
     createVertexBuffer();
-    createIndexBuffer(maxChars);
+    createIndexBuffer();
     createInstanceBuffer();
     loadFont(fontPath, sampler, bindlessManager);
 }
@@ -37,11 +37,11 @@ void Text::createVertexBuffer() {
     m_device.copyBuffer(stagingBuffer.getBuffer(), m_vertexBuffer->getBuffer(), bufferSize);
 }
 
-void Text::createIndexBuffer(uint32_t maxChars) {
+void Text::createIndexBuffer() {
     std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
     uint32_t indexCount = static_cast<uint32_t>(indices.size());
 
-    for (uint32_t i = 0; i < maxChars; i++) {
+    for (uint32_t i = 0; i < 800; i++) {
         uint32_t offset = i * 4;
 
         indices.push_back(offset + 0);

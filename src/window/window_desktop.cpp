@@ -1,80 +1,71 @@
 #include "window.hpp"
 
+#include <SDL2/SDL_syswm.h>
 #include <stb/stb_image.h>
 
 #include <stdexcept>
 
 #include "core/logger.hpp"
+#include <format>
 
 namespace win {
 
 Window::Window(int width, int height, const std::string& title) :
     m_winWidth(width), m_winHeight(height), m_fbWidth(width), m_fbHeight(height) {
-    if (!glfwInit()) {
-        throw std::runtime_error("GLFW: Failed to initialize");
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        throw std::runtime_error(std::string("SDL: Failed to initialize: ") + SDL_GetError());
     }
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    SDL_LogSetOutputFunction(logOutputFunction, nullptr);
 
-    if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
-        glfwWindowHintString(GLFW_WAYLAND_APP_ID, "nedizblox_client");
+    Uint32 windowFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
+
+    m_window = SDL_CreateWindow(
+        title.c_str(),
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        m_fbWidth, m_fbHeight,
+        windowFlags);
+
+    if (!m_window) {
+        SDL_Quit();
+        throw std::runtime_error(std::string("SDL: Failed to create window: ") + SDL_GetError());
     }
+
+    SDL_StartTextInput();
 
 #ifndef NDEBUG
-    switch (glfwGetPlatform()) {
-    case GLFW_PLATFORM_WIN32:
-        core::logger::info("Using WSI platform Win32", true);
-        break;
-    case GLFW_PLATFORM_WAYLAND:
-        core::logger::info("Using WSI platform Wayland", true);
-        break;
-    case GLFW_PLATFORM_X11:
-        core::logger::info("Using WSI platform X11", true);
-        break;
-    case GLFW_PLATFORM_COCOA:
-        core::logger::info("Using WSI platform Cocoa", true);
-        break;
-    case GLFW_PLATFORM_NULL:
-        core::logger::info("Using WSI platform Null", true);
-        break;
-    default:
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    if (SDL_GetWindowWMInfo(m_window, &wmInfo)) {
+        switch (wmInfo.subsystem) {
+        case SDL_SYSWM_WINDOWS:
+            core::logger::info("Using WSI platform Win32", true);
+            break;
+        case SDL_SYSWM_WAYLAND:
+            core::logger::info("Using WSI platform Wayland", true);
+            break;
+        case SDL_SYSWM_X11:
+            core::logger::info("Using WSI platform X11", true);
+            break;
+        case SDL_SYSWM_COCOA:
+            core::logger::info("Using WSI platform Cocoa", true);
+            break;
+        default:
+            core::logger::warn("Failed to fetch WSI platform", true);
+            break;
+        }
+    } else {
         core::logger::warn("Failed to fetch WSI platform", true);
-        break;
     }
 #endif
 
-    m_window = glfwCreateWindow(m_fbWidth, m_fbHeight, title.c_str(), nullptr, nullptr);
-
-    if (!m_window) {
-        glfwTerminate();
-        throw std::runtime_error("GLFW: Failed to create window");
-    }
-
-    // center window
-    const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    if (mode) {
-        int xpos = (mode->width - m_fbWidth) / 2;
-        int ypos = (mode->height - m_fbHeight) / 2;
-
-        glfwSetWindowPos(m_window, xpos, ypos);
-    }
-
-    glfwSetWindowUserPointer(m_window, this);
-
-    glfwSetKeyCallback(m_window, keyCallback);
-    glfwSetCharCallback(m_window, charCallback);
-    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
-    glfwSetCursorPosCallback(m_window, mousePosCallback);
-    glfwSetScrollCallback(m_window, scrollCallback);
-    glfwSetWindowSizeCallback(m_window, winResizeCallback);
-    glfwSetFramebufferSizeCallback(m_window, fbResizeCallback);
-    glfwSetErrorCallback(errorCallback);
+    m_lastFrame = SDL_GetPerformanceCounter();
 }
 
 Window::~Window() {
-    glfwDestroyWindow(m_window);
-    glfwTerminate();
+    SDL_DestroyWindow(m_window);
+    SDL_Quit();
 }
 
 void Window::setIcon(const std::string& filePath) {
@@ -84,13 +75,18 @@ void Window::setIcon(const std::string& filePath) {
         throw std::runtime_error("STB: Failed to open texture image file: " + filePath);
     }
 
-    GLFWimage image;
-    image.width = width;
-    image.height = height;
-    image.pixels = pixels;
+    SDL_Surface* surface = SDL_CreateRGBSurfaceFrom(
+        pixels, width, height, 32, width * 4,
+        0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 
-    glfwSetWindowIcon(m_window, 1, &image);
+    if (!surface) {
+        stbi_image_free(pixels);
+        throw std::runtime_error(std::string("SDL: Failed to create icon surface: ") + SDL_GetError());
+    }
 
+    SDL_SetWindowIcon(m_window, surface);
+
+    SDL_FreeSurface(surface);
     stbi_image_free(pixels);
 }
 
@@ -101,87 +97,147 @@ void Window::update() {
 
     m_inputCodepoints.clear();
 
-    float currentFrame = static_cast<float>(glfwGetTime());
-    m_deltaTime = currentFrame - m_lastFrame;
+    Uint64 currentFrame = SDL_GetPerformanceCounter();
+    m_deltaTime = static_cast<float>(currentFrame - m_lastFrame) /
+        static_cast<float>(SDL_GetPerformanceFrequency());
     m_lastFrame = currentFrame;
 
-    glfwPollEvents();
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_QUIT:
+            m_shouldClose = true;
+            break;
 
-    int width, height;
-    glfwGetFramebufferSize(m_window, &width, &height);
-    m_minimized = (width == 0 || height == 0);
+        case SDL_KEYDOWN:
+            if (!event.key.repeat) {
+                m_keys[event.key.keysym.scancode] = true;
+            }
+            break;
+
+        case SDL_KEYUP:
+            m_keys[event.key.keysym.scancode] = false;
+            break;
+
+        case SDL_TEXTINPUT: {
+            const char* text = event.text.text;
+            size_t len = SDL_strlen(text);
+            size_t i = 0;
+            while (i < len) {
+                unsigned char c = static_cast<unsigned char>(text[i]);
+                unsigned int codepoint = 0;
+                int extra = 0;
+
+                if (c < 0x80) {
+                    codepoint = c;
+                    extra = 0;
+                } else if ((c & 0xE0) == 0xC0) {
+                    codepoint = c & 0x1F;
+                    extra = 1;
+                } else if ((c & 0xF0) == 0xE0) {
+                    codepoint = c & 0x0F;
+                    extra = 2;
+                } else if ((c & 0xF8) == 0xF0) {
+                    codepoint = c & 0x07;
+                    extra = 3;
+                }
+
+                i++;
+                for (int k = 0; k < extra && i < len; k++, i++) {
+                    codepoint = (codepoint << 6) | (static_cast<unsigned char>(text[i]) & 0x3F);
+                }
+
+                m_inputCodepoints.push_back(codepoint);
+            }
+            break;
+        }
+
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button < m_mouseButtons.size()) {
+                m_mouseButtons[event.button.button] = true;
+            }
+            break;
+
+        case SDL_MOUSEBUTTONUP:
+            if (event.button.button < m_mouseButtons.size()) {
+                m_mouseButtons[event.button.button] = false;
+            }
+            break;
+
+        case SDL_MOUSEMOTION:
+            if (m_firstMouse) {
+                m_mousePos = glm::vec2(static_cast<float>(event.motion.x), static_cast<float>(event.motion.y));
+                m_firstMouse = false;
+            } else {
+                m_mouseDelta += glm::vec2(
+                    static_cast<float>(event.motion.xrel),
+                    -static_cast<float>(event.motion.yrel));
+                m_mousePos = glm::vec2(static_cast<float>(event.motion.x), static_cast<float>(event.motion.y));
+            }
+            break;
+
+        case SDL_MOUSEWHEEL:
+            m_scrollDelta += glm::vec2(static_cast<float>(event.wheel.x), static_cast<float>(event.wheel.y));
+            break;
+
+        case SDL_WINDOWEVENT:
+            switch (event.window.event) {
+            case SDL_WINDOWEVENT_RESIZED:
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
+                m_winWidth = event.window.data1;
+                m_winHeight = event.window.data2;
+                break;
+
+            case SDL_WINDOWEVENT_CLOSE:
+                m_shouldClose = true;
+                break;
+
+            default:
+                break;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    int fbWidth, fbHeight;
+    SDL_Vulkan_GetDrawableSize(m_window, &fbWidth, &fbHeight);
+
+    m_resized = (fbWidth != m_fbWidth || fbHeight != m_fbHeight);
+    m_fbWidth = fbWidth;
+    m_fbHeight = fbHeight;
+
+    m_minimized = (fbWidth == 0 || fbHeight == 0);
 }
 
 void Window::createSurface(VkInstance instance, VkSurfaceKHR* surface) {
-    if (glfwCreateWindowSurface(instance, m_window, nullptr, surface) != VK_SUCCESS) {
-        throw std::runtime_error("Vulkan: Failed to create window surface");
+    if (SDL_Vulkan_CreateSurface(m_window, instance, surface) != SDL_TRUE) {
+        throw std::runtime_error(std::string("Vulkan: Failed to create window surface: ") + SDL_GetError());
     }
 }
 
-void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    if (action == GLFW_PRESS) {
-        self->m_keys[key] = true;
-    } else if (action == GLFW_RELEASE) {
-        self->m_keys[key] = false;
+void Window::getInstanceExtensions(unsigned int* extensionCount, const char** extensions) {
+    if (SDL_Vulkan_GetInstanceExtensions(m_window, extensionCount, extensions) != SDL_TRUE) {
+        throw std::runtime_error(std::string("SDL: Failed to query instance extensions: ") + SDL_GetError());
     }
 }
 
-void Window::charCallback(GLFWwindow* window, unsigned int codepoint) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    self->m_inputCodepoints.push_back(codepoint);
-}
-
-void Window::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    if (action == GLFW_PRESS) {
-        self->m_mouseButtons[button] = true;
-    } else if (action == GLFW_RELEASE) {
-        self->m_mouseButtons[button] = false;
+void Window::spawnMessageBox(const std::string& title, const std::string& message, SDL_MessageBoxFlags flags) {
+    if (SDL_ShowSimpleMessageBox(flags, title.c_str(), message.c_str(), nullptr) != 0) {
+        core::logger::err(SDL_GetError());
     }
 }
 
-void Window::mousePosCallback(GLFWwindow* window, double x, double y) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    if (self->m_firstMouse) {
-        self->m_mousePos = glm::vec2(x, y);
-        self->m_firstMouse = false;
-        return;
+void Window::logOutputFunction(void* userdata, int category, SDL_LogPriority priority, const char* message) {
+    if (priority >= SDL_LOG_PRIORITY_ERROR) {
+        core::logger::err(std::format("SDL: {}", message));
+    } else if (priority >= SDL_LOG_PRIORITY_WARN) {
+        core::logger::warn(std::format("SDL: {}", message));
+    } else {
+        core::logger::info(std::format("SDL: {}", message));
     }
-
-    self->m_mouseDelta = glm::vec2(x - self->m_mousePos.x, self->m_mousePos.y - y);
-
-    self->m_mousePos = glm::vec2(x, y);
-}
-
-void Window::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    self->m_scrollDelta = glm::vec2(xoffset, yoffset);
-}
-
-void Window::winResizeCallback(GLFWwindow* window, int width, int height) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    self->m_winWidth = width;
-    self->m_winHeight = height;
-}
-
-void Window::fbResizeCallback(GLFWwindow* window, int width, int height) {
-    Window* self = static_cast<Window*>(glfwGetWindowUserPointer(window));
-
-    self->m_fbWidth = width;
-    self->m_fbHeight = height;
-
-    self->m_resized = true;
-}
-
-void Window::errorCallback(int error, const char* description) {
-    core::logger::err(description);
 }
 
 } // namespace win

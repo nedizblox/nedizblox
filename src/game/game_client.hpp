@@ -1,14 +1,14 @@
 #pragma once
 
 #include "audio/audio.hpp"
-#include "core/core.hpp"
-#include "scripting/scripting.hpp"
+// #include "scripting/scripting.hpp"
 #include "graphics/graphics.hpp"
 
 #include "render_context.hpp"
 
-#include "types/types.hpp"
 #include "prefabs/prefabs.hpp"
+#include "types/types.hpp"
+#include "ui/ui.hpp"
 #include "utils/utils.hpp"
 
 #include "managers/managers.hpp"
@@ -32,24 +32,23 @@ public:
 
 private:
     std::unique_ptr<RenderContext> m_renderContext;
-
-    std::unique_ptr<mngrs::AssetManager> m_assetManager;
-    std::unique_ptr<mngrs::InstanceManager> m_instanceManager;
-    std::unique_ptr<mngrs::RenderManager> m_renderManager;
+    
     std::unique_ptr<gfx::mngrs::ModelManager> m_modelManager;
     std::unique_ptr<gfx::mngrs::BillboardManager> m_billboardManager;
     std::unique_ptr<gfx::mngrs::UiManager> m_uiManager;
+    std::unique_ptr<gfx::mngrs::PipelineManager> m_pipelineManager;
+    
     std::unique_ptr<audio::AudioManager> m_audioManager;
+
+    std::unique_ptr<mngrs::AssetManager> m_assetManager;
+    std::unique_ptr<mngrs::RenderManager> m_renderManager;
 
     std::unique_ptr<multiplayer::Replicator> m_replicator;
     std::unique_ptr<multiplayer::Ownership> m_ownership;
 
-    std::unique_ptr<gfx::ui::Imgui> m_imgui;
-    std::unique_ptr<utils::DevTools> m_devTools;
-    std::unique_ptr<utils::DebugTools> m_debugTools;
+    std::unique_ptr<ui::DevTools> m_devTools;
+    std::unique_ptr<ui::DebugTools> m_debugTools;
 
-    std::unique_ptr<core::camera::SphericalCamera> m_sphericalCamera;
-    std::unique_ptr<core::camera::FreeCamera> m_freeCamera;
     std::unique_ptr<utils::Controller> m_controller;
 
     std::unique_ptr<physics::Physics> m_physics;
@@ -61,12 +60,12 @@ private:
     std::shared_ptr<prefabs::Rig> m_localRig;
 
     void initRenderContext();
-    void initManagers();
-    void loadTextures();
-    void loadModels();
-    void loadUis();
 
-    void createCamera();
+    void initManagers();
+
+    void initBasicResources();
+
+    void createController();
 
     void createServices();
     void createTools();

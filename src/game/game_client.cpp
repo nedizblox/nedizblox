@@ -1,25 +1,26 @@
 #include "game_client.hpp"
 
+#include "core/signal_handler.hpp"
+
 namespace game {
 
 GameClient::GameClient(const std::string& server, uint16_t port, const std::string& nickname) {
+    core::sighandler::listen();
+
     initRenderContext();
 
     initManagers();
-    loadTextures();
-    loadModels();
-    loadUis();
+
+    initBasicResources();
 
     createServices();
 
     createClient(server, port, nickname);
 
+    createController();
     createTools();
 
     createLocalRig(nickname);
-    createCamera();
-
-    core::sighandler::listen();
 }
 
 GameClient::~GameClient() {}
@@ -33,79 +34,29 @@ void GameClient::initManagers() {
     auto& renderer = m_renderContext->getRenderer();
     auto& bindlessManager = m_renderContext->getBindlessManager();
 
-    m_assetManager = std::make_unique<mngrs::AssetManager>(device, bindlessManager);
-
-    m_instanceManager = std::make_unique<mngrs::InstanceManager>(*m_assetManager);
-
     m_modelManager = std::make_unique<gfx::mngrs::ModelManager>(device);
 
     m_billboardManager = std::make_unique<gfx::mngrs::BillboardManager>(device, bindlessManager);
 
     m_uiManager = std::make_unique<gfx::mngrs::UiManager>(device, bindlessManager);
 
-    m_renderManager = std::make_unique<mngrs::RenderManager>(
+    m_pipelineManager = std::make_unique<gfx::mngrs::PipelineManager>(
         device, renderer, bindlessManager, *m_modelManager, *m_billboardManager, *m_uiManager);
-    m_renderManager->initPipelines(m_renderContext->getDescriptorSetLayout().getDescriptorSetLayout());
+    m_pipelineManager->initPipelines(m_renderContext->getDescriptorSetLayout().getDescriptorSetLayout());
 
     m_audioManager = std::make_unique<audio::AudioManager>();
+
+    m_assetManager = std::make_unique<mngrs::AssetManager>(device, bindlessManager);
+
+    m_renderManager = std::make_unique<mngrs::RenderManager>(*m_assetManager);
 }
 
-void GameClient::loadTextures() {
-    m_assetManager->loadTexture("smooth", "assets/textures/smooth.png");
-    m_assetManager->loadTexture("studs", "assets/textures/studs.png");
-    m_assetManager->loadTexture("inlets", "assets/textures/inlets.png");
-    m_assetManager->loadTexture("glue", "assets/textures/glue.png");
-
-    m_assetManager->loadTexture("grass", "assets/textures/grass.png");
-    m_assetManager->loadTexture("wood", "assets/textures/wood.png");
-
-    m_assetManager->loadTexture("headFace", "assets/textures/face.png", "repeat", true, false);
-    m_assetManager->loadTexture("nedizbloxTshirt", "assets/textures/logo_tshirt.png", "repeat", true, false);
-    m_assetManager->loadTexture("spawnLocation", "assets/textures/spawn_location.png", "repeat", true, false);
-
-    std::array<std::string, 6> skyboxFaces
-        = {"assets/textures/skybox/rt.png", "assets/textures/skybox/lf.png",
-           "assets/textures/skybox/up.png", "assets/textures/skybox/dn.png",
-           "assets/textures/skybox/ft.png", "assets/textures/skybox/bk.png"};
-    m_assetManager->loadCubemap("skybox", skyboxFaces, "skybox");
+void GameClient::initBasicResources() {
+    utils::brl::load(*m_modelManager, *m_uiManager, m_renderContext->getWindow(), *m_billboardManager, *m_assetManager);
 }
 
-void GameClient::loadModels() {
-    auto& device = m_renderContext->getDevice();
-
-    m_modelManager->loadSkybox();
-
-    m_modelManager->loadModel("cube", gfx::geoms::cube);
-    m_modelManager->loadModel("sphere", gfx::geoms::sphere);
-    m_modelManager->loadModel("cylinder", gfx::geoms::cylinder);
-    m_modelManager->loadModel("wedge", gfx::geoms::wedge);
-
-    m_modelManager->loadModelOutline("cube", gfx::geoms::cube);
-    m_modelManager->loadModelOutline("sphere", gfx::geoms::sphere);
-    m_modelManager->loadModelOutline("cylinder", gfx::geoms::cylinder);
-    m_modelManager->loadModelOutline("wedge", gfx::geoms::wedge);
-
-    m_modelManager->loadModel("head", "assets/models/head.obj");
-}
-
-void GameClient::loadUis() {
-    m_imgui = std::make_unique<gfx::ui::Imgui>(
-        m_renderContext->getWindow(), m_renderContext->getDevice(),
-        m_assetManager->getSampler("ui"), m_renderContext->getBindlessManager());
-
-    m_uiManager->loadText("nunito", m_assetManager->getSampler("ui"), "assets/fonts/Nunito.ttf", 50);
-
-    m_billboardManager->loadText("nunito", m_assetManager->getSampler("repeat"), "assets/fonts/Nunito.ttf", 32);
-
-    m_billboardManager->loadImage("logo", m_assetManager->getSampler("repeat"), "assets/textures/logo.png");
-}
-
-void GameClient::createCamera() {
-    m_sphericalCamera = std::make_unique<core::camera::SphericalCamera>();
-    m_freeCamera = std::make_unique<core::camera::FreeCamera>();
-
-    m_controller = std::make_unique<utils::Controller>(
-        m_renderContext->getWindow(), *m_imgui, *m_freeCamera, *m_sphericalCamera, m_localRig);
+void GameClient::createController() {
+    m_controller = std::make_unique<utils::Controller>(m_renderContext->getWindow(), m_localRig);
 }
 
 void GameClient::buildMap(const std::string& rbxlPath) {
@@ -128,23 +79,19 @@ void GameClient::createServices() {
     m_game = std::make_shared<types::Game>();
 
     m_workspace = std::make_shared<types::Workspace>();
-    m_workspace->onDescendantChildrenChanged(
-        [this](std::shared_ptr<types::Workspace> newChild) { m_instanceManager->markMapDirty(); });
     m_workspace->setParent(m_game);
 
     m_coreGui = std::make_shared<types::CoreGui>();
-    m_coreGui->onDescendantChildrenChanged(
-        [this](std::shared_ptr<types::CoreGui> newChild) { m_instanceManager->markGuiDirty(); });
-    m_workspace->setParent(m_game);
+    m_coreGui->setParent(m_game);
 
     m_physics = std::make_unique<physics::Physics>(m_workspace);
 }
 
 void GameClient::createTools() {
-    m_devTools = std::make_unique<utils::DevTools>(*m_imgui, m_game);
+    m_devTools = std::make_unique<ui::DevTools>(*m_uiManager, m_game, *m_controller);
 
     m_debugTools
-        = std::make_unique<utils::DebugTools>(*m_imgui, *m_instanceManager, m_replicator->getClient());
+        = std::make_unique<ui::DebugTools>(*m_uiManager, *m_renderManager, *m_ownership, m_replicator->getClient());
 }
 
 void GameClient::createLocalRig(const std::string& nickname) {
@@ -154,7 +101,7 @@ void GameClient::createLocalRig(const std::string& nickname) {
 
 void GameClient::createClient(const std::string& server, uint16_t port, const std::string& nickname) {
     m_replicator = std::make_unique<multiplayer::Replicator>(
-        server, port, nickname, *m_physics, *m_instanceManager, m_workspace);
+        server, port, nickname, *m_physics, m_workspace);
 
     m_ownership = std::make_unique<multiplayer::Ownership>(*m_physics, m_replicator->getClient());
 }
@@ -167,7 +114,8 @@ void GameClient::run() {
 
     while (window.isOpen() && !core::sighandler::shouldStop) {
         window.update();
-        m_imgui->update();
+
+        m_uiManager->update();
         m_audioManager->update();
         m_controller->update();
 
@@ -176,71 +124,50 @@ void GameClient::run() {
         m_physics->step(dt);
         m_physics->stepNetworkInterpolation(dt);
 
-        if (m_instanceManager->isMapDirty())
-            m_instanceManager->rebuildMap(m_workspace);
-        if (m_instanceManager->isGuiDirty())
-            m_instanceManager->rebuildGui(m_coreGui);
+        if (m_renderManager->isMapDirty())
+            m_renderManager->rebuildMap(m_workspace);
+        if (m_renderManager->isGuiDirty())
+            m_renderManager->rebuildGui(m_coreGui);
 
         m_localRig->update(dt);
         m_replicator->updateNetworkRigs(dt);
 
-        if (m_localRig)
-            m_sphericalCamera->setTarget(m_localRig->getPivotPosition());
-
-        auto outgoingStates = m_ownership->update(dt, m_localRig, m_replicator->getNetworkParts());
+        auto outgoingStates = m_ownership->update(dt, m_localRig, m_replicator->getNetworkInstances());
         m_replicator->sendPhysicsState(outgoingStates);
 
         if (VkCommandBuffer cmd = renderer.beginFrame()) {
-            glm::mat4 projection{};
-            glm::mat4 view{};
+            auto projection = m_controller->getCameraProjection();
+            auto view = m_controller->getCameraView();
 
-            glm::vec3 position{};
-            glm::vec3 at{}, up{};
-
-            if (m_controller->isFreeCameraMode()) {
-                projection = m_freeCamera->getProjection();
-                view = m_freeCamera->getView();
-
-                position = m_freeCamera->getPosition();
-                at = m_freeCamera->getFront();
-                up = m_freeCamera->getUp();
-            } else {
-                projection = m_sphericalCamera->getProjection();
-                view = m_sphericalCamera->getView();
-
-                position = m_sphericalCamera->getPosition();
-                at = m_sphericalCamera->getFront();
-                up = glm::vec3(0.0f, 1.0f, 0.0f);
-            }
+            auto position = m_controller->getCameraPosition();
+            auto [at, up] = m_controller->getCameraLook();
 
             m_audioManager->moveListener(position, at, up);
 
             renderer.beginRenderPass(cmd);
 
-            m_instanceManager->updateDynamicTransforms();
+            m_renderManager->updateDynamicTransforms();
 
-            m_instanceManager->sortTransparentInstances(position);
+            m_renderManager->sortTransparentInstances(position);
 
-            m_renderManager->renderModelsOpaque(
-                cmd, projection, view, position, m_instanceManager->getOpaqueModelInstancesData());
-            m_renderManager->renderModelOutlinesOpaque(
-                cmd, projection, view, position, m_instanceManager->getOpaqueModelOutlineInstancesData());
+            m_pipelineManager->renderModelsOpaque(
+                cmd, projection, view, position, m_renderManager->getOpaqueModelInstancesData());
+            m_pipelineManager->renderModelOutlinesOpaque(
+                cmd, projection, view, position, m_renderManager->getOpaqueModelOutlineInstancesData());
 
-            m_renderManager->renderSkybox(cmd, projection, view, m_assetManager->getCubemapId("skybox"));
+            m_pipelineManager->renderSkybox(cmd, projection, view, m_assetManager->getCubemapId("skybox"));
 
-            m_renderManager->renderModelsTransparent(
-                cmd, projection, view, position, m_instanceManager->getTransparentModelInstancesData());
-            m_renderManager->renderModelOutlinesTransparent(
-                cmd, projection, view, position, m_instanceManager->getTransparentModelOutlineInstancesData());
+            m_pipelineManager->renderModelsTransparent(
+                cmd, projection, view, position, m_renderManager->getTransparentModelInstancesData());
+            m_pipelineManager->renderModelOutlinesTransparent(
+                cmd, projection, view, position, m_renderManager->getTransparentModelOutlineInstancesData());
 
-            m_renderManager->renderBillboardTexts(
-                cmd, projection, view, m_instanceManager->getBillbTextInstancesContent());
-            m_renderManager->renderBillboardImages(
-                cmd, projection, view, m_instanceManager->getBillbImageInstancesData());
+            m_pipelineManager->renderBillboardTexts(
+                cmd, projection, view, m_renderManager->getBillbTextInstancesContent());
 
-            m_renderManager->renderTexts(cmd, window, m_instanceManager->getTextInstancesContent());
+            m_pipelineManager->renderTexts(cmd, window, m_renderManager->getTextInstancesContent());
 
-            m_renderManager->renderImgui(cmd, window, *m_imgui);
+            m_pipelineManager->renderImgui(cmd, window);
 
             renderer.endRenderPass(cmd);
             renderer.endFrame();

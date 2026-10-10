@@ -258,11 +258,11 @@ bool Device::checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice) const 
 }
 
 std::vector<const char*> Device::getRequiredExtensions() const {
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    unsigned int extensionCount = 0;
+    m_window.getInstanceExtensions(&extensionCount, nullptr);
 
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    std::vector<const char*> extensions(extensionCount);
+    m_window.getInstanceExtensions(&extensionCount, extensions.data());
 
     if (base::ENABLE_VALIDATION_LAYER) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

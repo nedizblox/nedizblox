@@ -6,16 +6,18 @@ namespace core::camera {
 
 void FreeCamera::move(CameraDirection direction, float deltaTime) {
     float velocity = m_movementSpeed * deltaTime;
-    if (direction == CameraDirection::Forward) {
+
+    switch (direction) {
+    case CameraDirection::Forward:
         m_position += m_front * velocity;
-    }
-    if (direction == CameraDirection::Backward) {
-        m_position -= m_front * velocity;
-    }
-    if (direction == CameraDirection::Left) {
+        break;
+    case CameraDirection::Backward:
+        m_position += m_front * velocity;
+        break;
+    case CameraDirection::Left:
         m_position -= m_right * velocity;
-    }
-    if (direction == CameraDirection::Right) {
+        break;
+    case CameraDirection::Right:
         m_position += m_right * velocity;
     }
 }

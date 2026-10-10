@@ -57,7 +57,6 @@ private:
         uint32_t playerId = 0;
         uint64_t sessionToken = 0;
         std::string nickname;
-        glm::vec3 lastPosition{0.0f};
     };
 
     struct ObjectOwnership {

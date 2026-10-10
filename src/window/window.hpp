@@ -1,13 +1,13 @@
 #pragma once
 
-#define GLFW_INCLUDE_NONE
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
 
 #include <glm/glm.hpp>
 
 #include <array>
 #include <string>
+#include <vector>
 
 namespace win {
 
@@ -21,18 +21,20 @@ public:
 
     void update();
 
-    void setTitle(const std::string& title) { glfwSetWindowTitle(m_window, title.c_str()); }
+    void setTitle(const std::string& title) { SDL_SetWindowTitle(m_window, title.c_str()); }
     void setIcon(const std::string& filePath);
 
     void resetResizedState() { m_resized = false; }
 
-    bool isOpen() const { return !glfwWindowShouldClose(m_window); }
+    bool isOpen() const { return !m_shouldClose; }
     bool isResized() const { return m_resized; }
     bool isMinimized() const { return m_minimized; }
 
-    bool isKeyPressed(int key) const { return m_keys[key]; }
-    bool isKeyJustPressed(int key) const { return m_keys[key] && !m_keysPrev[key]; }
+    bool isKeyPressed(SDL_Scancode key) const { return m_keys[key]; }
+    bool isKeyJustPressed(SDL_Scancode key) const { return m_keys[key] && !m_keysPrev[key]; }
     bool isMouseButtonPressed(int button) const { return m_mouseButtons[button]; }
+
+    void waitEvents() { SDL_WaitEvent(nullptr); }
 
     const std::vector<unsigned int>& getInputCodepoints() const { return m_inputCodepoints; }
 
@@ -45,22 +47,28 @@ public:
     glm::vec2 getMouseDelta() const { return m_mouseDelta; }
     glm::vec2 getScrollDelta() const { return m_scrollDelta; }
 
-    const char* getClipboardString() const { return glfwGetClipboardString(m_window); }
+    const char* getClipboardString() const { return SDL_GetClipboardText(); }
     void setClipboardString(const char* text) {
-        glfwSetClipboardString(m_window, text);
+        SDL_SetClipboardText(text);
     }
 
     int getWidth() const { return m_fbWidth; }
     int getHeight() const { return m_fbHeight; }
     float getAspect() const { return static_cast<float>(m_fbWidth) / m_fbHeight; }
 
-    float getCurrentTime() const { return glfwGetTime(); }
+    float getCurrentTime() const {
+        return static_cast<float>(SDL_GetPerformanceCounter()) / static_cast<float>(SDL_GetPerformanceFrequency());
+    }
     float getDeltaTime() const { return m_deltaTime; }
 
     void createSurface(VkInstance instance, VkSurfaceKHR* surface);
 
+    void getInstanceExtensions(unsigned int* extensionCount, const char** extensions);
+
+    static void spawnMessageBox(const std::string& title, const std::string& message, SDL_MessageBoxFlags flags);
+
 private:
-    GLFWwindow* m_window = nullptr;
+    SDL_Window* m_window = nullptr;
 
     int m_winWidth = 0;
     int m_winHeight = 0;
@@ -70,13 +78,15 @@ private:
 
     bool m_resized = false;
     bool m_minimized = false;
+    bool m_shouldClose = false;
 
-    float m_lastFrame = 0.0f;
+    Uint64 m_lastFrame = 0;
     float m_deltaTime = 0.0f;
 
-    std::array<bool, GLFW_KEY_LAST + 1> m_keys = {false};
-    std::array<bool, GLFW_KEY_LAST + 1> m_keysPrev = {false};
-    std::array<bool, GLFW_MOUSE_BUTTON_LAST + 1> m_mouseButtons = {false};
+    // Indexed by SDL_Scancode.
+    std::array<bool, SDL_NUM_SCANCODES> m_keys = {false};
+    std::array<bool, SDL_NUM_SCANCODES> m_keysPrev = {false};
+    std::array<bool, 8> m_mouseButtons = {false};
 
     std::vector<unsigned int> m_inputCodepoints;
 
@@ -85,14 +95,7 @@ private:
     glm::vec2 m_scrollDelta{0.0f};
     bool m_firstMouse = true;
 
-    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    static void charCallback(GLFWwindow* window, unsigned int codepoint);
-    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-    static void mousePosCallback(GLFWwindow* window, double x, double y);
-    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
-    static void winResizeCallback(GLFWwindow* window, int width, int height);
-    static void fbResizeCallback(GLFWwindow* window, int width, int height);
-    static void errorCallback(int error, const char* description);
+    static void logOutputFunction(void* userdata, int category, SDL_LogPriority priority, const char* message);
 };
 
 } // namespace win

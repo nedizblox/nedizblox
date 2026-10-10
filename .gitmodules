@@ -1,12 +1,16 @@
-[submodule "extern/glfw"]
-	path = extern/glfw
-	url = https://github.com/glfw/glfw.git
 [submodule "extern/glm"]
 	path = extern/glm
 	url = https://github.com/g-truc/glm.git
-[submodule "extern/boxer"]
-	path = extern/boxer
-	url = https://github.com/aaronmjacobs/Boxer.git
 [submodule "extern/assimp"]
 	path = extern/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "extern/bullet"]
+	path = extern/bullet
+	url = https://github.com/bulletphysics/bullet3.git
+[submodule "extern/openal-soft"]
+	path = extern/openal-soft
+	url = https://github.com/kcat/openal-soft.git
+[submodule "extern/sdl"]
+	path = extern/sdl
+	url = https://github.com/libsdl-org/SDL.git
+	branch = SDL2

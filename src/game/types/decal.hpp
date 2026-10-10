@@ -17,40 +17,38 @@ public:
         std::weak_ptr<Decal> self = std::static_pointer_cast<Decal>(shared_from_this());
 
         auto instanceProps = Instance::getProperties();
-        std::vector<PropertyDescriptor> decalProps = {
-            {
-                "Source",
-                "Decal texture source",
-                enums::PropertyType::String,
-                static_cast<void*>(&m_source),
-                false,
+        std::vector<PropertyDescriptor> decalProps
+            = {{"Source", "Decal texture source", enums::PropertyType::String, static_cast<void*>(&m_source), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
-                }
-            },
-            {
-                "Face",
-                "Decal face",
-                enums::PropertyType::Enum,
-                static_cast<void*>(&m_face),
-                false,
+                }},
+               {"Face", "Decal face", enums::PropertyType::Enum, static_cast<void*>(&m_face), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
                 },
-                nullptr,
-                nullptr,
-                enums::getStringsFromEnums<enums::Face>()
-            }
-        };
+                nullptr, nullptr, enums::getStringsFromEnums<enums::Face>()}};
 
         instanceProps.insert(
-            instanceProps.end(),
-            std::make_move_iterator(decalProps.begin()),
+            instanceProps.end(), std::make_move_iterator(decalProps.begin()),
             std::make_move_iterator(decalProps.end()));
 
         return instanceProps;
+    }
+
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Instance::serialize(writer);
+
+        writer.writeString(m_source);
+        writer.write<enums::Face>(m_face);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override {
+        Instance::deserialize(reader);
+
+        m_source = reader.readString();
+        m_face = reader.read<enums::Face>();
     }
 
     std::string getSource() const { return m_source; }

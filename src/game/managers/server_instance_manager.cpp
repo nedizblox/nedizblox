@@ -1,7 +1,5 @@
 #include "server_instance_manager.hpp"
 
-#include <cstring>
-
 namespace game::mngrs {
 
 ServerInstanceManager::ServerInstanceManager(physics::Physics& physics) : m_physics(physics) {}
@@ -35,6 +33,20 @@ void ServerInstanceManager::setRoot(const std::shared_ptr<types::Instance>& root
     }
 }
 
+uint32_t ServerInstanceManager::countSerializableInstances(const std::shared_ptr<types::Instance>& parent) const {
+    if (!parent)
+        return 0;
+
+    uint32_t count = 0;
+    for (const auto& child : parent->getChildren()) {
+        if (!child)
+            continue;
+
+        count += 1 + countSerializableInstances(child);
+    }
+    return count;
+}
+
 void ServerInstanceManager::rebuildMap() {
     auto root = m_currentRoot.lock();
     if (!root) {
@@ -43,33 +55,24 @@ void ServerInstanceManager::rebuildMap() {
         return;
     }
 
-    std::vector<net::packets::PartInfo> partInfos;
+    net::serializer::BinaryWriter writer;
 
     {
         std::lock_guard<std::mutex> lock(m_networkPartsMutex);
         m_networkParts.clear();
 
-        collectInstances(root, partInfos);
+        uint32_t totalObjects = countSerializableInstances(root);
+        writer.write<uint32_t>(totalObjects);
+
+        collectInstances(root, writer);
     }
 
-    net::packets::InitialMapPacket header{};
-    header.partCount = static_cast<uint32_t>(partInfos.size());
-
-    size_t headerSize = sizeof(header);
-    size_t dataSize = partInfos.size() * sizeof(net::packets::PartInfo);
-
-    m_mapBuffer.resize(headerSize + dataSize);
-    std::memcpy(m_mapBuffer.data(), &header, headerSize);
-
-    if (!partInfos.empty()) {
-        std::memcpy(m_mapBuffer.data() + headerSize, partInfos.data(), dataSize);
-    }
-
+    m_mapBuffer = std::move(writer.buffer);
     m_dirty = false;
 }
 
 void ServerInstanceManager::collectInstances(
-    const std::shared_ptr<types::Instance>& parent, std::vector<net::packets::PartInfo>& outInfos) {
+    const std::shared_ptr<types::Instance>& parent, net::serializer::BinaryWriter& writer) {
     if (!parent)
         return;
 
@@ -77,38 +80,24 @@ void ServerInstanceManager::collectInstances(
         if (!child)
             continue;
 
+        uint32_t networkId = child->getNetworkId();
+        if (networkId == 0) {
+            networkId = m_nextNetworkId.fetch_add(1);
+            child->setNetworkId(networkId);
+        }
+
         if (child->getType() == enums::InstanceType::Part) {
             auto part = std::static_pointer_cast<types::Part>(child);
-
-            uint32_t networkId = part->getNetworkId();
-            if (networkId == 0) {
-                networkId = m_nextNetworkId.fetch_add(1);
-                part->setNetworkId(networkId);
-            }
 
             if (!part->getRigidBody()) {
                 m_physics.createRigidBodyPart(part.get());
             }
-
             m_networkParts[networkId] = part;
-
-            net::packets::PartInfo info{};
-            info.networkId = networkId;
-            info.parentNetworkId = parent ? parent->getNetworkId() : 0;
-            std::strncpy(info.name, part->getName().c_str(), sizeof(info.name) - 1);
-            info.position = part->getPosition();
-            info.rotation = part->getOrientation();
-            info.size = part->getSize();
-            info.color = part->getColor();
-            info.transparency = part->getTransparency();
-            info.anchored = part->getAnchored();
-            info.shape = static_cast<net::packets::PartShape>(part->getShape());
-            info.type = static_cast<net::packets::PartType>(part->getPartType());
-
-            outInfos.push_back(info);
         }
 
-        collectInstances(child, outInfos);
+        child->serialize(writer);
+
+        collectInstances(child, writer);
     }
 }
 

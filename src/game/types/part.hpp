@@ -124,6 +124,58 @@ public:
         return instanceProps;
     }
 
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Instance::serialize(writer);
+
+        writer.write<glm::vec3>(m_position);
+        writer.write<glm::quat>(m_orientation);
+        writer.write<glm::vec3>(m_size);
+
+        writer.write<glm::u8vec3>(m_color);
+        writer.write<float>(m_transparency);
+
+        writer.write<bool>(m_anchored);
+
+        writer.write<enums::PartType>(m_type);
+        writer.write<enums::PartShape>(m_shape);
+
+        writer.write<enums::MaterialType>(m_material);
+
+        writer.write<enums::SurfaceType>(m_surfaceTop);
+        writer.write<enums::SurfaceType>(m_surfaceBottom);
+        writer.write<enums::SurfaceType>(m_surfaceLeft);
+        writer.write<enums::SurfaceType>(m_surfaceRight);
+        writer.write<enums::SurfaceType>(m_surfaceFront);
+        writer.write<enums::SurfaceType>(m_surfaceBack);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override {
+        Instance::deserialize(reader);
+
+        m_position = reader.read<glm::vec3>();
+        m_orientation = reader.read<glm::quat>();
+        m_size = reader.read<glm::vec3>();
+
+        m_color = reader.read<glm::u8vec3>();
+        m_transparency = reader.read<float>();
+
+        m_anchored = reader.read<bool>();
+
+        m_type = reader.read<enums::PartType>();
+        m_shape = reader.read<enums::PartShape>();
+
+        m_material = reader.read<enums::MaterialType>();
+
+        m_surfaceTop = reader.read<enums::SurfaceType>();
+        m_surfaceBottom = reader.read<enums::SurfaceType>();
+        m_surfaceLeft = reader.read<enums::SurfaceType>();
+        m_surfaceRight = reader.read<enums::SurfaceType>();
+        m_surfaceFront = reader.read<enums::SurfaceType>();
+        m_surfaceBack = reader.read<enums::SurfaceType>();
+
+        updateModelMatrix();
+    }
+
     glm::vec3 getPosition() const { return m_position; }
     void setPosition(const glm::vec3& position, bool silent = false) {
         m_position = position;

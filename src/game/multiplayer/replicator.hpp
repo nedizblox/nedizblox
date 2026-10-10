@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../managers/managers.hpp"
 #include "../physics/physics.hpp"
 #include "../prefabs/prefabs.hpp"
 #include "../types/types.hpp"
@@ -17,7 +16,7 @@ class Replicator {
 public:
     Replicator(
         const std::string& server, uint16_t port, const std::string& nickname, physics::Physics& physics,
-        mngrs::InstanceManager& instanceManager, std::shared_ptr<types::Workspace> workspace);
+        std::shared_ptr<types::Workspace> workspace);
     ~Replicator();
 
     Replicator(const Replicator&) = delete;
@@ -29,8 +28,8 @@ public:
     void sendPhysicsState(const std::vector<net::packets::PhysicalObjectState>& states);
 
     net::Client& getClient() { return *m_client; }
-    const std::unordered_map<uint32_t, std::shared_ptr<types::Part>>& getNetworkParts() const {
-        return m_networkParts;
+    const std::unordered_map<uint32_t, std::shared_ptr<types::Instance>>& getNetworkInstances() const {
+        return m_networkInstances;
     }
     const std::unordered_map<uint32_t, std::shared_ptr<prefabs::Rig>>& getNetworkRigs() const {
         return m_networkRigs;
@@ -39,14 +38,20 @@ public:
     void updateNetworkRigs(float dt);
 
 private:
+    struct PendingParenting {
+        std::shared_ptr<types::Instance> instance;
+        uint32_t parentId;
+    };
+
     std::unique_ptr<net::Client> m_client;
 
     physics::Physics& m_physics;
-    mngrs::InstanceManager& m_instanceManager;
     std::shared_ptr<types::Workspace> m_workspace;
 
-    std::unordered_map<uint32_t, std::shared_ptr<types::Part>> m_networkParts;
+    std::unordered_map<uint32_t, std::shared_ptr<types::Instance>> m_networkInstances;
     std::unordered_map<uint32_t, std::shared_ptr<prefabs::Rig>> m_networkRigs;
+
+    std::shared_ptr<types::Instance> createInstanceByType(enums::InstanceType type);
 
     void setupCallbacks();
 };

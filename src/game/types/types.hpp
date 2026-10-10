@@ -23,7 +23,5 @@
 
 #include "billboard_text.hpp"
 
-#include "billboard_image.hpp"
-
 #include "text.hpp"
 // IWYU pragma: end_exports

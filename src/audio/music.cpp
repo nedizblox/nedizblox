@@ -34,7 +34,7 @@ bool Music::load(const std::string& filename) {
     m_sampleRate = info.sample_rate;
     m_format = (info.channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
 
-    for (size_t i = 0; i < kNumBuffers; ++i) {
+    for (size_t i = 0; i < kNumBuffers; i++) {
         if (!streamChunk(m_buffers[i])) break;
 
         alSourceQueueBuffers(m_source, 1, &m_buffers[i]);

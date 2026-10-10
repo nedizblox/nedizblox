@@ -1,5 +1,7 @@
 #include "game/game_client.hpp"
 
+#include "core/core.hpp"
+
 #include <charconv>
 #include <stdexcept>
 
@@ -34,7 +36,7 @@ int main(int argc, char* argv[]) {
         game->run();
     } catch (const std::exception& e) {
         core::logger::err(e.what());
-        core::msgbox::showError("Nedizblox Client", e.what());
+        win::Window::spawnMessageBox("Nedizblox Client", e.what(), SDL_MESSAGEBOX_ERROR);
         return 1;
     }
 

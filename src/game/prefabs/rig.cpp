@@ -34,6 +34,9 @@ void Rig::createBodyParts() {
     leftLeg->setColor(glm::u8vec3(0, 98, 255));
     rightLeg->setColor(glm::u8vec3(0, 98, 255));
 
+    torso->setSurfaceRight(enums::SurfaceType::Glue);
+    torso->setSurfaceLeft(enums::SurfaceType::Glue);
+
     rootPart->setTransparency(1.0f);
     rootPart->setNetworkId(getNetworkId());
 
@@ -91,10 +94,10 @@ void Rig::syncParts() {
 }
 
 void Rig::move(enums::RigMoveDirection direction, float phi) {
-    glm::vec3 forward = glm::normalize(glm::vec3(-glm::sin(phi), 0.0f, -glm::cos(phi)));
+    glm::vec3 forward(-glm::sin(phi), 0.0f, -glm::cos(phi));
 
     glm::vec3 up(0.0f, 1.0f, 0.0f);
-    glm::vec3 right = glm::normalize(glm::cross(forward, up));
+    glm::vec3 right = glm::cross(forward, up);
 
     glm::vec3 moveDir(0.0f);
     if (direction == enums::RigMoveDirection::Forward)

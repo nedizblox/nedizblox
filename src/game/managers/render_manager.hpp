@@ -1,68 +1,120 @@
 #pragma once
 
+#include "../types/types.hpp"
+#include "asset_manager.hpp"
 #include "graphics/graphics.hpp"
 
 #include <memory>
-#include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace game::mngrs {
 
 class RenderManager {
 public:
-    RenderManager(
-        gfx::vk::Device& device, gfx::vk::Renderer& renderer,
-        gfx::mngrs::BindlessManager& bindlessManager, gfx::mngrs::ModelManager& modelManager,
-        gfx::mngrs::BillboardManager& billboardManager, gfx::mngrs::UiManager& uiManager);
+    RenderManager(AssetManager& assetManager);
     ~RenderManager();
 
     RenderManager(const RenderManager&) = delete;
     RenderManager& operator=(const RenderManager&) = delete;
 
-    void initPipelines(VkDescriptorSetLayout setLayout);
+    size_t getMapRebuildCount() const { return m_mapRebuildCount; }
+    size_t getGuiRebuildCount() const { return m_guiRebuildCount; }
 
-    void renderModelsOpaque(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
+    void rebuildMap(const std::shared_ptr<types::Instance>& root);
+    void rebuildGui(const std::shared_ptr<types::Instance>& root);
 
-    void renderModelOutlinesOpaque(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+    void updateDynamicTransforms();
 
-    void renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, uint32_t skyboxCubId);
+    void sortTransparentInstances(const glm::vec3& cameraPos);
 
-    void renderModelsTransparent(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
+    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>&
+    getOpaqueModelInstancesData() const {
+        return m_opaqueModelInstancesData;
+    }
 
-    void renderModelOutlinesTransparent(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+    getOpaqueModelOutlineInstancesData() const {
+        return m_opaqueModelOutlineInstancesData;
+    }
 
-    void renderBillboardTexts(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
-        const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
+    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>&
+    getTransparentModelInstancesData() const {
+        return m_transparentModelInstancesData;
+    }
 
-    void renderBillboardImages(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
-        const std::unordered_map<std::string, std::vector<gfx::billb::Image::InstanceData>>& instancesData);
+    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+    getTransparentModelOutlineInstancesData() const {
+        return m_transparentModelOutlineInstancesData;
+    }
 
-    void renderTexts(
-        VkCommandBuffer commandBuffer, win::Window& window,
-        const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData);
+    const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>&
+    getBillbTextInstancesContent() const {
+        return m_billbTextInstancesContent;
+    }
 
-    void renderImgui(VkCommandBuffer commandBuffer, win::Window& window, gfx::ui::Imgui& imgui);
+    const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>&
+    getTextInstancesContent() const {
+        return m_textInstancesContent;
+    }
+
+    void markMapDirty() { m_mapHierarchyDirty = true; }
+    bool isMapDirty() const { return m_mapHierarchyDirty; }
+
+    void markGuiDirty() { m_guiHierarchyDirty = true; }
+    bool isGuiDirty() const { return m_guiHierarchyDirty; }
 
 private:
-    gfx::vk::Device& m_device;
-    gfx::vk::Renderer& m_renderer;
+    size_t m_mapRebuildCount = 0;
+    size_t m_guiRebuildCount = 0;
 
-    gfx::mngrs::BindlessManager& m_bindlessManager;
-    gfx::mngrs::ModelManager& m_modelManager;
-    gfx::mngrs::BillboardManager& m_billboardManager;
-    gfx::mngrs::UiManager& m_uiManager;
+    AssetManager& m_assetManager;
 
-    std::unordered_map<std::string, std::unique_ptr<gfx::vk::Pipeline>> m_pipelines;
+    template <typename T>
+    struct DynamicTarget {
+        std::shared_ptr<T> obj;
+        std::string bucketName;
+        size_t index;
+        bool isTransparent;
+        std::shared_ptr<types::Part> parentPart = nullptr;
+    };
+
+    std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>> m_opaqueModelInstancesData;
+    std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>> m_transparentModelInstancesData;
+
+    std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>> m_opaqueModelOutlineInstancesData;
+    std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>> m_transparentModelOutlineInstancesData;
+
+    std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>> m_billbTextInstancesContent;
+    std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>> m_textInstancesContent;
+
+    std::vector<DynamicTarget<types::Part>> m_partDynamicTargets;
+    std::vector<DynamicTarget<types::SelectionBox>> m_selectionBoxDynamicTargets;
+    std::vector<DynamicTarget<types::BillboardText>> m_billbTextDynamicTargets;
+    std::vector<DynamicTarget<types::Text>> m_textDynamicTargets;
+
+    std::weak_ptr<types::Instance> m_currentMapRoot;
+    types::Instance::CallbackId m_mapPropSubId = 0;
+    types::Instance::CallbackId m_mapChildrenSubId = 0;
+    types::Instance::CallbackId m_mapDescendantChildrenSubId = 0;
+
+    std::weak_ptr<types::Instance> m_currentGuiRoot;
+    types::Instance::CallbackId m_guiPropSubId = 0;
+    types::Instance::CallbackId m_guiChildrenSubId = 0;
+    types::Instance::CallbackId m_guiDescendantChildrenSubId = 0;
+
+    bool m_mapHierarchyDirty = true;
+    bool m_guiHierarchyDirty = true;
+
+    void collectMapInstances(const std::shared_ptr<types::Instance>& parent);
+    void collectGuiInstances(const std::shared_ptr<types::Instance>& parent);
+
+    void sortInstances(
+        const glm::vec3& cameraPos, std::vector<gfx::Model::InstanceData>& instances,
+        std::vector<DynamicTarget<types::Part>>& targets, const std::string& bucketName);
+    void sortInstances(
+        const glm::vec3& cameraPos, std::vector<gfx::ModelOutline::InstanceData>& instances,
+        std::vector<DynamicTarget<types::SelectionBox>>& targets, const std::string& bucketName);
 };
 
 } // namespace game::mngrs

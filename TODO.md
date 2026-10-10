@@ -1,10 +1,11 @@
 # Bugs
  - ~~Fix laggy rig moving~~
- - Fix object freezing when the release distance is reached
+ - Fix object freezing for 3 seconds when the release distance is reached
  - ~~Optimize network packets send~~
 
 # Features
  - Make instance destroy network packet
- - Make own network packets serialization alghoritm
+ - ~~Make own map serialization alghoritm~~
+ - Make Communication Server (for text and voice chat) and Asset Server (to deliver assets for the map)
  - Finish up scripting engine
  - Make own maps format and remove .rbxl maps

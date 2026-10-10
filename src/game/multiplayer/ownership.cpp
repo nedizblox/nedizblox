@@ -9,7 +9,7 @@ Ownership::Ownership(physics::Physics& physics, net::Client& client) :
 
 std::vector<net::packets::PhysicalObjectState> Ownership::update(
     float dt, const std::shared_ptr<prefabs::Rig>& localRig,
-    const std::unordered_map<uint32_t, std::shared_ptr<types::Part>>& networkParts) {
+    const std::unordered_map<uint32_t, std::shared_ptr<types::Instance>>& networkInstances) {
 
     std::vector<net::packets::PhysicalObjectState> outgoingStates;
 
@@ -19,6 +19,14 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
     btRigidBody* playerBody = localRig->getRigidBody();
     if (!playerBody)
         return outgoingStates;
+
+    auto getPart = [&networkInstances](uint32_t netId) -> std::shared_ptr<types::Part> {
+        auto it = networkInstances.find(netId);
+        if (it != networkInstances.end() && it->second && it->second->getType() == enums::InstanceType::Part) {
+            return std::static_pointer_cast<types::Part>(it->second);
+        }
+        return nullptr;
+    };
 
     std::unordered_set<uint32_t> candidates;
     std::vector<SearchNode> frontier;
@@ -37,14 +45,14 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
         if (!visited.insert(current.netId).second)
             continue;
 
-        auto it = networkParts.find(current.netId);
-        if (it == networkParts.end() || !it->second || it->second->getAnchored())
+        auto part = getPart(current.netId);
+        if (!part || part->getAnchored())
             continue;
 
         candidates.insert(current.netId);
 
         if (current.depth < kMaxCollisionDepth) {
-            btRigidBody* b = it->second->getRigidBody();
+            btRigidBody* b = part->getRigidBody();
             if (b) {
                 std::vector<uint32_t> more = m_physics.getBodyCollisions(b);
                 for (uint32_t nextId : more) {
@@ -57,27 +65,37 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
     }
 
     for (uint32_t netId : candidates) {
-        auto it = networkParts.find(netId);
-        if (it == networkParts.end() || !it->second)
-            continue;
+        auto part = getPart(netId);
+        btRigidBody* b = part ? part->getRigidBody() : nullptr;
 
-        btRigidBody* b = it->second->getRigidBody();
-        if (!b)
+        if (!part || !b) {
+            auto staleIt = std::find(m_ownershipOrder.begin(), m_ownershipOrder.end(), netId);
+            if (staleIt != m_ownershipOrder.end())
+                m_ownershipOrder.erase(staleIt);
+            m_reportedAsleepIds.erase(netId);
             continue;
+        }
 
         auto orderIt = std::find(m_ownershipOrder.begin(), m_ownershipOrder.end(), netId);
 
         if (orderIt == m_ownershipOrder.end()) {
             if (m_ownershipOrder.size() >= kMaxLocallyOwnedObjects) {
-                uint32_t oldestId = m_ownershipOrder.front();
-                m_ownershipOrder.pop_front();
-                m_reportedAsleepIds.erase(oldestId);
+                auto evictIt = std::find_if(m_ownershipOrder.begin(), m_ownershipOrder.end(), [&](uint32_t candidateId) {
+                    auto candidatePart = getPart(candidateId);
+                    btRigidBody* candidateBody = candidatePart ? candidatePart->getRigidBody() : nullptr;
+                    return candidateBody && !candidateBody->isActive();
+                });
 
-                auto oldIt = networkParts.find(oldestId);
-                if (oldIt != networkParts.end() && oldIt->second) {
-                    btRigidBody* oldBody = oldIt->second->getRigidBody();
-                    if (oldBody) {
-                        m_physics.setBodyNetworkMode(oldBody, false);
+                if (evictIt != m_ownershipOrder.end()) {
+                    uint32_t evictedId = *evictIt;
+                    m_ownershipOrder.erase(evictIt);
+                    m_reportedAsleepIds.erase(evictedId);
+
+                    auto evictedPart = getPart(evictedId);
+                    if (evictedPart) {
+                        if (btRigidBody* evictedBody = evictedPart->getRigidBody()) {
+                            m_physics.setBodyNetworkMode(evictedBody, false);
+                        }
                     }
                 }
             }
@@ -100,13 +118,16 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
     std::vector<uint32_t> activeOwnerships(m_ownershipOrder.begin(), m_ownershipOrder.end());
 
     for (uint32_t netId : activeOwnerships) {
-        auto it = networkParts.find(netId);
-        if (it == networkParts.end() || !it->second)
-            continue;
+        auto part = getPart(netId);
+        btRigidBody* body = part ? part->getRigidBody() : nullptr;
 
-        btRigidBody* body = it->second->getRigidBody();
-        if (!body)
+        if (!part || !body) {
+            auto orderIt = std::find(m_ownershipOrder.begin(), m_ownershipOrder.end(), netId);
+            if (orderIt != m_ownershipOrder.end())
+                m_ownershipOrder.erase(orderIt);
+            m_reportedAsleepIds.erase(netId);
             continue;
+        }
 
         bool isFarAway = false;
         btVector3 btPos = body->getWorldTransform().getOrigin();
@@ -118,7 +139,7 @@ std::vector<net::packets::PhysicalObjectState> Ownership::update(
         }
 
         bool isContactLost = (candidates.find(netId) == candidates.end());
-        bool shouldRelease = isFarAway || (!body->isActive() && isContactLost);
+        bool shouldRelease = isFarAway || (isContactLost && !body->isActive());
 
         if (shouldRelease) {
             outgoingStates.push_back(m_physics.captureNetworkState(netId, body));

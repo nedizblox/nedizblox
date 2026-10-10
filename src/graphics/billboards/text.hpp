@@ -42,13 +42,13 @@ public:
         glm::vec2 scale;
     };
 
-    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath, uint32_t maxChars);
+    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath);
     ~Text();
 
     Text(const Text&) = delete;
     Text& operator=(const Text&) = delete;
 
-    uint32_t getTextureIndex() const { return m_fontTextureIndex; }
+    uint32_t getFontTextureIndex() const { return m_fontTextureIndex; }
 
     void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances);
 
@@ -76,7 +76,7 @@ private:
     float m_lineSpacing;
 
     void createVertexBuffer();
-    void createIndexBuffer(uint32_t maxChars);
+    void createIndexBuffer();
     void createInstanceBuffer();
     void loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager);
 };

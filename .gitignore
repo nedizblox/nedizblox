@@ -1,5 +1,6 @@
-build/
-.cache/
-.vscode/
+build
+.cache
+.vscode
 .envrc
-.direnv/
+.direnv
+.clangd

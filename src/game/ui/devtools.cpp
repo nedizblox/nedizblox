@@ -1,41 +1,54 @@
 #include "devtools.hpp"
 
-#include <algorithm>
-#include <cstdint>
 #include <cstring>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
-namespace game::utils {
+#include "../types/part.hpp"
 
-DevTools::DevTools(gfx::ui::Imgui& imgui, std::shared_ptr<types::Game>& root) :
-    m_imgui(imgui), m_root(root) {
-    createGUIs();
+namespace game::ui {
+
+DevTools::DevTools(
+    gfx::mngrs::UiManager& uiManager, std::shared_ptr<types::Game>& root, utils::Controller& controller) :
+    m_root(root), m_controller(controller) {
+    createGUIs(uiManager);
 }
 
 DevTools::~DevTools() {}
 
-void DevTools::createGUIs() {
-    m_imgui.addGUI({"Explorer", [this]() {
-                        if (m_root) {
-                            drawNode(m_root);
-                        } else {
-                            ImGui::TextDisabled("No root instance found");
-                        }
+void DevTools::createGUIs(gfx::mngrs::UiManager& uiManager) {
+    uiManager.addImguiWindow(
+        {"Explorer",
+         [this]() {
+             if (m_root) {
+                 drawNode(m_root, true);
+             } else {
+                 ImGui::TextDisabled("No root instance found");
+             }
 
-                        drawCreateInstancePopup();
-                    }});
+             drawCreateInstancePopup();
+             drawGizmo();
+         },
+         ImGuiWindowFlags_NoCollapse, nullptr, gfx::mngrs::UiManager::DockSlot::Right, 0.5f});
 
-    m_imgui.addGUI({"Properties", [this]() { drawPropertiesPanel(); }});
+    uiManager.addImguiWindow(
+        {"Properties", [this]() { drawPropertiesPanel(); }, ImGuiWindowFlags_NoCollapse, nullptr,
+         gfx::mngrs::UiManager::DockSlot::Right});
 }
 
-void DevTools::drawNode(const std::shared_ptr<types::Instance>& node) {
+void DevTools::drawNode(const std::shared_ptr<types::Instance>& node, bool defaultOpen) {
     if (!node)
         return;
 
     auto children = node->getChildren();
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+    if (defaultOpen) {
+        flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    }
 
     if (children.empty()) {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -54,7 +67,7 @@ void DevTools::drawNode(const std::shared_ptr<types::Instance>& node) {
 
     if (ImGui::BeginDragDropSource()) {
         types::Instance* raw = node.get();
-        ImGui::SetDragDropPayload("DEVTOOLS_INSTANCE", &raw, sizeof(raw));
+        ImGui::SetDragDropPayload("DEVTOOLS_INSTANCE", &raw, sizeof(*raw));
         ImGui::TextUnformatted(node->getName().c_str());
         ImGui::EndDragDropSource();
     }
@@ -119,19 +132,6 @@ void DevTools::drawPropertiesPanel() {
         ImGui::TextDisabled("Select an instance from the Explorer to edit properties");
         return;
     }
-
-    auto instanceTypeNames = enums::getStringsFromEnums<enums::InstanceType>();
-    int instanceTypeIndex = static_cast<int>(m_selectedInstance->getType());
-    const char* instanceTypeName
-        = (instanceTypeIndex >= 0 && instanceTypeIndex < static_cast<int>(instanceTypeNames.size()))
-              ? instanceTypeNames[instanceTypeIndex].c_str()
-              : "Unknown";
-
-    ImGui::Text("Type: %s", instanceTypeName);
-    ImGui::Text("Direct Children: %zu", m_selectedInstance->getChildren().size());
-    ImGui::Text("Total Descendants: %zu", m_selectedInstance->getDescendants().size());
-
-    ImGui::Separator();
 
     auto properties = m_selectedInstance->getProperties();
     for (auto& prop : properties) {
@@ -342,4 +342,64 @@ void DevTools::drawCreateInstancePopup() {
     }
 }
 
-} // namespace game::utils
+void DevTools::drawGizmo() {
+    if (!m_selectedInstance)
+        return;
+
+    std::shared_ptr<types::Part> part = nullptr;
+    if (m_selectedInstance->getType() == enums::InstanceType::Part) {
+        part = std::static_pointer_cast<types::Part>(m_selectedInstance);
+    }
+
+    if (!part)
+        return;
+
+    if (!ImGui::GetIO().WantTextInput) {
+        if (ImGui::IsKeyPressed(ImGuiKey_W, false)) {
+            m_gizmoOperation = ImGuizmo::TRANSLATE;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_E, false)) {
+            m_gizmoOperation = ImGuizmo::ROTATE;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+            m_gizmoOperation = ImGuizmo::SCALE;
+        }
+    }
+
+    glm::mat4 transform = part->getModelMatrix();
+
+    ImGuizmo::SetOrthographic(false);
+    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuizmo::SetRect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y);
+
+    glm::mat4 view = m_controller.getCameraView();
+    glm::mat4 projection = m_controller.getCameraProjection();
+
+    projection[1][1] *= -1.0f;
+
+    if (ImGuizmo::Manipulate(
+            glm::value_ptr(view), glm::value_ptr(projection), m_gizmoOperation, ImGuizmo::LOCAL,
+            glm::value_ptr(transform))) {
+        glm::vec3 newPosition = glm::vec3(transform[3]);
+
+        glm::vec3 col0 = glm::vec3(transform[0]);
+        glm::vec3 col1 = glm::vec3(transform[1]);
+        glm::vec3 col2 = glm::vec3(transform[2]);
+
+        glm::vec3 newSize(glm::length(col0), glm::length(col1), glm::length(col2));
+
+        glm::mat3 rotationMatrix(
+            newSize.x > 0.0f ? col0 / newSize.x : col0, newSize.y > 0.0f ? col1 / newSize.y : col1,
+            newSize.z > 0.0f ? col2 / newSize.z : col2);
+        glm::quat newOrientation = glm::quat_cast(rotationMatrix);
+
+        part->setPosition(newPosition);
+        part->setOrientation(newOrientation);
+
+        if (m_gizmoOperation == ImGuizmo::SCALE) {
+            part->setSize(newSize);
+        }
+    }
+}
+
+} // namespace game::ui

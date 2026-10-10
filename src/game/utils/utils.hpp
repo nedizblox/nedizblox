@@ -4,9 +4,7 @@
 #ifdef CLIENT_BUILD
 #include "controller.hpp"
 
-#include "devtools.hpp"
-
-#include "debug_tools.hpp"
+#include "basic_resource_loader.hpp"
 #endif
 
 #include "rbxl.hpp"

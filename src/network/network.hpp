@@ -5,6 +5,8 @@
 
 #include "tcp_framing.hpp"
 
+#include "serializer.hpp"
+
 #include "client.hpp"
 
 #include "server.hpp"

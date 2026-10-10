@@ -18,62 +18,52 @@ public:
         std::weak_ptr<Text> self = std::static_pointer_cast<Text>(shared_from_this());
 
         auto instanceProps = Instance::getProperties();
-        std::vector<PropertyDescriptor> textProps = {
-            {
-                "Position",
-                "Text 2D position",
-                enums::PropertyType::Vector2,
-                static_cast<void*>(&m_position),
-                false,
+        std::vector<PropertyDescriptor> textProps
+            = {{"Position", "Text 2D position", enums::PropertyType::Vector2, static_cast<void*>(&m_position), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
-                }
-            },
-            {
-                "Scale",
-                "Text 2D scale",
-                enums::PropertyType::Vector2,
-                static_cast<void*>(&m_scale),
-                false,
+                }},
+               {"Scale", "Text 2D scale", enums::PropertyType::Vector2, static_cast<void*>(&m_scale), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
-                }
-            },
-            {
-                "Text",
-                "Text content",
-                enums::PropertyType::String,
-                static_cast<void*>(&m_text),
-                false,
+                }},
+               {"Text", "Text content", enums::PropertyType::String, static_cast<void*>(&m_text), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
-                }
-            },
-            {
-                "TextFont",
-                "Text font",
-                enums::PropertyType::Enum,
-                static_cast<void*>(&m_textFont),
-                false,
+                }},
+               {"TextFont", "Text font", enums::PropertyType::Enum, static_cast<void*>(&m_textFont), false,
                 [self]() {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
                 },
-                nullptr,
-                nullptr,
-                enums::getStringsFromEnums<enums::TextFont>()
-            }
-        };
+                nullptr, nullptr, enums::getStringsFromEnums<enums::TextFont>()}};
 
         instanceProps.insert(
-            instanceProps.end(),
-            std::make_move_iterator(textProps.begin()),
+            instanceProps.end(), std::make_move_iterator(textProps.begin()),
             std::make_move_iterator(textProps.end()));
 
         return instanceProps;
+    }
+
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Instance::serialize(writer);
+
+        writer.write<glm::vec2>(m_position);
+        writer.write<glm::vec2>(m_scale);
+        writer.writeString(m_text);
+        writer.write<enums::TextFont>(m_textFont);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override {
+        Instance::deserialize(reader);
+
+        m_position = reader.read<glm::vec2>();
+        m_scale = reader.read<glm::vec2>();
+        m_text = reader.readString();
+        m_textFont = reader.read<enums::TextFont>();
     }
 
     glm::vec2 getPosition() const { return m_position; }

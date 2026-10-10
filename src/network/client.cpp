@@ -89,26 +89,12 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     }
 
     std::vector<uint8_t> mapReply;
-    if (!tcpframing::readFramed(m_tcpSocket, mapReply, ec) || mapReply.size() < sizeof(packets::InitialMapPacket)) {
-        throw std::runtime_error("Client did not receive a valid InitialMapPacket: " + ec.message());
+    if (!tcpframing::readFramed(m_tcpSocket, mapReply, ec) || mapReply.empty()) {
+        throw std::runtime_error("Client did not receive a valid MapBuffer: " + ec.message());
     }
     m_bytesReceived += sizeof(packets::TcpMessageHeader) + mapReply.size();
 
-    packets::InitialMapPacket mapHeader{};
-    std::memcpy(&mapHeader, mapReply.data(), sizeof(mapHeader));
-
-    const uint8_t* mapPartsPtr = mapReply.data() + sizeof(packets::InitialMapPacket);
-    size_t expectedMapSize
-        = sizeof(packets::InitialMapPacket) + (mapHeader.partCount * sizeof(packets::PartInfo));
-
-    if (mapReply.size() == expectedMapSize) {
-        for (uint32_t i = 0; i < mapHeader.partCount; i++) {
-            packets::PartInfo mapPart{};
-            std::memcpy(&mapPart, mapPartsPtr + (i * sizeof(packets::PartInfo)), sizeof(mapPart));
-
-            m_cachedMapParts.push_back(mapPart);
-        }
-    }
+    m_cachedMapBuffer = std::move(mapReply);
 
     udp::resolver udpResolver(m_ioContext);
     m_udpServer = *udpResolver.resolve(udp::v4(), host, std::to_string(port)).begin();
@@ -190,17 +176,17 @@ void Client::start() {
 
     if (m_oldPlayersCallback) {
         for (const auto& oldPlayer : m_cachedOldPlayers) {
-            m_oldPlayersCallback(oldPlayer.playerId, std::string(oldPlayer.nickname), oldPlayer.position);
+            m_oldPlayersCallback(oldPlayer.playerId, std::string(oldPlayer.nickname));
         }
     }
 
     m_cachedOldPlayers.clear();
 
-    if (m_mapCallback) {
-        m_mapCallback(m_cachedMapParts);
+    if (m_mapCallback && !m_cachedMapBuffer.empty()) {
+        m_mapCallback(m_cachedMapBuffer);
     }
 
-    m_cachedMapParts.clear();
+    m_cachedMapBuffer.clear();
 
     m_tcpReceiveThread = std::thread(&Client::tcpUpdateLoop, this);
     m_udpReceiveThread = std::thread(&Client::udpUpdateLoop, this);

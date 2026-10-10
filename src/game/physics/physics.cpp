@@ -49,6 +49,59 @@ void Physics::bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace
         m_dynamicsWorld->setGravity(btVector3(0.0f, changed->getGravity(), 0.0f));
     });
 
+    workspace->onDescendantPropertyChanged([this](std::shared_ptr<types::Instance> changed) {
+        if (!changed || changed->getType() != enums::InstanceType::Part)
+            return;
+
+        auto part = std::static_pointer_cast<types::Part>(changed);
+        btRigidBody* body = part->getRigidBody();
+        if (!body)
+            return;
+
+        glm::vec3 p = part->getPosition();
+        glm::quat o = part->getOrientation();
+
+        const btTransform& current = body->getWorldTransform();
+        const btVector3& currentOrigin = current.getOrigin();
+        btQuaternion currentRotation = current.getRotation();
+
+        glm::vec3 positionDelta(
+            p.x - currentOrigin.x(), p.y - currentOrigin.y(), p.z - currentOrigin.z());
+        float rotationDot = glm::abs(
+            o.x * currentRotation.x() + o.y * currentRotation.y() + o.z * currentRotation.z()
+            + o.w * currentRotation.w());
+
+        bool positionChanged = glm::dot(positionDelta, positionDelta) > 1e-6f;
+        bool rotationChanged = rotationDot < 0.999999f;
+
+        if (!positionChanged && !rotationChanged)
+            return;
+
+        btTransform transform;
+        transform.setOrigin(btVector3(p.x, p.y, p.z));
+        transform.setRotation(btQuaternion(o.x, o.y, o.z, o.w));
+
+        body->setWorldTransform(transform);
+        if (body->getMotionState()) {
+            body->getMotionState()->setWorldTransform(transform);
+        }
+
+        body->clearForces();
+        body->setLinearVelocity(btVector3(0.0f, 0.0f, 0.0f));
+        body->setAngularVelocity(btVector3(0.0f, 0.0f, 0.0f));
+        body->activate(true);
+
+        if (body->getCollisionFlags() & btCollisionObject::CF_KINEMATIC_OBJECT) {
+            std::lock_guard<std::mutex> lock(m_networkTargetsMutex);
+            auto& target = m_networkTargets[part->getNetworkId()];
+            target.networkId = part->getNetworkId();
+            target.position = p;
+            target.rotation = o;
+            target.linearVelocity = glm::vec3(0.0f);
+            target.angularVelocity = glm::vec3(0.0f);
+        }
+    });
+
     workspace->onDescendantDestroy([this](std::shared_ptr<types::Instance> destroyed) {
         if (destroyed->getType() == enums::InstanceType::Part) {
             auto part = std::static_pointer_cast<types::Part>(destroyed);

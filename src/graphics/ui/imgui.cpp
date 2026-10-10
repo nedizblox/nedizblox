@@ -19,6 +19,7 @@ void Imgui::initImGui() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.IniFilename = nullptr;
 
     io.ClipboardUserData = &m_window;
@@ -39,7 +40,7 @@ void Imgui::setClipboardText(void* userData, const char* text) {
 }
 
 void Imgui::createVertexBuffer() {
-    VkDeviceSize bufferSize = static_cast<VkDeviceSize>(10000 * sizeof(ImDrawVert));
+    VkDeviceSize bufferSize = static_cast<VkDeviceSize>(10000 * sizeof(Vertex));
 
     m_vertexBuffer = std::make_unique<vk::Buffer>(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -77,7 +78,7 @@ void Imgui::createFontTexture(vk::Sampler& sampler) {
 }
 
 void Imgui::uploadDrawData(ImDrawData* drawData) {
-    VkDeviceSize vertexSize = static_cast<VkDeviceSize>(drawData->TotalVtxCount * sizeof(ImDrawVert));
+    VkDeviceSize vertexSize = static_cast<VkDeviceSize>(drawData->TotalVtxCount * sizeof(Vertex));
     VkDeviceSize indexSize = static_cast<VkDeviceSize>(drawData->TotalIdxCount * sizeof(ImDrawIdx));
 
     if (vertexSize == 0 || indexSize == 0)
@@ -85,7 +86,6 @@ void Imgui::uploadDrawData(ImDrawData* drawData) {
 
     if (m_vertexBuffer->getSize() < vertexSize) {
         VkDeviceSize newSize = static_cast<VkDeviceSize>(vertexSize * 1.5f);
-
         m_vertexBuffer.reset();
         m_vertexBuffer = std::make_unique<vk::Buffer>(
             m_device, newSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -94,24 +94,40 @@ void Imgui::uploadDrawData(ImDrawData* drawData) {
 
     if (m_indexBuffer->getSize() < indexSize) {
         VkDeviceSize newSize = static_cast<VkDeviceSize>(indexSize * 1.5f);
-
         m_indexBuffer.reset();
         m_indexBuffer = std::make_unique<vk::Buffer>(
             m_device, newSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT);
     }
 
-    ImDrawVert* vtxDst = static_cast<ImDrawVert*>(m_vertexBuffer->map());
-    ImDrawIdx* idxDst = static_cast<ImDrawIdx*>(m_indexBuffer->map());
+    auto* vtxDst = static_cast<Vertex*>(m_vertexBuffer->map());
+    auto* idxDst = static_cast<ImDrawIdx*>(m_indexBuffer->map());
 
     for (size_t i = 0; i < drawData->CmdListsCount; i++) {
         const ImDrawList* cmdList = drawData->CmdLists[i];
 
-        std::memcpy(vtxDst, cmdList->VtxBuffer.Data, cmdList->VtxBuffer.Size * sizeof(ImDrawVert));
         std::memcpy(idxDst, cmdList->IdxBuffer.Data, cmdList->IdxBuffer.Size * sizeof(ImDrawIdx));
+        idxDst += cmdList->IdxBuffer.Size;
+
+        for (int v = 0; v < cmdList->VtxBuffer.Size; v++) {
+            const ImDrawVert& imVtx = cmdList->VtxBuffer[v];
+            vtxDst[v].position = glm::vec2(imVtx.pos.x, imVtx.pos.y);
+            vtxDst[v].uv = glm::vec2(imVtx.uv.x, imVtx.uv.y);
+            vtxDst[v].color = imVtx.col;
+            vtxDst[v].texIndex = m_fontTextureIndex;
+        }
+
+        for (int cmdI = 0; cmdI < cmdList->CmdBuffer.Size; cmdI++) {
+            const ImDrawCmd* pcmd = &cmdList->CmdBuffer[cmdI];
+            uint32_t currentTexID = static_cast<uint32_t>(pcmd->GetTexID());
+
+            for (uint32_t idx = pcmd->IdxOffset; idx < pcmd->IdxOffset + pcmd->ElemCount; idx++) {
+                ImDrawIdx vtxIndex = cmdList->IdxBuffer[idx];
+                vtxDst[vtxIndex].texIndex = currentTexID;
+            }
+        }
 
         vtxDst += cmdList->VtxBuffer.Size;
-        idxDst += cmdList->IdxBuffer.Size;
     }
 
     m_vertexBuffer->unmap();
@@ -124,9 +140,6 @@ void Imgui::update() {
     io.DisplaySize
         = ImVec2(static_cast<float>(m_window.getWidth()), static_cast<float>(m_window.getHeight()));
 
-    m_isKeyboardFocused = io.WantCaptureKeyboard;
-    m_isMouseFocused = io.WantCaptureMouse;
-
     float dt = m_window.getDeltaTime();
     io.DeltaTime = dt > 0.0f ? dt : 1.0f / 60.0f;
 
@@ -137,9 +150,9 @@ void Imgui::update() {
         io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
     }
 
-    io.AddMouseButtonEvent(ImGuiMouseButton_Left, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT));
-    io.AddMouseButtonEvent(ImGuiMouseButton_Right, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT));
-    io.AddMouseButtonEvent(ImGuiMouseButton_Middle, m_window.isMouseButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Left, m_window.isMouseButtonPressed(SDL_BUTTON_LEFT));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Right, m_window.isMouseButtonPressed(SDL_BUTTON_RIGHT));
+    io.AddMouseButtonEvent(ImGuiMouseButton_Middle, m_window.isMouseButtonPressed(SDL_BUTTON_MIDDLE));
 
     auto scrollDt = m_window.getScrollDelta();
     io.AddMouseWheelEvent(scrollDt.x, scrollDt.y);
@@ -150,18 +163,10 @@ void Imgui::update() {
     }
 
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
 }
 
 void Imgui::draw(VkCommandBuffer commandBuffer) {
-    for (auto& gui : m_guis) {
-        ImGui::Begin(gui.title.c_str());
-        gui.design();
-        ImGui::End();
-    }
-
-    if (m_showDemoWindow)
-        ImGui::ShowDemoWindow(&m_showDemoWindow);
-
     ImGui::Render();
 
     ImDrawData* drawData = ImGui::GetDrawData();
@@ -194,8 +199,6 @@ void Imgui::draw(VkCommandBuffer commandBuffer) {
             scissor.extent.height = static_cast<uint32_t>(pcmd->ClipRect.w - pcmd->ClipRect.y);
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-            uint32_t texIndex = static_cast<uint32_t>(pcmd->GetTexID());
-
             vkCmdDrawIndexed(
                 commandBuffer, pcmd->ElemCount, 1, pcmd->IdxOffset + indexOffset,
                 pcmd->VtxOffset + vertexOffset, 0);
@@ -206,20 +209,22 @@ void Imgui::draw(VkCommandBuffer commandBuffer) {
     }
 }
 
-std::vector<VkVertexInputBindingDescription> Imgui::getBindingDescriptions() {
+std::vector<VkVertexInputBindingDescription> Imgui::Vertex::getBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 
-    bindingDescriptions.push_back({0, sizeof(ImDrawVert), VK_VERTEX_INPUT_RATE_VERTEX});
+    bindingDescriptions.push_back({0, sizeof(Vertex), VK_VERTEX_INPUT_RATE_VERTEX});
 
     return bindingDescriptions;
 }
 
-std::vector<VkVertexInputAttributeDescription> Imgui::getAttributeDescriptions() {
+std::vector<VkVertexInputAttributeDescription> Imgui::Vertex::getAttributeDescriptions() {
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
-    attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, pos)});
-    attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, uv)});
-    attributeDescriptions.push_back({2, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(ImDrawVert, col)});
+    attributeDescriptions.push_back({0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, position)});
+    attributeDescriptions.push_back({1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)});
+    attributeDescriptions.push_back({2, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(Vertex, color)});
+
+    attributeDescriptions.push_back({3, 0, VK_FORMAT_R32_UINT, offsetof(Vertex, texIndex)});
 
     return attributeDescriptions;
 }

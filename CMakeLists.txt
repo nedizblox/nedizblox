@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
+cmake_policy(SET CMP0167 NEW)
 
 set(NEDIZBLOX_VERSION_MAJOR 0)
-set(NEDIZBLOX_VERSION_MINOR 8)
+set(NEDIZBLOX_VERSION_MINOR 9)
 set(NEDIZBLOX_VERSION_PATCH 0)
 
 project(nedizblox 
@@ -25,28 +26,25 @@ if(ENABLE_ADDRESS_SANITIZER)
     set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wno-unsafe-buffer-usage -Wno-unsafe-buffer-usage-in-libc-call)
-endif()
-
 if(NOT SERVER_BUILD)
     find_package(Vulkan REQUIRED COMPONENTS glslangValidator)
     find_package(Freetype REQUIRED)
-    find_package(OpenAL REQUIRED)
 endif()
 
-find_package(Bullet REQUIRED)
 find_package(Boost REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(LIBTYPE STATIC)
 
 if(NOT SERVER_BUILD)
-    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-    add_subdirectory(extern/glfw)
+    set(SDL2_TEST_ENABLED_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_SDL2MAIN ON CACHE BOOL "" FORCE)
+    set(SDL_SHARED_ENABLED_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC_ENABLED_BY_DEFAULT ON CACHE BOOL "" FORCE)
+    add_subdirectory(extern/sdl)
 
     set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
@@ -57,11 +55,41 @@ if(NOT SERVER_BUILD)
     set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
     add_subdirectory(extern/assimp)
 
-    add_subdirectory(extern/boxer)
+    set(ALSOFT_UTILS OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_NO_CONFIG_UTIL ON CACHE BOOL "" FORCE)
+    set(ALSOFT_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_TESTS OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_ENABLE_MODULES OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_EMBED_HRTF_DATA OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL_CONFIG OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL_HRTF_DATA OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL_AMBDEC_PRESETS OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_INSTALL_UTILS OFF CACHE BOOL "" FORCE)
+    set(ALSOFT_UPDATE_BUILD_VERSION OFF CACHE BOOL "" FORCE)
+    add_subdirectory(extern/openal-soft)
 endif()
 
 set(GLM_ENABLE_CXX_20 ON CACHE BOOL "" FORCE)
 add_subdirectory(extern/glm)
+
+set(BUILD_BULLET3 OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+set(BUILD_CPU_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_CLSOCKET OFF CACHE BOOL "" FORCE)
+set(BUILD_ENET OFF CACHE BOOL "" FORCE)
+set(BUILD_EGL OFF CACHE BOOL "" FORCE)
+set(ENABLE_VHACD OFF CACHE BOOL "" FORCE)
+set(USE_GRAPHICAL_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(USE_SOFT_BODY_MULTI_BODY_DYNAMICS_WORLD OFF CACHE BOOL "" FORCE)
+set(USE_GLUT OFF CACHE BOOL "" FORCE)
+set(INSTALL_LIBS OFF CACHE BOOL "" FORCE)
+set(INSTALL_CMAKE_FILES OFF CACHE BOOL "" FORCE)
+add_subdirectory(extern/bullet)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -120,7 +148,6 @@ set(BASIC_MAIN_SOURCES
 set(CLIENT_MAIN_SOURCES
     ${BASIC_MAIN_SOURCES}
     src/core/camera.cpp
-    src/core/msgbox.cpp
     src/window/window_desktop.cpp
     src/graphics/vk/device.cpp
     src/graphics/vk/swapchain.cpp
@@ -136,26 +163,25 @@ set(CLIENT_MAIN_SOURCES
     src/graphics/cubemap.cpp
     src/graphics/skybox.cpp
     src/graphics/billboards/text.cpp
-    src/graphics/billboards/image.cpp
     src/graphics/ui/text.cpp
-    src/graphics/ui/image.cpp
     src/graphics/ui/imgui.cpp
     src/graphics/managers/bindless_manager.cpp
     src/graphics/managers/model_manager.cpp
     src/graphics/managers/billboard_manager.cpp
     src/graphics/managers/ui_manager.cpp
+    src/graphics/managers/pipeline_manager.cpp
     src/audio/sound.cpp
     src/audio/music.cpp
     src/audio/audio_manager.cpp
     src/network/client.cpp
     src/game/utils/controller.cpp
-    src/game/utils/devtools.cpp
-    src/game/utils/debug_tools.cpp
+    src/game/utils/basic_resource_loader.cpp
+    src/game/ui/devtools.cpp
+    src/game/ui/debug_tools.cpp
     src/game/multiplayer/replicator.cpp
     src/game/multiplayer/ownership.cpp
     src/game/managers/instance_manager.cpp
     src/game/managers/asset_manager.cpp
-    src/game/managers/render_manager.cpp
     src/game/render_context.cpp
     src/game/game_client.cpp
     src/client_main.cpp
@@ -192,6 +218,7 @@ set(CLIENT_EXTERN_SOURCES
     extern/imgui/imgui_tables.cpp
     extern/imgui/imgui_widgets.cpp
     extern/imgui/imgui.cpp
+    extern/imgui/ImGuizmo.cpp
 )
 
 set(SERVER_EXTERN_SOURCES
@@ -201,6 +228,8 @@ set(SERVER_EXTERN_SOURCES
 if(SERVER_BUILD)
     set(EXECUTABLE_NAME nedizblox-server)
     add_executable(${EXECUTABLE_NAME} ${SERVER_EXTERN_SOURCES} ${SERVER_MAIN_SOURCES})
+
+    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC SERVER_BUILD)
 else()
     set(EXECUTABLE_NAME nedizblox-client)
     add_executable(${EXECUTABLE_NAME} ${CLIENT_EXTERN_SOURCES} ${SPIRV_BINARY_FILES} ${CLIENT_MAIN_SOURCES})
@@ -234,7 +263,9 @@ endif()
 
 set(BASIC_LIBRARIES
     Boost::headers
-    ${BULLET_LIBRARIES}
+    BulletDynamics
+    BulletCollision
+    LinearMath
     OpenSSL::Crypto
     glm::glm
     rbx_dom
@@ -243,11 +274,10 @@ set(BASIC_LIBRARIES
 set(CLIENT_LIBRARIES
     ${BASIC_LIBRARIES}
     Vulkan::Vulkan
-    glfw
+    SDL2::SDL2-static
     Freetype::Freetype
-    OpenAL::OpenAL
+    OpenAL
     assimp
-    Boxer
 )
 
 set(SERVER_LIBRARIES
@@ -268,4 +298,4 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
 
 target_compile_definitions(${EXECUTABLE_NAME} PUBLIC GLM_ENABLE_EXPERIMENTAL)
 
-target_include_directories(${EXECUTABLE_NAME} PRIVATE extern src ${BULLET_INCLUDE_DIRS})
+target_include_directories(${EXECUTABLE_NAME} PRIVATE extern src extern/bullet/src)

@@ -32,7 +32,8 @@ void Renderer::createCommandBuffers() {
 
 void Renderer::recreateSwapchain() {
     while (m_window.isResized()) {
-        glfwWaitEvents();
+        m_window.waitEvents();
+        m_window.update();
     }
 
     m_device.waitIdle();

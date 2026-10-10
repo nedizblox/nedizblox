@@ -76,6 +76,8 @@ void GameServer::buildMap(const std::string& rbxlMapPath) {
     m_instanceManager->setRoot(m_workspace);
     m_instanceManager->rebuildMap();
 
+    syncNetworkParts();
+
     m_server->setMapData(m_instanceManager->getMapBuffer());
 }
 
@@ -142,12 +144,20 @@ void GameServer::broadcastUnownedObjects() {
     }
 }
 
+void GameServer::syncNetworkParts() {
+    auto parts = m_instanceManager->getNetworkParts();
+
+    std::lock_guard<std::mutex> lock(m_networkPartsMutex);
+    m_networkParts = std::move(parts);
+}
+
 void GameServer::run() {
     m_physicsThread = std::thread(&GameServer::physicsLoop, this);
 
     while (!core::sighandler::shouldStop) {
         if (m_instanceManager->isDirty()) {
             m_instanceManager->rebuildMap();
+            syncNetworkParts();
             m_server->setMapData(m_instanceManager->getMapBuffer());
         }
 

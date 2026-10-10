@@ -110,6 +110,10 @@ std::vector<std::shared_ptr<types::Instance>> rbxl::parseRbxl(const std::string&
         }
         }
 
+        if (instance) {
+            instance->setId(static_cast<uint32_t>(obj.base.id));
+        }
+
         instanceMap[obj.base.id] = instance;
         allInstances.push_back(instance);
     }

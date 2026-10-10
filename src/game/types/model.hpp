@@ -15,6 +15,18 @@ public:
         return std::make_shared<Model>(name);
     }
 
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Instance::serialize(writer);
+
+        writer.write<glm::mat4>(m_pivot);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override {
+        Instance::deserialize(reader);
+
+        m_pivot = reader.read<glm::mat4>();
+    }
+
     glm::mat4 getPivot() const { return m_pivot; }
     virtual void setPivot(const glm::mat4& pivot, bool silent = false) {
         glm::mat4 delta = pivot * glm::inverse(m_pivot);

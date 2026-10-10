@@ -4,18 +4,14 @@ namespace game::multiplayer {
 
 Replicator::Replicator(
     const std::string& server, uint16_t port, const std::string& nickname, physics::Physics& physics,
-    mngrs::InstanceManager& instanceManager, std::shared_ptr<types::Workspace> workspace) :
-    m_physics(physics), m_instanceManager(instanceManager), m_workspace(std::move(workspace)) {
+    std::shared_ptr<types::Workspace> workspace) :
+    m_physics(physics),  m_workspace(std::move(workspace)) {
 
     m_client = std::make_unique<net::Client>(server, port, nickname);
     setupCallbacks();
 }
 
-Replicator::~Replicator() {
-    stop();
-    m_networkParts.clear();
-    m_networkRigs.clear();
-}
+Replicator::~Replicator() { stop(); }
 
 void Replicator::start() { m_client->start(); }
 
@@ -39,64 +35,92 @@ void Replicator::updateNetworkRigs(float dt) {
     }
 }
 
+std::shared_ptr<types::Instance> Replicator::createInstanceByType(enums::InstanceType type) {
+    switch (type) {
+    case enums::InstanceType::Part:
+        return types::Part::create();
+    case enums::InstanceType::BillboardText:
+        return types::BillboardText::create();
+    case enums::InstanceType::Decal:
+        return types::Decal::create();
+    case enums::InstanceType::SelectionBox:
+        return types::SelectionBox::create();
+    case enums::InstanceType::Model:
+        return types::Model::create();
+    case enums::InstanceType::Folder:
+        return types::Folder::create();
+    default:
+        return nullptr;
+    }
+}
+
 void Replicator::setupCallbacks() {
-    m_client->setMapCallback([this](const std::vector<net::packets::PartInfo>& parts) {
-        for (const auto& info : parts) {
-            std::shared_ptr<types::Part> part;
-            if (info.type == net::packets::PartType::SpawnLocation) {
-                part = types::SpawnLocation::create();
-            } else {
-                part = types::Part::create();
+    m_client->setMapCallback([this](const std::vector<uint8_t>& mapBuffer) {
+        net::serializer::BinaryReader reader(mapBuffer.data(), mapBuffer.size());
+
+        uint32_t objectCount = reader.read<uint32_t>();
+
+        std::vector<PendingParenting> pendingList;
+        pendingList.reserve(objectCount);
+
+        std::unordered_map<uint32_t, std::shared_ptr<types::Instance>> instancesById;
+        instancesById.reserve(objectCount);
+
+        for (uint32_t i = 0; i < objectCount; ++i) {
+            auto type = reader.read<enums::InstanceType>();
+
+            auto instance = createInstanceByType(type);
+            if (!instance) {
+                continue;
             }
 
-            part->setNetworkId(info.networkId);
+            instance->deserialize(reader);
 
-            std::string name(info.name);
-            if (!name.empty())
-                part->setName(name);
+            uint32_t netId = instance->getNetworkId();
+            uint32_t parentId = instance->getParentId();
 
-            part->setPosition(info.position);
-            part->setOrientation(info.rotation);
-            part->setSize(info.size);
-            part->setColor(info.color);
-            part->setTransparency(info.transparency);
-            part->setAnchored(info.anchored);
-            part->setShape(static_cast<enums::PartShape>(info.shape));
+            m_networkInstances[netId] = instance;
+            instancesById[instance->getId()] = instance;
 
-            btRigidBody* rigidBody = m_physics.createRigidBodyPart(part.get());
-            m_physics.setBodyNetworkMode(rigidBody, false);
+            if (instance->getType() == enums::InstanceType::Part) {
+                auto part = std::static_pointer_cast<types::Part>(instance);
 
-            part->setRigidBody(rigidBody);
+                btRigidBody* rigidBody = m_physics.createRigidBodyPart(part.get());
+                m_physics.setBodyNetworkMode(rigidBody, false);
+                part->setRigidBody(rigidBody);
 
-            m_networkParts[info.networkId] = std::move(part);
+                m_networkInstances[netId] = part;
+                instancesById[instance->getId()] = part;
+            }
+
+            pendingList.push_back({instance, parentId});
         }
 
-        for (const auto& info : parts) {
-            auto it = m_networkParts.find(info.networkId);
-            if (it == m_networkParts.end() || !it->second)
+        for (const auto& item : pendingList) {
+            if (!item.instance)
                 continue;
 
-            if (info.parentNetworkId == 0) {
-                it->second->setParent(m_workspace);
+            if (item.parentId == 0) {
+                item.instance->setParent(m_workspace);
                 continue;
             }
 
-            auto parentIt = m_networkParts.find(info.parentNetworkId);
-            if (parentIt != m_networkParts.end() && parentIt->second) {
-                it->second->setParent(parentIt->second);
+            auto parentIt = instancesById.find(item.parentId);
+            if (parentIt != instancesById.end() && parentIt->second) {
+                item.instance->setParent(parentIt->second);
             } else {
-                it->second->setParent(m_workspace);
+                item.instance->setParent(m_workspace);
             }
         }
     });
 
-    m_client->setOldPlayersCallback([this](uint32_t playerId, const std::string& nickname, const glm::vec3& position) {
+    m_client->setOldPlayersCallback([this](uint32_t playerId, const std::string& nickname) {
         if (playerId == m_client->getPlayerId())
             return;
 
         auto rig = prefabs::Rig::create(m_physics, nickname, playerId);
         rig->setParent(m_workspace);
-        rig->setPivotPosition(position);
+        // rig->setPivotPosition(position);
 
         m_physics.setBodyNetworkMode(rig->getRigidBody(), false);
         m_networkRigs[playerId] = std::move(rig);
@@ -131,9 +155,12 @@ void Replicator::setupCallbacks() {
                 if (auto rigIt = m_networkRigs.find(object.networkId);
                     rigIt != m_networkRigs.end() && rigIt->second) {
                     body = rigIt->second->getRigidBody();
-                } else if (auto partIt = m_networkParts.find(object.networkId);
-                           partIt != m_networkParts.end() && partIt->second) {
-                    body = partIt->second->getRigidBody();
+                } else if (
+                    auto instanceIt = m_networkInstances.find(object.networkId);
+                    instanceIt != m_networkInstances.end() && instanceIt->second
+                    && instanceIt->second->getType() == enums::InstanceType::Part) {
+                    auto part = std::static_pointer_cast<types::Part>(instanceIt->second);
+                    body = part->getRigidBody();
                 }
 
                 if (body) {

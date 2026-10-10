@@ -7,7 +7,8 @@ namespace game::types {
 
 class SpawnLocation : public Part {
 public:
-    SpawnLocation(const std::string& name = "SpawnLocation") : Part(name, enums::PartType::SpawnLocation) {
+    SpawnLocation(const std::string& name = "SpawnLocation") :
+        Part(name, enums::PartType::SpawnLocation) {
         setSize(glm::vec3(5.0f, 1.0f, 5.0f));
         setSurfaceTop(enums::SurfaceType::Smooth);
         setSurfaceBottom(enums::SurfaceType::Smooth);
@@ -26,6 +27,12 @@ public:
 
         return spawn;
     }
+
+    void serialize(net::serializer::BinaryWriter& writer) const override {
+        Part::serialize(writer);
+    }
+
+    void deserialize(net::serializer::BinaryReader& reader) override { Part::deserialize(reader); }
 
 private:
 };

@@ -19,14 +19,14 @@ namespace net {
 
 class Client {
 public:
-    using OldPlayersCallback = std::function<void(uint32_t, const std::string&, const glm::vec3&)>;
+    using OldPlayersCallback = std::function<void(uint32_t, const std::string&)>;
     using PlayerJoinedCallback = std::function<void(uint32_t, const std::string&)>;
     using PlayerLeftCallback = std::function<void(uint32_t)>;
 
     using PhysicsUpdateCallback
         = std::function<void(uint32_t, const std::vector<packets::PhysicalObjectState>&)>;
 
-    using MapCallback = std::function<void(const std::vector<packets::PartInfo>&)>;
+    using MapCallback = std::function<void(const std::vector<uint8_t>&)>;
 
     using ReliableMessageCallback = std::function<void(const std::vector<uint8_t>&)>;
 
@@ -99,7 +99,7 @@ private:
 
     std::unordered_map<uint32_t, packets::PhysicalObjectState> m_objectStates;
     std::vector<packets::OldPlayerInfo> m_cachedOldPlayers;
-    std::vector<packets::PartInfo> m_cachedMapParts;
+    std::vector<uint8_t> m_cachedMapBuffer;
 
     OldPlayersCallback m_oldPlayersCallback;
     PlayerJoinedCallback m_playerJoinedCallback;

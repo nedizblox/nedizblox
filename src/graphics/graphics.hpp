@@ -10,6 +10,7 @@
 #include "managers/model_manager.hpp"
 #include "managers/billboard_manager.hpp"
 #include "managers/ui_manager.hpp"
+#include "managers/pipeline_manager.hpp"
 
 #include "geometries.hpp"
 #include "model.hpp"
@@ -19,9 +20,7 @@
 #include "texture.hpp"
 
 #include "ui/text.hpp"
-#include "ui/image.hpp"
 #include "ui/imgui.hpp"
 
 #include "billboards/text.hpp"
-#include "billboards/image.hpp"
 // IWYU pragma: end_exports
