@@ -1,45 +1,64 @@
-#include "server_instance_manager.hpp"
+#include "server_replicator.hpp"
 
-namespace game::mngrs {
+namespace game::multiplayer {
 
-ServerInstanceManager::ServerInstanceManager(physics::Physics& physics) : m_physics(physics) {}
+namespace {
 
-ServerInstanceManager::~ServerInstanceManager() {
+bool isRig(const std::shared_ptr<types::Instance>& instance) {
+    return dynamic_cast<types::Rig*>(instance.get()) != nullptr;
+}
+
+} // namespace
+
+ServerReplicator::ServerReplicator(physics::Physics& physics) :
+    m_physics(physics) {
+}
+
+ServerReplicator::~ServerReplicator() {
     if (auto root = m_currentRoot.lock()) {
         root->removeDescendantPropertyChangedCallback(m_propSubId);
         root->removeChildrenChangedCallback(m_childrenSubId);
-        root->removeDescendantChildrenChangedCallback(m_descendantChildrenSubId);
+        root->removeDescendantChildrenChangedCallback(
+            m_descendantChildrenSubId
+        );
     }
 }
 
-void ServerInstanceManager::setRoot(const std::shared_ptr<types::Instance>& root) {
+void ServerReplicator::setRoot(const std::shared_ptr<types::Instance>& root) {
     if (m_currentRoot.lock() != root) {
         if (auto oldRoot = m_currentRoot.lock()) {
             oldRoot->removeDescendantPropertyChangedCallback(m_propSubId);
             oldRoot->removeChildrenChangedCallback(m_childrenSubId);
-            oldRoot->removeDescendantChildrenChangedCallback(m_descendantChildrenSubId);
+            oldRoot->removeDescendantChildrenChangedCallback(
+                m_descendantChildrenSubId
+            );
         }
 
         m_currentRoot = root;
 
         if (root) {
-            m_propSubId = root->onDescendantPropertyChanged([this](auto) { markDirty(); });
-            m_childrenSubId = root->onChildrenChanged([this](auto) { markDirty(); });
-            m_descendantChildrenSubId
-                = root->onDescendantChildrenChanged([this](auto) { markDirty(); });
+            m_propSubId = root->onDescendantPropertyChanged([this](auto)
+                                                            { markDirty(); });
+            m_childrenSubId =
+                root->onChildrenChanged([this](auto) { markDirty(); });
+            m_descendantChildrenSubId =
+                root->onDescendantChildrenChanged([this](auto)
+                                                  { markDirty(); });
         }
 
         markDirty();
     }
 }
 
-uint32_t ServerInstanceManager::countSerializableInstances(const std::shared_ptr<types::Instance>& parent) const {
+uint32_t ServerReplicator::countSerializableInstances(
+    const std::shared_ptr<types::Instance>& parent
+) const {
     if (!parent)
         return 0;
 
     uint32_t count = 0;
     for (const auto& child : parent->getChildren()) {
-        if (!child)
+        if (!child || isRig(child))
             continue;
 
         count += 1 + countSerializableInstances(child);
@@ -47,7 +66,7 @@ uint32_t ServerInstanceManager::countSerializableInstances(const std::shared_ptr
     return count;
 }
 
-void ServerInstanceManager::rebuildMap() {
+void ServerReplicator::rebuildMap() {
     auto root = m_currentRoot.lock();
     if (!root) {
         m_mapBuffer.clear();
@@ -71,13 +90,15 @@ void ServerInstanceManager::rebuildMap() {
     m_dirty = false;
 }
 
-void ServerInstanceManager::collectInstances(
-    const std::shared_ptr<types::Instance>& parent, net::serializer::BinaryWriter& writer) {
+void ServerReplicator::collectInstances(
+    const std::shared_ptr<types::Instance>& parent,
+    net::serializer::BinaryWriter& writer
+) {
     if (!parent)
         return;
 
     for (const auto& child : parent->getChildren()) {
-        if (!child)
+        if (!child || isRig(child))
             continue;
 
         uint32_t networkId = child->getNetworkId();
@@ -91,6 +112,8 @@ void ServerInstanceManager::collectInstances(
 
             if (!part->getRigidBody()) {
                 m_physics.createRigidBodyPart(part.get());
+            } else {
+                m_physics.rebindNetworkId(part.get());
             }
             m_networkParts[networkId] = part;
         }
@@ -101,4 +124,4 @@ void ServerInstanceManager::collectInstances(
     }
 }
 
-} // namespace game::mngrs
+} // namespace game::multiplayer

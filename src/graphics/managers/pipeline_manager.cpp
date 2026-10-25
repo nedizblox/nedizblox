@@ -6,132 +6,221 @@ namespace gfx::mngrs {
 
 PipelineManager::PipelineManager(
     gfx::vk::Device& device, gfx::vk::Renderer& renderer,
-    gfx::mngrs::BindlessManager& bindlessManager, gfx::mngrs::ModelManager& modelManager,
-    gfx::mngrs::BillboardManager& billboardManager, gfx::mngrs::UiManager& uiManager) :
-    m_device(device),
-    m_renderer(renderer),
-    m_bindlessManager(bindlessManager),
-    m_modelManager(modelManager),
-    m_billboardManager(billboardManager),
-    m_uiManager(uiManager) {}
+    gfx::mngrs::BindlessManager& bindlessManager,
+    gfx::mngrs::ModelManager& modelManager,
+    gfx::mngrs::BillboardManager& billboardManager,
+    gfx::mngrs::UiManager& uiManager
+) :
+    m_device(device), m_renderer(renderer), m_bindlessManager(bindlessManager),
+    m_modelManager(modelManager), m_billboardManager(billboardManager),
+    m_uiManager(uiManager) {
+    m_shadowMap = std::make_unique<gfx::ShadowMap>(m_device);
+}
 
-PipelineManager::~PipelineManager() {}
+PipelineManager::~PipelineManager() {
+}
 
 void PipelineManager::initPipelines(VkDescriptorSetLayout setLayout) {
-    m_pipelines["skybox"] = gfx::vk::Pipeline::Builder(m_device)
-                                .setVertShaderPath("shaders/skybox.vert.spv")
-                                .setFragShaderPath("shaders/skybox.frag.spv")
-                                .setConstantSize(sizeof(gfx::Skybox::PushConstantObject))
-                                .setDescriptorLayouts({setLayout})
-                                .setRenderPass(m_renderer.getRenderPass())
-                                .setBindingDescriptions(gfx::Skybox::Vertex::getBindingDescriptions())
-                                .setAttributeDescriptions(gfx::Skybox::Vertex::getAttributeDescriptions())
-                                .enableDepthTest()
-                                .disableDepthWrite()
-                                .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
-                                .build();
+    m_pipelines["skybox"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/skybox.vert.spv")
+            .setFragShaderPath("shaders/skybox.frag.spv")
+            .setConstantSize(sizeof(gfx::Skybox::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::Skybox::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::Skybox::Vertex::getAttributeDescriptions()
+            )
+            .enableDepthTest()
+            .disableDepthWrite()
+            .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
+            .build();
 
-    m_pipelines["model_opaque"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/model.vert.spv")
-              .setFragShaderPath("shaders/model.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .setCullMode(VK_CULL_MODE_FRONT_BIT)
-              .enableDepthTest()
-              .build();
+    m_pipelines["model_shadow"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/model_shadow.vert.spv")
+            .setFragShaderPath("shaders/model_shadow.frag.spv")
+            .setConstantSize(sizeof(gfx::ModelShadow::PushConstantObject))
+            .setRenderPass(m_shadowMap->getRenderPass())
+            .setBindingDescriptions(
+                gfx::ModelShadow::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::ModelShadow::Vertex::getAttributeDescriptions()
+            )
+            .disableColorAttachments()
+            .enableDepthTest()
+            .setDepthBias(1.25f, 0.0f, 1.75f)
+            .build();
 
-    m_pipelines["model_transparent"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/model.vert.spv")
-              .setFragShaderPath("shaders/model.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .setCullMode(VK_CULL_MODE_FRONT_BIT)
-              .enableDepthTest()
-              .disableDepthWrite()
-              .enableAlphaBlending()
-              .build();
+    m_pipelines["model_opaque"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/model.vert.spv")
+            .setFragShaderPath("shaders/model.frag.spv")
+            .setConstantSize(sizeof(gfx::Model::PushConstantObject))
+            .setDescriptorLayouts(
+                {setLayout, m_shadowMap->getDescriptorSetLayout()}
+            )
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::Model::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::Model::Vertex::getAttributeDescriptions()
+            )
+            .setCullMode(VK_CULL_MODE_FRONT_BIT)
+            .enableDepthTest()
+            .build();
 
-    m_pipelines["model_outline_opaque"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/model_outline.vert.spv")
-              .setFragShaderPath("shaders/model_outline.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .enableDepthTest()
-              .setDepthBias(-2.0f, 0.0f, -2.0f)
-              .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
-              .build();
+    m_pipelines["model_transparent"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/model.vert.spv")
+            .setFragShaderPath("shaders/model.frag.spv")
+            .setConstantSize(sizeof(gfx::Model::PushConstantObject))
+            .setDescriptorLayouts(
+                {setLayout, m_shadowMap->getDescriptorSetLayout()}
+            )
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::Model::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::Model::Vertex::getAttributeDescriptions()
+            )
+            .setCullMode(VK_CULL_MODE_FRONT_BIT)
+            .enableDepthTest()
+            .disableDepthWrite()
+            .enableAlphaBlending()
+            .build();
 
-    m_pipelines["model_outline_transparent"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/model_outline.vert.spv")
-              .setFragShaderPath("shaders/model_outline.frag.spv")
-              .setConstantSize(sizeof(gfx::Model::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::Model::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::Model::Vertex::getAttributeDescriptions())
-              .enableDepthTest()
-              .disableDepthWrite()
-              .setDepthBias(-2.0f, 0.0f, -2.0f)
-              .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
-              .enableAlphaBlending()
-              .build();
+    m_pipelines["model_outline_opaque"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/model_outline.vert.spv")
+            .setFragShaderPath("shaders/model_outline.frag.spv")
+            .setConstantSize(sizeof(gfx::Model::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::Model::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::Model::Vertex::getAttributeDescriptions()
+            )
+            .enableDepthTest()
+            .setDepthBias(-2.0f, 0.0f, -2.0f)
+            .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
+            .build();
 
-    m_pipelines["text"] = gfx::vk::Pipeline::Builder(m_device)
-                              .setVertShaderPath("shaders/text.vert.spv")
-                              .setFragShaderPath("shaders/text.frag.spv")
-                              .setConstantSize(sizeof(gfx::ui::Text::PushConstantObject))
-                              .setDescriptorLayouts({setLayout})
-                              .setRenderPass(m_renderer.getRenderPass())
-                              .setBindingDescriptions(gfx::ui::Text::Vertex::getBindingDescriptions())
-                              .setAttributeDescriptions(gfx::ui::Text::Vertex::getAttributeDescriptions())
-                              .enableAlphaBlending()
-                              .build();
+    m_pipelines["model_outline_transparent"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/model_outline.vert.spv")
+            .setFragShaderPath("shaders/model_outline.frag.spv")
+            .setConstantSize(sizeof(gfx::Model::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::Model::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::Model::Vertex::getAttributeDescriptions()
+            )
+            .enableDepthTest()
+            .disableDepthWrite()
+            .setDepthBias(-2.0f, 0.0f, -2.0f)
+            .setDepthCompareOp(VK_COMPARE_OP_LESS_OR_EQUAL)
+            .enableAlphaBlending()
+            .build();
 
-    m_pipelines["billboard_text"]
-        = gfx::vk::Pipeline::Builder(m_device)
-              .setVertShaderPath("shaders/billboard_text.vert.spv")
-              .setFragShaderPath("shaders/text.frag.spv")
-              .setConstantSize(sizeof(gfx::billb::Text::PushConstantObject))
-              .setDescriptorLayouts({setLayout})
-              .setRenderPass(m_renderer.getRenderPass())
-              .setBindingDescriptions(gfx::billb::Text::Vertex::getBindingDescriptions())
-              .setAttributeDescriptions(gfx::billb::Text::Vertex::getAttributeDescriptions())
-              .enableDepthTest()
-              .disableDepthWrite()
-              .enableAlphaBlending()
-              .build();
+    m_pipelines["text"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/text.vert.spv")
+            .setFragShaderPath("shaders/text.frag.spv")
+            .setConstantSize(sizeof(gfx::ui::Text::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::ui::Text::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::ui::Text::Vertex::getAttributeDescriptions()
+            )
+            .enableAlphaBlending()
+            .build();
 
-    m_pipelines["imgui"] = gfx::vk::Pipeline::Builder(m_device)
-                               .setVertShaderPath("shaders/imgui.vert.spv")
-                               .setFragShaderPath("shaders/imgui.frag.spv")
-                               .setConstantSize(sizeof(gfx::ui::Imgui::PushConstantObject))
-                               .setDescriptorLayouts({setLayout})
-                               .setRenderPass(m_renderer.getRenderPass())
-                               .setBindingDescriptions(gfx::ui::Imgui::Vertex::getBindingDescriptions())
-                               .setAttributeDescriptions(gfx::ui::Imgui::Vertex::getAttributeDescriptions())
-                               .enableAlphaBlending()
-                               .build();
+    m_pipelines["billboard_text"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/billboard_text.vert.spv")
+            .setFragShaderPath("shaders/text.frag.spv")
+            .setConstantSize(sizeof(gfx::billb::Text::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::billb::Text::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::billb::Text::Vertex::getAttributeDescriptions()
+            )
+            .enableDepthTest()
+            .disableDepthWrite()
+            .enableAlphaBlending()
+            .build();
+
+    m_pipelines["imgui"] =
+        gfx::vk::Pipeline::Builder(m_device)
+            .setVertShaderPath("shaders/imgui.vert.spv")
+            .setFragShaderPath("shaders/imgui.frag.spv")
+            .setConstantSize(sizeof(gfx::ui::Imgui::PushConstantObject))
+            .setDescriptorLayouts({setLayout})
+            .setRenderPass(m_renderer.getRenderPass())
+            .setBindingDescriptions(
+                gfx::ui::Imgui::Vertex::getBindingDescriptions()
+            )
+            .setAttributeDescriptions(
+                gfx::ui::Imgui::Vertex::getAttributeDescriptions()
+            )
+            .enableAlphaBlending()
+            .build();
+}
+
+void PipelineManager::renderShadowPass(
+    VkCommandBuffer commandBuffer, const glm::mat4& lightSpace,
+    float orthoRadius,
+    const std::unordered_map<
+        std::string, std::vector<gfx::Model::InstanceData>>& instancesData,
+    const gfx::ShadowMap::Settings& settings
+) {
+    uint32_t frameIndex = m_renderer.getFrameIndex();
+
+    m_shadowMap->update(frameIndex, lightSpace, orthoRadius, settings);
+    m_shadowMap->begin(commandBuffer, frameIndex);
+
+    auto& pipeline = m_pipelines["model_shadow"];
+    pipeline->bind(commandBuffer);
+
+    gfx::ModelShadow::PushConstantObject push{};
+    push.lightSpace = lightSpace;
+    pipeline->pushConstant(commandBuffer, push);
+
+    m_modelManager.drawShadow(commandBuffer, instancesData);
+
+    m_shadowMap->end(commandBuffer);
 }
 
 void PipelineManager::renderModelsOpaque(
-    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    const glm::vec3& pos,
+    const std::unordered_map<
+        std::string, std::vector<gfx::Model::InstanceData>>& instancesData
+) {
     auto& pipeline = m_pipelines["model_opaque"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
+    m_shadowMap->bind(
+        commandBuffer, pipeline->getPipelineLayout(), m_renderer.getFrameIndex()
+    );
 
     gfx::Model::PushConstantObject push{};
     push.viewProj = proj * view;
@@ -142,8 +231,12 @@ void PipelineManager::renderModelsOpaque(
 }
 
 void PipelineManager::renderModelOutlinesOpaque(
-    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData) {
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    const glm::vec3& pos,
+    const std::unordered_map<
+        std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+        instancesData
+) {
     auto& pipeline = m_pipelines["model_outline_opaque"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -156,7 +249,10 @@ void PipelineManager::renderModelOutlinesOpaque(
     m_modelManager.drawOutlinesOpaque(commandBuffer, instancesData);
 }
 
-void PipelineManager::renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, uint32_t skyboxCubId) {
+void PipelineManager::renderSkybox(
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    uint32_t skyboxCubId
+) {
     auto& pipeline = m_pipelines["skybox"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -170,11 +266,17 @@ void PipelineManager::renderSkybox(VkCommandBuffer commandBuffer, const glm::mat
 }
 
 void PipelineManager::renderModelsTransparent(
-    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-    const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData) {
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    const glm::vec3& pos,
+    const std::unordered_map<
+        std::string, std::vector<gfx::Model::InstanceData>>& instancesData
+) {
     auto& pipeline = m_pipelines["model_transparent"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
+    m_shadowMap->bind(
+        commandBuffer, pipeline->getPipelineLayout(), m_renderer.getFrameIndex()
+    );
 
     gfx::Model::PushConstantObject push{};
     push.viewProj = proj * view;
@@ -185,8 +287,12 @@ void PipelineManager::renderModelsTransparent(
 }
 
 void PipelineManager::renderModelOutlinesTransparent(
-    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-    const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData) {
+    VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
+    const glm::vec3& pos,
+    const std::unordered_map<
+        std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+        instancesData
+) {
     auto& pipeline = m_pipelines["model_outline_transparent"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -201,7 +307,10 @@ void PipelineManager::renderModelOutlinesTransparent(
 
 void PipelineManager::renderBillboardTexts(
     VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
-    const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData) {
+    const std::unordered_map<
+        std::string, std::vector<gfx::billb::Text::InstanceContent>>&
+        instancesData
+) {
     auto& pipeline = m_pipelines["billboard_text"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -222,7 +331,9 @@ void PipelineManager::renderBillboardTexts(
 
 void PipelineManager::renderTexts(
     VkCommandBuffer commandBuffer, win::Window& window,
-    const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData) {
+    const std::unordered_map<
+        std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData
+) {
     auto& pipeline = m_pipelines["text"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
@@ -233,7 +344,9 @@ void PipelineManager::renderTexts(
 
         gfx::ui::Text::PushConstantObject push{};
         push.proj = glm::ortho(
-            0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
+            0.0f, static_cast<float>(window.getWidth()), 0.0f,
+            static_cast<float>(window.getHeight())
+        );
         push.texIndex = m_uiManager.getTextureIndex(name);
 
         pipeline->pushConstant(commandBuffer, push);
@@ -241,14 +354,18 @@ void PipelineManager::renderTexts(
     }
 }
 
-void PipelineManager::renderImgui(VkCommandBuffer commandBuffer, win::Window& window) {
+void PipelineManager::renderImgui(
+    VkCommandBuffer commandBuffer, win::Window& window
+) {
     auto& pipeline = m_pipelines["imgui"];
     pipeline->bind(commandBuffer);
     m_bindlessManager.bind(commandBuffer, pipeline->getPipelineLayout());
 
     gfx::ui::Imgui::PushConstantObject push{};
     push.proj = glm::ortho(
-        0.0f, static_cast<float>(window.getWidth()), 0.0f, static_cast<float>(window.getHeight()));
+        0.0f, static_cast<float>(window.getWidth()), 0.0f,
+        static_cast<float>(window.getHeight())
+    );
 
     pipeline->pushConstant(commandBuffer, push);
     m_uiManager.drawImgui(commandBuffer);

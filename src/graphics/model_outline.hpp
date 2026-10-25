@@ -6,24 +6,29 @@
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
-#include <span>
 
 namespace gfx {
 
 class ModelOutline {
 public:
+    static constexpr size_t kMaxInstanceCount = 8000;
+
     struct Vertex {
         glm::vec3 position{};
         glm::vec3 normal{};
         glm::vec2 uv{};
 
-        static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
-        static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+        static std::vector<VkVertexInputBindingDescription>
+        getBindingDescriptions();
+        static std::vector<VkVertexInputAttributeDescription>
+        getAttributeDescriptions();
 
         bool operator==(const Vertex& other) const {
-            return position == other.position && normal == other.normal && uv == other.uv;
+            return position == other.position && normal == other.normal &&
+                   uv == other.uv;
         }
     };
 
@@ -51,10 +56,16 @@ public:
     ModelOutline(const ModelOutline&) = delete;
     ModelOutline& operator=(const ModelOutline&) = delete;
 
-    static std::unique_ptr<ModelOutline> createModelFromFile(vk::Device& device, const std::string& filepath);
-    static std::unique_ptr<ModelOutline> createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw);
+    static std::unique_ptr<ModelOutline>
+    createModelFromFile(vk::Device& device, const std::string& filepath);
+    static std::unique_ptr<ModelOutline> createModelFromGeometryRaw(
+        vk::Device& device, const std::span<const uint8_t>& geometryRaw
+    );
 
-    void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>& instances);
+    void draw(
+        VkCommandBuffer commandBuffer,
+        const std::vector<InstanceData>& instances
+    );
 
 private:
     vk::Device& m_device;

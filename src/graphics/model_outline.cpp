@@ -55,7 +55,7 @@ void ModelOutline::createIndexBuffer(const std::vector<uint32_t>& indices) {
 }
 
 void ModelOutline::createInstanceBuffer() {
-    VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
+    VkDeviceSize bufferSize = sizeof(InstanceData) * kMaxInstanceCount;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -85,6 +85,9 @@ void ModelOutline::draw(VkCommandBuffer commandBuffer, const std::vector<Instanc
     uint32_t instanceCount = static_cast<uint32_t>(instances.size());
     if (instanceCount == 0)
         return;
+
+    if (instanceCount > kMaxInstanceCount)
+        instanceCount = kMaxInstanceCount;
 
     std::memcpy(m_instanceData, instances.data(), sizeof(InstanceData) * instanceCount);
 

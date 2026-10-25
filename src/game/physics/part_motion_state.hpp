@@ -1,14 +1,16 @@
 #pragma once
 
-#include "../types/part.hpp"
+#include "body_motion_state.hpp"
 
-#include <btBulletDynamicsCommon.h>
+#include "../types/part.hpp"
 
 namespace game::physics {
 
-class PartMotionState : public btMotionState {
+class PartMotionState : public BodyMotionState {
 public:
-    PartMotionState(const btTransform& startTrans, types::Part* part) : m_part(part) {}
+    PartMotionState(const btTransform& startTrans, types::Part* part) :
+        m_part(part) {
+    }
 
     void getWorldTransform(btTransform& worldTrans) const override {
         if (!m_part)
@@ -45,20 +47,21 @@ public:
         }
     }
 
-    bool isPendingDestroy() const { return m_pendingDestroy; }
+    types::Instance* getTarget() const override {
+        return m_part;
+    }
 
-    types::Part* getPart() const { return m_part; }
+    types::Part* getPart() const {
+        return m_part;
+    }
 
-    void detachPart() {
+    void detach() override {
         m_part = nullptr;
         m_pendingDestroy = false;
     }
 
 private:
-    static constexpr float kKillHeight = -500.0f;
-
     types::Part* m_part;
-    bool m_pendingDestroy = false;
 };
 
 } // namespace game::physics

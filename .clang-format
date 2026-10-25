@@ -1,39 +1,74 @@
+BasedOnStyle: LLVM
 Language: Cpp
-Standard: c++20
 
-TabWidth: 4
+# Base
 IndentWidth: 4
+TabWidth: 4
 UseTab: Never
-ColumnLimit: 100
+ColumnLimit: 80
+
+# Pointers and links
 PointerAlignment: Left
-DerivePointerBinding: false
-AccessModifierOffset: -4
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# Indentation and blank lines
 NamespaceIndentation: None
+AccessModifierOffset: -4
+IndentAccessModifiers: false
 KeepEmptyLinesAtTheStartOfBlocks: true
 MaxEmptyLinesToKeep: 1
+
+# Namespaces
 FixNamespaceComments: true
+
+# Parameters
+AlignAfterOpenBracket: BlockIndent
+
+# Templates and includes
+BreakTemplateDeclarations: Yes
+SpaceAfterTemplateKeyword: false
+SortIncludes: CaseSensitive
+
+# Line breaks in expressions
+BreakBeforeBinaryOperators: None
+PenaltyBreakBeforeFirstCallParameter: 0
+BinPackArguments: true
 BinPackParameters: true
-AllowAllParametersOfDeclarationOnNextLine: false
-AlignAfterOpenBracket: AlwaysBreak
-AlwaysBreakTemplateDeclarations: true 
-BreakConstructorInitializersBeforeComma: false
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: false
+  BeforeLambdaBody: true
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# Constructors
 BreakConstructorInitializers: AfterColon
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
-PackConstructorInitializers: BinPack
 ConstructorInitializerIndentWidth: 4
-BreakBeforeBraces: Attach
-BreakBeforeBinaryOperators: All
-BreakBeforeTernaryOperators: true
-SpacesInContainerLiterals: true
-AllowShortIfStatementsOnASingleLine: false
+PackConstructorInitializers: BinPack
+
+# Short constructions
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: All
-AllowShortBlocksOnASingleLine: true
-AlignTrailingComments: true
-SpacesBeforeTrailingComments: 1
-SortIncludes: true
-IncludeBlocks: Preserve
-PenaltyBreakComment: 100
-PenaltyBreakString: 100
-PenaltyExcessCharacter: 1
-PenaltyReturnTypeOnItsOwnLine: 20
+
+# Other
+SpaceBeforeParens: ControlStatements
+IndentCaseLabels: true
+IndentPPDirectives: None

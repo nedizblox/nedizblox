@@ -6,7 +6,6 @@
 #include <stdexcept>
 
 #include "core/logger.hpp"
-#include <format>
 
 namespace win {
 
@@ -40,23 +39,23 @@ Window::Window(int width, int height, const std::string& title) :
     if (SDL_GetWindowWMInfo(m_window, &wmInfo)) {
         switch (wmInfo.subsystem) {
         case SDL_SYSWM_WINDOWS:
-            core::logger::info("Using WSI platform Win32", true);
+            core::logger::debug("Using WSI platform Win32");
             break;
         case SDL_SYSWM_WAYLAND:
-            core::logger::info("Using WSI platform Wayland", true);
+            core::logger::debug("Using WSI platform Wayland");
             break;
         case SDL_SYSWM_X11:
-            core::logger::info("Using WSI platform X11", true);
+            core::logger::debug("Using WSI platform X11");
             break;
         case SDL_SYSWM_COCOA:
-            core::logger::info("Using WSI platform Cocoa", true);
+            core::logger::debug("Using WSI platform Cocoa");
             break;
         default:
-            core::logger::warn("Failed to fetch WSI platform", true);
+            core::logger::warn("Failed to fetch WSI platform");
             break;
         }
     } else {
-        core::logger::warn("Failed to fetch WSI platform", true);
+        core::logger::warn("Failed to fetch WSI platform");
     }
 #endif
 
@@ -96,6 +95,7 @@ void Window::update() {
     m_keysPrev = m_keys;
 
     m_inputCodepoints.clear();
+    m_pollEvents.clear();
 
     Uint64 currentFrame = SDL_GetPerformanceCounter();
     m_deltaTime = static_cast<float>(currentFrame - m_lastFrame) /
@@ -104,6 +104,8 @@ void Window::update() {
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        m_pollEvents.push_back(event);
+        
         switch (event.type) {
         case SDL_QUIT:
             m_shouldClose = true;
@@ -232,11 +234,11 @@ void Window::spawnMessageBox(const std::string& title, const std::string& messag
 
 void Window::logOutputFunction(void* userdata, int category, SDL_LogPriority priority, const char* message) {
     if (priority >= SDL_LOG_PRIORITY_ERROR) {
-        core::logger::err(std::format("SDL: {}", message));
+        core::logger::err("SDL: ", message);
     } else if (priority >= SDL_LOG_PRIORITY_WARN) {
-        core::logger::warn(std::format("SDL: {}", message));
+        core::logger::warn("SDL: ", message);
     } else {
-        core::logger::info(std::format("SDL: {}", message));
+        core::logger::info("SDL: ", message);
     }
 }
 

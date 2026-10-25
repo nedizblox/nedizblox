@@ -22,8 +22,13 @@ namespace net {
 
 class Server {
 public:
-    using PhysicsUpdateCallback
-        = std::function<void(uint32_t senderPlayerId, const std::vector<packets::PhysicalObjectState>& objects)>;
+    using PlayerJoinedCallback =
+        std::function<void(uint32_t playerId, const std::string& nickname)>;
+    using PlayerLeftCallback = std::function<void(uint32_t playerId)>;
+    using PhysicsUpdateCallback = std::function<void(
+        uint32_t senderPlayerId,
+        const std::vector<packets::PhysicalObjectState>& objects
+    )>;
 
     Server(uint16_t port);
     ~Server();
@@ -39,17 +44,37 @@ public:
         m_physicsUpdateCallback = callback;
     }
 
+    void setPlayerJoinedCallback(PlayerJoinedCallback callback) {
+        std::lock_guard<std::mutex> lock(m_playerCallbacksMutex);
+        m_playerJoinedCallback = std::move(callback);
+    }
+
+    void setPlayerLeftCallback(PlayerLeftCallback callback) {
+        std::lock_guard<std::mutex> lock(m_playerCallbacksMutex);
+        m_playerLeftCallback = std::move(callback);
+    }
+
     void setMapData(std::vector<uint8_t> mapData);
 
     bool isOwned(uint32_t networkId) const;
 
-    void broadcastPhysicsState(const std::vector<packets::PhysicalObjectState>& objects);
+    void broadcastPhysicsState(
+        const std::vector<packets::PhysicalObjectState>& objects
+    );
 
-    double getSentKB() const { return static_cast<double>(m_bytesSent.load()) / 1024.0; }
-    double getRecvKB() const { return static_cast<double>(m_bytesReceived.load()) / 1024.0; }
+    double getSentKB() const {
+        return static_cast<double>(m_bytesSent.load()) / 1024.0;
+    }
+    double getRecvKB() const {
+        return static_cast<double>(m_bytesReceived.load()) / 1024.0;
+    }
 
-    double getSentKBps() const { return m_sentKBps.load(); }
-    double getRecvKBps() const { return m_recvKBps.load(); }
+    double getSentKBps() const {
+        return m_sentKBps.load();
+    }
+    double getRecvKBps() const {
+        return m_recvKBps.load();
+    }
 
 private:
     struct TcpClient {
@@ -94,6 +119,10 @@ private:
     std::atomic<bool> m_running{true};
 
     PhysicsUpdateCallback m_physicsUpdateCallback;
+
+    std::mutex m_playerCallbacksMutex;
+    PlayerJoinedCallback m_playerJoinedCallback;
+    PlayerLeftCallback m_playerLeftCallback;
 
     std::atomic<uint64_t> m_bytesSent{0};
     std::atomic<uint64_t> m_bytesReceived{0};

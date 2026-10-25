@@ -4,13 +4,18 @@
 
 namespace gfx::vk {
 
-Sampler::Sampler(Device& device, const VkSamplerCreateInfo& createInfo) : m_device(device) {
-    if (vkCreateSampler(m_device.getDevice(), &createInfo, nullptr, &m_sampler) != VK_SUCCESS) {
+Sampler::Sampler(Device& device, const VkSamplerCreateInfo& createInfo) :
+    m_device(device) {
+    if (vkCreateSampler(
+            m_device.getDevice(), &createInfo, nullptr, &m_sampler
+        ) != VK_SUCCESS) {
         throw std::runtime_error("Vulkan: Failed to create texture sampler");
     }
 }
 
-Sampler::~Sampler() { vkDestroySampler(m_device.getDevice(), m_sampler, nullptr); }
+Sampler::~Sampler() {
+    vkDestroySampler(m_device.getDevice(), m_sampler, nullptr);
+}
 
 Sampler::Builder::Builder(Device& device) : m_device(device) {
     // default settings
@@ -29,7 +34,8 @@ Sampler::Builder::Builder(Device& device) : m_device(device) {
     m_createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 }
 
-Sampler::Builder& Sampler::Builder::setFilters(VkFilter magFilter, VkFilter minFilter) {
+Sampler::Builder&
+Sampler::Builder::setFilters(VkFilter magFilter, VkFilter minFilter) {
     m_createInfo.magFilter = magFilter;
     m_createInfo.minFilter = minFilter;
     return *this;
@@ -48,7 +54,8 @@ Sampler::Builder& Sampler::Builder::setAnisotropy(float maxAnisotropy) {
     return *this;
 }
 
-Sampler::Builder& Sampler::Builder::setMipmaps(VkSamplerMipmapMode mode, float lodBias) {
+Sampler::Builder&
+Sampler::Builder::setMipmaps(VkSamplerMipmapMode mode, float lodBias) {
     m_createInfo.mipmapMode = mode;
     m_createInfo.mipLodBias = lodBias;
     return *this;
@@ -62,6 +69,12 @@ Sampler::Builder& Sampler::Builder::setBorderColor(VkBorderColor color) {
 Sampler::Builder& Sampler::Builder::setMaxLod(float lod) {
     m_createInfo.minLod = 0.0f;
     m_createInfo.maxLod = lod;
+    return *this;
+}
+
+Sampler::Builder& Sampler::Builder::setCompareOp(VkCompareOp op) {
+    m_createInfo.compareEnable = VK_TRUE;
+    m_createInfo.compareOp = op;
     return *this;
 }
 

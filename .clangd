@@ -1,0 +1,12 @@
+CompileFlags:
+  Add: [
+    -Wall,
+    -Wextra
+    -DCLIENT_BUILD,
+    -DSERVER_BUILD
+  ]
+  CompilationDatabase: "build/debug"
+  Compiler: clang
+
+Completion:
+  HeaderInsertion: Never

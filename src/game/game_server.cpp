@@ -9,12 +9,12 @@
 
 namespace game {
 
-GameServer::GameServer(uint16_t port, const std::string& rbxlMapPath) {
-    createServer(port);
-
+GameServer::GameServer(uint16_t port, const std::string& nbxlPath) {
     createServices();
 
-    buildMap(rbxlMapPath);
+    createServer(port);
+
+    buildMap(nbxlPath);
 
     core::sighandler::listen();
 }
@@ -33,14 +33,43 @@ void GameServer::createServices() {
     // m_coreGui = std::make_shared<types::CoreGui>();
 
     m_physics = std::make_unique<physics::Physics>(m_workspace);
+
+    m_humanoidManager =
+        std::make_unique<mngrs::HumanoidManager>(*m_physics, m_workspace);
 }
 
 void GameServer::createServer(uint16_t port) {
     m_server = std::make_unique<net::Server>(port);
 
+    m_server->setPlayerJoinedCallback(
+        [this](uint32_t playerId, const std::string& nickname)
+        {
+            std::lock_guard<std::mutex> lock(m_playerEventsMutex);
+            m_playerEvents.push_back({true, playerId, nickname});
+        }
+    );
+
+    m_server->setPlayerLeftCallback(
+        [this](uint32_t playerId)
+        {
+            std::lock_guard<std::mutex> lock(m_playerEventsMutex);
+            m_playerEvents.push_back({false, playerId, {}});
+        }
+    );
+
     m_server->setPhysicsUpdateCallback(
-        [this](uint32_t senderPlayerId, const std::vector<net::packets::PhysicalObjectState>& objects) {
+        [this](
+            uint32_t senderPlayerId,
+            const std::vector<net::packets::PhysicalObjectState>& objects
+        )
+        {
             for (const auto& object : objects) {
+                if (m_humanoidManager->hasHumanoid(object.networkId)) {
+                    if (object.networkId == senderPlayerId)
+                        m_physics->applyNetworkState(object);
+                    continue;
+                }
+
                 std::shared_ptr<types::Part> part = nullptr;
 
                 {
@@ -60,11 +89,12 @@ void GameServer::createServer(uint16_t port) {
                     m_physics->applyNetworkState(object);
                 }
             }
-        });
+        }
+    );
 }
 
-void GameServer::buildMap(const std::string& rbxlMapPath) {
-    auto parsedRoot = utils::rbxl::parseRbxl(rbxlMapPath);
+void GameServer::buildMap(const std::string& nbxlPath) {
+    auto parsedRoot = utils::nbxf::parseNbxl(nbxlPath);
 
     for (auto& inst : parsedRoot) {
         if (inst && !inst->getParent()) {
@@ -72,13 +102,13 @@ void GameServer::buildMap(const std::string& rbxlMapPath) {
         }
     }
 
-    m_instanceManager = std::make_unique<mngrs::ServerInstanceManager>(*m_physics);
-    m_instanceManager->setRoot(m_workspace);
-    m_instanceManager->rebuildMap();
+    m_replicator = std::make_unique<multiplayer::ServerReplicator>(*m_physics);
+    m_replicator->setRoot(m_workspace);
+    m_replicator->rebuildMap();
 
     syncNetworkParts();
 
-    m_server->setMapData(m_instanceManager->getMapBuffer());
+    m_server->setMapData(m_replicator->getMapBuffer());
 }
 
 void GameServer::physicsLoop() {
@@ -89,16 +119,19 @@ void GameServer::physicsLoop() {
     auto lastBroadcast = lastStep;
 
     while (m_running) {
-        std::this_thread::sleep_for(std::chrono::duration<float>(kPhysicsInterval));
+        std::this_thread::sleep_for(
+            std::chrono::duration<float>(kPhysicsInterval)
+        );
 
         auto now = std::chrono::steady_clock::now();
         float dt = std::chrono::duration<float>(now - lastStep).count();
         lastStep = now;
 
-        m_physics->step(dt);
-        m_physics->stepNetworkInterpolation(dt);
+        m_physics->update(dt);
+        m_humanoidManager->update(dt);
 
-        float sinceBroadcast = std::chrono::duration<float>(now - lastBroadcast).count();
+        float sinceBroadcast =
+            std::chrono::duration<float>(now - lastBroadcast).count();
         if (sinceBroadcast >= kBroadcastInterval) {
             lastBroadcast = now;
             broadcastUnownedObjects();
@@ -132,9 +165,13 @@ void GameServer::broadcastUnownedObjects() {
 
             if (body->isActive()) {
                 m_reportedAsleep.erase(networkId);
-                states.push_back(m_physics->captureNetworkState(networkId, body));
+                states.push_back(
+                    m_physics->captureNetworkState(networkId, body)
+                );
             } else if (m_reportedAsleep.insert(networkId).second) {
-                states.push_back(m_physics->captureNetworkState(networkId, body));
+                states.push_back(
+                    m_physics->captureNetworkState(networkId, body)
+                );
             }
         }
     }
@@ -145,20 +182,43 @@ void GameServer::broadcastUnownedObjects() {
 }
 
 void GameServer::syncNetworkParts() {
-    auto parts = m_instanceManager->getNetworkParts();
+    auto parts = m_replicator->getNetworkParts();
 
     std::lock_guard<std::mutex> lock(m_networkPartsMutex);
     m_networkParts = std::move(parts);
 }
 
+void GameServer::processPlayerEvents() {
+    std::vector<PlayerEvent> events;
+
+    {
+        std::lock_guard<std::mutex> lock(m_playerEventsMutex);
+        events.swap(m_playerEvents);
+    }
+
+    for (const auto& event : events) {
+        if (event.joined) {
+            m_humanoidManager->createHumanoid(
+                event.nickname, event.playerId, false
+            );
+        } else {
+            m_humanoidManager->removeHumanoid(event.playerId);
+        }
+    }
+}
+
 void GameServer::run() {
+    m_physics->start();
+
     m_physicsThread = std::thread(&GameServer::physicsLoop, this);
 
     while (!core::sighandler::shouldStop) {
-        if (m_instanceManager->isDirty()) {
-            m_instanceManager->rebuildMap();
+        processPlayerEvents();
+
+        if (m_replicator->isDirty()) {
+            m_replicator->rebuildMap();
             syncNetworkParts();
-            m_server->setMapData(m_instanceManager->getMapBuffer());
+            m_server->setMapData(m_replicator->getMapBuffer());
         }
 
         m_server->update();

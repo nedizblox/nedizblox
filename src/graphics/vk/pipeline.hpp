@@ -38,21 +38,29 @@ public:
         Builder& setFragShaderPath(const std::string& path);
 
         Builder& setRenderPass(VkRenderPass renderPass);
-        Builder& setDescriptorLayouts(std::vector<VkDescriptorSetLayout> layouts);
+        Builder&
+        setDescriptorLayouts(std::vector<VkDescriptorSetLayout> layouts);
         Builder& setConstantSize(size_t size);
 
-        Builder& setBindingDescriptions(std::vector<VkVertexInputBindingDescription> bindings);
-        Builder& setAttributeDescriptions(std::vector<VkVertexInputAttributeDescription> attributes);
+        Builder& setBindingDescriptions(
+            std::vector<VkVertexInputBindingDescription> bindings
+        );
+        Builder& setAttributeDescriptions(
+            std::vector<VkVertexInputAttributeDescription> attributes
+        );
 
         Builder& enableDepthTest();
         Builder& disableDepthWrite();
         Builder& setDepthCompareOp(VkCompareOp op);
 
-        Builder& setDepthBias(float constantFactor, float clamp, float slopeFactor);
+        Builder&
+        setDepthBias(float constantFactor, float clamp, float slopeFactor);
 
         Builder& setCullMode(VkCullModeFlags mode);
 
         Builder& enableAlphaBlending();
+
+        Builder& disableColorAttachments();
 
         std::unique_ptr<Pipeline> build() const;
 
@@ -68,15 +76,19 @@ public:
     Pipeline(const Pipeline&) = delete;
     Pipeline& operator=(const Pipeline&) = delete;
 
-    VkPipelineLayout getPipelineLayout() const { return m_pipelineLayout; }
+    VkPipelineLayout getPipelineLayout() const {
+        return m_pipelineLayout;
+    }
 
     void bind(VkCommandBuffer commandBuffer);
 
-    template <typename T>
+    template<typename T>
     void pushConstant(VkCommandBuffer commandBuffer, const T& data) {
         vkCmdPushConstants(
             commandBuffer, m_pipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(T), &data);
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+            sizeof(T), &data
+        );
     }
 
 private:

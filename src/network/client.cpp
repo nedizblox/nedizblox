@@ -7,7 +7,6 @@
 
 #include <chrono>
 #include <cstring>
-#include <format>
 
 // NOLINTBEGIN(bugprone-unused-return-value)
 
@@ -109,7 +108,7 @@ Client::Client(const std::string& host, uint16_t port, const std::string& nickna
     }
     m_bytesSent += sizeof(helloPacket);
 
-    core::logger::info(std::format("Successfully connected to the server ({}:{})", host, port));
+    core::logger::info("Successfully connected to the server (", host, ":", port, ")");
 }
 
 Client::~Client() { stop(); }
@@ -129,7 +128,7 @@ void Client::sendPhysicsState(const std::vector<packets::PhysicalObjectState>& o
     }
 
     for (size_t offset = 0; offset < wireObjects.size(); offset += kMaxObjectsPerPacket) {
-        size_t count = std::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
+        size_t count = glm::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
 
         packets::PhysicsStepPacket header{};
         header.senderPlayerId = m_playerId;
@@ -152,7 +151,7 @@ void Client::sendReliable(const void* data, size_t size) {
 
     boost::system::error_code ec;
     if (!tcpframing::writeFramed(m_tcpSocket, data, size, ec)) {
-        core::logger::err("Client sendReliable: " + ec.message());
+        core::logger::err("Client sendReliable: ", ec.message());
     } else {
         m_bytesSent += sizeof(packets::TcpMessageHeader) + size;
     }
@@ -229,7 +228,7 @@ void Client::tcpUpdateLoop() {
 
         if (!tcpframing::readFramed(m_tcpSocket, payload, ec)) {
             if (m_running) {
-                core::logger::info("Network client (TCP) receiver stopped: " + ec.message());
+                core::logger::info("Network client (TCP) receiver stopped: ", ec.message());
             }
             break;
         }
@@ -266,7 +265,7 @@ void Client::tcpUpdateLoop() {
             packets::PlayerKickPacket kick{};
             std::memcpy(&kick, payload.data(), sizeof(kick));
 
-            core::logger::err(std::format("Client kicked from server. Reason: {}", kick.reason));
+            core::logger::err("Client kicked from server. Reason: ", kick.reason);
             break;
         }
 

@@ -2,9 +2,7 @@
 
 #include "../managers/render_manager.hpp"
 
-#include "../multiplayer/ownership.hpp"
-
-#include "network/client.hpp"
+#include "../multiplayer/multiplayer.hpp"
 
 #include "graphics/managers/ui_manager.hpp"
 
@@ -12,7 +10,10 @@ namespace game::ui {
 
 class DebugTools {
 public:
-    DebugTools(gfx::mngrs::UiManager& uiManager, mngrs::RenderManager& renderManager, multiplayer::Ownership& ownership, net::Client& client);
+    DebugTools(
+        gfx::mngrs::UiManager& uiManager, mngrs::RenderManager& renderManager,
+        multiplayer::ClientOwnership& ownership, multiplayer::ClientReplicator& replicator
+    );
     ~DebugTools();
 
     DebugTools(const DebugTools&) = delete;
@@ -20,8 +21,8 @@ public:
 
 private:
     mngrs::RenderManager& m_renderManager;
-    multiplayer::Ownership& m_ownership;
-    net::Client& m_client;
+    multiplayer::ClientOwnership& m_ownership;
+    multiplayer::ClientReplicator& m_replicator;
 
     void createGUIs(gfx::mngrs::UiManager& uiManager);
 

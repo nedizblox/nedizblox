@@ -28,12 +28,6 @@ public:
         return spawn;
     }
 
-    void serialize(net::serializer::BinaryWriter& writer) const override {
-        Part::serialize(writer);
-    }
-
-    void deserialize(net::serializer::BinaryReader& reader) override { Part::deserialize(reader); }
-
 private:
 };
 

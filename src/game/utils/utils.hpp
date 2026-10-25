@@ -7,5 +7,5 @@
 #include "basic_resource_loader.hpp"
 #endif
 
-#include "rbxl.hpp"
+#include "nbx_file.hpp"
 // IWYU pragma: end_exports

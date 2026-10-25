@@ -40,7 +40,7 @@ public:
     T read() {
         static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
         if (offset + sizeof(T) > size) {
-            throw std::runtime_error("BinaryReader overflow read!");
+            throw std::runtime_error("BinaryReader overflow read");
         }
         T value;
         std::memcpy(&value, data + offset, sizeof(T));

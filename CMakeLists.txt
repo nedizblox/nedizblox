@@ -3,7 +3,7 @@ cmake_policy(SET CMP0167 NEW)
 
 set(NEDIZBLOX_VERSION_MAJOR 0)
 set(NEDIZBLOX_VERSION_MINOR 9)
-set(NEDIZBLOX_VERSION_PATCH 0)
+set(NEDIZBLOX_VERSION_PATCH 3)
 
 project(nedizblox 
     VERSION ${NEDIZBLOX_VERSION_MAJOR}.${NEDIZBLOX_VERSION_MINOR}.${NEDIZBLOX_VERSION_PATCH}
@@ -33,9 +33,6 @@ endif()
 
 find_package(Boost REQUIRED)
 find_package(OpenSSL REQUIRED)
-
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(LIBTYPE STATIC)
 
 if(NOT SERVER_BUILD)
     set(SDL2_TEST_ENABLED_BY_DEFAULT OFF CACHE BOOL "" FORCE)
@@ -91,21 +88,14 @@ set(INSTALL_LIBS OFF CACHE BOOL "" FORCE)
 set(INSTALL_CMAKE_FILES OFF CACHE BOOL "" FORCE)
 add_subdirectory(extern/bullet)
 
-include(FetchContent)
-FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.6
-)
-FetchContent_MakeAvailable(Corrosion)
-corrosion_import_crate(MANIFEST_PATH extern/rbx-dom/Cargo.toml)
-
 if(NOT SERVER_BUILD)
     set(SHADER_SOURCES
         shaders/model.vert
         shaders/model.frag
         shaders/model_outline.vert
         shaders/model_outline.frag
+        shaders/model_shadow.vert
+        shaders/model_shadow.frag
         shaders/text.vert
         shaders/text.frag
         shaders/image.frag
@@ -140,8 +130,8 @@ set(BASIC_MAIN_SOURCES
     src/core/signal_handler.cpp
     src/core/crypto.cpp
     src/scripting/script_engine.cpp
-    src/game/prefabs/rig.cpp
-    src/game/utils/rbxl.cpp
+    src/game/managers/humanoid_manager.cpp
+    src/game/utils/nbx_file.cpp
     src/game/physics/physics.cpp
 )
 
@@ -159,8 +149,10 @@ set(CLIENT_MAIN_SOURCES
     src/graphics/geometries.cpp
     src/graphics/model.cpp
     src/graphics/model_outline.cpp
+    src/graphics/model_shadow.cpp
     src/graphics/texture.cpp
     src/graphics/cubemap.cpp
+    src/graphics/shadow_map.cpp
     src/graphics/skybox.cpp
     src/graphics/billboards/text.cpp
     src/graphics/ui/text.cpp
@@ -168,6 +160,7 @@ set(CLIENT_MAIN_SOURCES
     src/graphics/managers/bindless_manager.cpp
     src/graphics/managers/model_manager.cpp
     src/graphics/managers/billboard_manager.cpp
+    src/graphics/managers/texture_manager.cpp
     src/graphics/managers/ui_manager.cpp
     src/graphics/managers/pipeline_manager.cpp
     src/audio/sound.cpp
@@ -178,10 +171,9 @@ set(CLIENT_MAIN_SOURCES
     src/game/utils/basic_resource_loader.cpp
     src/game/ui/devtools.cpp
     src/game/ui/debug_tools.cpp
-    src/game/multiplayer/replicator.cpp
-    src/game/multiplayer/ownership.cpp
-    src/game/managers/instance_manager.cpp
-    src/game/managers/asset_manager.cpp
+    src/game/multiplayer/client_replicator.cpp
+    src/game/multiplayer/client_ownership.cpp
+    src/game/managers/render_manager.cpp
     src/game/render_context.cpp
     src/game/game_client.cpp
     src/client_main.cpp
@@ -190,7 +182,7 @@ set(CLIENT_MAIN_SOURCES
 set(SERVER_MAIN_SOURCES
     ${BASIC_MAIN_SOURCES}
     src/network/server.cpp
-    src/game/managers/server_instance_manager.cpp
+    src/game/multiplayer/server_replicator.cpp
     src/game/game_server.cpp
     src/server_main.cpp
 )
@@ -219,6 +211,7 @@ set(CLIENT_EXTERN_SOURCES
     extern/imgui/imgui_widgets.cpp
     extern/imgui/imgui.cpp
     extern/imgui/ImGuizmo.cpp
+    extern/imgui/ImGuiFileDialog.cpp
 )
 
 set(SERVER_EXTERN_SOURCES
@@ -268,13 +261,12 @@ set(BASIC_LIBRARIES
     LinearMath
     OpenSSL::Crypto
     glm::glm
-    rbx_dom
 )
 
 set(CLIENT_LIBRARIES
     ${BASIC_LIBRARIES}
     Vulkan::Vulkan
-    SDL2::SDL2-static
+    SDL2::SDL2
     Freetype::Freetype
     OpenAL
     assimp

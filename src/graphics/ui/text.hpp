@@ -15,11 +15,15 @@ namespace gfx::ui {
 
 class Text {
 public:
+    static constexpr size_t kMaxInstanceCount = 8000;
+
     struct Vertex {
         glm::vec2 position{};
 
-        static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
-        static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+        static std::vector<VkVertexInputBindingDescription>
+        getBindingDescriptions();
+        static std::vector<VkVertexInputAttributeDescription>
+        getAttributeDescriptions();
     };
 
     struct PushConstantObject {
@@ -41,15 +45,23 @@ public:
         glm::vec2 scale;
     };
 
-    Text(vk::Device& device, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager, const std::string& fontPath);
+    Text(
+        vk::Device& device, vk::Sampler& sampler,
+        mngrs::BindlessManager& bindlessManager, const std::string& fontPath
+    );
     ~Text();
 
     Text(const Text&) = delete;
     Text& operator=(const Text&) = delete;
 
-    uint32_t getFontTextureIndex() const { return m_fontTextureIndex; }
+    uint32_t getFontTextureIndex() const {
+        return m_fontTextureIndex;
+    }
 
-    void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent>& instances);
+    void draw(
+        VkCommandBuffer commandBuffer,
+        const std::vector<InstanceContent>& instances
+    );
 
 private:
     struct Character {
@@ -77,7 +89,10 @@ private:
     void createVertexBuffer();
     void createIndexBuffer();
     void createInstanceBuffer();
-    void loadFont(const std::string& fontPath, vk::Sampler& sampler, mngrs::BindlessManager& bindlessManager);
+    void loadFont(
+        const std::string& fontPath, vk::Sampler& sampler,
+        mngrs::BindlessManager& bindlessManager
+    );
 };
 
 } // namespace gfx::ui

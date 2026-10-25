@@ -3,14 +3,13 @@
 #include "logger.hpp"
 
 #include <csignal>
-#include <format>
 
 namespace core {
 
 bool sighandler::shouldStop = false;
 
 static void handleSignal(int sig) {
-    logger::info(std::format("Catched signal {}, stopping", sig));
+    logger::info("Catched signal ", sig, ", stopping");
     sighandler::shouldStop = true;
 }
 

@@ -12,7 +12,7 @@ void FreeCamera::move(CameraDirection direction, float deltaTime) {
         m_position += m_front * velocity;
         break;
     case CameraDirection::Backward:
-        m_position += m_front * velocity;
+        m_position -= m_front * velocity;
         break;
     case CameraDirection::Left:
         m_position -= m_right * velocity;

@@ -4,8 +4,6 @@ FROM alpine:latest AS builder
 RUN apk add --no-cache \
     build-base \
     cmake \
-    cargo \
-    rust \
     boost-dev \
     openssl-dev
 
@@ -29,4 +27,4 @@ COPY --from=builder /app/build/nedizblox-server /app/nedizblox-server
 
 ENTRYPOINT [ "./nedizblox-server" ]
 
-CMD [ "--port", "8080", "--map", "testplace.rbxl" ]
+CMD [ "--port", "8080", "--map", "testplace.nbxl" ]

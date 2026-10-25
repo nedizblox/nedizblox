@@ -12,26 +12,34 @@
 #include <unordered_map>
 #include <vector>
 
-namespace game::mngrs {
+namespace game::multiplayer {
 
-class ServerInstanceManager {
+class ServerReplicator {
 public:
-    ServerInstanceManager(physics::Physics& physics);
-    ~ServerInstanceManager();
+    ServerReplicator(physics::Physics& physics);
+    ~ServerReplicator();
 
-    ServerInstanceManager(const ServerInstanceManager&) = delete;
-    ServerInstanceManager& operator=(const ServerInstanceManager&) = delete;
+    ServerReplicator(const ServerReplicator&) = delete;
+    ServerReplicator& operator=(const ServerReplicator&) = delete;
 
     void setRoot(const std::shared_ptr<types::Instance>& root);
 
     void rebuildMap();
 
-    bool isDirty() const { return m_dirty; }
-    void markDirty() { m_dirty = true; }
+    bool isDirty() const {
+        return m_dirty;
+    }
 
-    const std::vector<uint8_t>& getMapBuffer() const { return m_mapBuffer; }
+    void markDirty() {
+        m_dirty = true;
+    }
 
-    std::unordered_map<uint32_t, std::shared_ptr<types::Part>> getNetworkParts() const {
+    const std::vector<uint8_t>& getMapBuffer() const {
+        return m_mapBuffer;
+    }
+
+    std::unordered_map<uint32_t, std::shared_ptr<types::Part>>
+    getNetworkParts() const {
         std::lock_guard<std::mutex> lock(m_networkPartsMutex);
         return m_networkParts;
     }
@@ -51,11 +59,16 @@ private:
 
     std::vector<uint8_t> m_mapBuffer;
 
-    bool m_dirty = true;
+    std::atomic<bool> m_dirty{true};
 
-    uint32_t countSerializableInstances(const std::shared_ptr<types::Instance>& parent) const;
+    uint32_t countSerializableInstances(
+        const std::shared_ptr<types::Instance>& parent
+    ) const;
 
-    void collectInstances(const std::shared_ptr<types::Instance>& parent, net::serializer::BinaryWriter& writer);
+    void collectInstances(
+        const std::shared_ptr<types::Instance>& parent,
+        net::serializer::BinaryWriter& writer
+    );
 };
 
-} // namespace game::mngrs
+} // namespace game::multiplayer

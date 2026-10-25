@@ -1,10 +1,12 @@
 #pragma once
 
 #include "../types/types.hpp"
+
 #include "network/packets.hpp"
 
 #include <btBulletDynamicsCommon.h>
 
+#include <atomic>
 #include <map>
 #include <mutex>
 #include <tuple>
@@ -20,24 +22,47 @@ public:
     Physics(const Physics&) = delete;
     Physics& operator=(const Physics&) = delete;
 
-    btDiscreteDynamicsWorld* getDynamicsWorld() const { return m_dynamicsWorld; }
+    btDiscreteDynamicsWorld* getDynamicsWorld() const {
+        return m_dynamicsWorld;
+    }
 
-    btRigidBody* createRigidBodyPart(types::Part* part);
-    btRigidBody* createRigidBodyModel(types::Model* model, types::Part* rootPart);
+    btRigidBody*
+    createRigidBodyPart(types::Part* part, bool registerNetworked = true);
 
-    net::packets::PhysicalObjectState captureNetworkState(uint32_t networkId, btRigidBody* body) const;
+    btRigidBody* createRigidBodyRig(types::Rig* rig);
+
+    void destroyRigidBody(types::Part* part);
+
+    void rebindNetworkId(types::Part* part);
+
+    std::recursive_mutex& getWorldMutex() {
+        return m_worldMutex;
+    }
+
+    net::packets::PhysicalObjectState
+    captureNetworkState(uint32_t networkId, btRigidBody* body) const;
 
     std::vector<uint32_t> getBodyCollisions(btRigidBody* body);
 
     void applyNetworkState(const net::packets::PhysicalObjectState& state);
 
-    void stepNetworkInterpolation(float dt);
-
     void setBodyNetworkMode(btRigidBody* body, bool isLocalOwner);
 
-    void step(float deltaTime);
+    void update(float deltaTime);
+
+    void start(bool snapshot = false);
+    void stop();
+    bool isRunning() const {
+        return m_running;
+    }
 
 private:
+    struct BodyState {
+        btTransform transform;
+        btVector3 linearVelocity;
+        btVector3 angularVelocity;
+    };
+
     using ShapeKey = std::tuple<enums::PartShape, float, float, float>;
 
     static constexpr float kNetworkInterpolationSpeed = 15.0f;
@@ -51,20 +76,32 @@ private:
 
     std::map<ShapeKey, btCollisionShape*> m_shapeCache;
 
+    std::recursive_mutex m_worldMutex;
+
     std::mutex m_networkTargetsMutex;
-    std::unordered_map<uint32_t, net::packets::PhysicalObjectState> m_networkTargets;
+    std::unordered_map<uint32_t, net::packets::PhysicalObjectState>
+        m_networkTargets;
 
     std::mutex m_bodiesMutex;
     std::unordered_map<uint32_t, btRigidBody*> m_bodies;
 
     std::unordered_map<btRigidBody*, float> m_bodyMasses;
 
+    std::atomic<bool> m_running{false};
+    std::unordered_map<btRigidBody*, BodyState> m_savedStates;
+
     btCylinderShape* createCylinderShape(const glm::vec3& size);
     btConvexHullShape* createWedgeShape(const glm::vec3& size);
 
-    btCollisionShape* getOrCreateShape(enums::PartShape shape, const glm::vec3& size);
+    btCollisionShape*
+    getOrCreateShape(enums::PartShape shape, const glm::vec3& size);
 
     void bindToWorkspace(const std::shared_ptr<types::Workspace>& workspace);
+
+    void updatePartShape(types::Part* part, btRigidBody* body);
+
+    void step(float dt);
+    void stepNetworkInterpolation(float dt);
 };
 
 } // namespace game::physics

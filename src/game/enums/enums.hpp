@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace game::enums {
 
@@ -14,8 +14,9 @@ enum class InstanceType {
     Part = 5,
     SelectionBox = 6,
     Decal = 7,
-    BillboardText = 8,
-    Text = 9
+    Humanoid = 8,
+    BillboardText = 9,
+    Text = 10
 };
 
 enum class PropertyType {
@@ -31,59 +32,83 @@ enum class PropertyType {
     Enum = 9,
 };
 
-enum class PartType { Part = 0, MeshPart = 1, SpawnLocation = 2 };
+enum class PartType {
+    Part = 0,
+    MeshPart = 1,
+    SpawnLocation = 2
+};
 
-enum class PartShape { Ball = 0, Block = 1, Cylinder = 2, Wedge = 3, Head = 4 };
+enum class PartShape {
+    Ball = 0,
+    Block = 1,
+    Cylinder = 2,
+    Wedge = 3,
+    Head = 4
+};
 
-enum class Face { Top = 0, Bottom = 1, Left = 2, Right = 3, Front = 4, Back = 5 };
+enum class Face {
+    Top = 0,
+    Bottom = 1,
+    Left = 2,
+    Right = 3,
+    Front = 4,
+    Back = 5
+};
 
-enum class SurfaceType { Smooth = 0, Studs = 1, Inlets = 2, Glue = 3 };
+enum class SurfaceType {
+    Smooth = 0,
+    Studs = 1,
+    Inlets = 2,
+    Glue = 3
+};
 
-enum class MaterialType { SmoothPlastic = 0, Grass = 1, Wood = 2 };
+enum class MaterialType {
+    SmoothPlastic = 0,
+    Grass = 1,
+    Wood = 2
+};
 
-enum class RigMoveDirection { Forward = 0, Backward = 1, Left = 2, Right = 3 };
+enum class TextFont {
+    Nunito = 0,
+    Arial = 1
+};
 
-enum class TextFont { Nunito = 0, Arial = 1 };
-
-template <typename T>
+template<typename T>
 std::vector<std::string> getStringsFromEnums();
- 
-template <>
+
+template<>
 inline std::vector<std::string> getStringsFromEnums<InstanceType>() {
-    return {"Game", "Workspace", "CoreGui", "Model", "Folder", "Part", "SelectionBox", "Decal", "BillboardText", "Text"};
+    return {"Game",     "Workspace",     "CoreGui",      "Model",
+            "Folder",   "Part",          "SelectionBox", "Decal",
+            "Humanoid", "BillboardText", "Text"};
 }
 
-template <>
+template<>
 inline std::vector<std::string> getStringsFromEnums<PartType>() {
     return {"Part", "MeshPart", "SpawnLocation"};
 }
 
-template <>
+template<>
 inline std::vector<std::string> getStringsFromEnums<PartShape>() {
     return {"Ball", "Block", "Cylinder", "Wedge", "Head"};
 }
- 
-template <>
+
+template<>
 inline std::vector<std::string> getStringsFromEnums<Face>() {
     return {"Top", "Bottom", "Left", "Right", "Front", "Back"};
 }
- 
-template <>
+
+template<>
 inline std::vector<std::string> getStringsFromEnums<SurfaceType>() {
     return {"Smooth", "Studs", "Inlets", "Glue"};
 }
- 
-template <>
+
+template<>
 inline std::vector<std::string> getStringsFromEnums<MaterialType>() {
     return {"SmoothPlastic", "Grass", "Wood"};
 }
- 
-template <>
-inline std::vector<std::string> getStringsFromEnums<RigMoveDirection>() {
-    return {"Forward", "Backward", "Left", "Right"};
-}
- 
-template <>
+
+template<>
 inline std::vector<std::string> getStringsFromEnums<TextFont>() {
     return {"Nunito", "Arial"};
 }

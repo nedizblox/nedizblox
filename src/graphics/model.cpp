@@ -55,7 +55,7 @@ void Model::createIndexBuffer(const std::vector<uint32_t>& indices) {
 }
 
 void Model::createInstanceBuffer() {
-    VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
+    VkDeviceSize bufferSize = sizeof(InstanceData) * kMaxInstanceCount;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -85,6 +85,9 @@ void Model::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>&
     uint32_t instanceCount = static_cast<uint32_t>(instances.size());
     if (instanceCount == 0)
         return;
+
+    if (instanceCount > kMaxInstanceCount)
+        instanceCount = kMaxInstanceCount;
 
     std::memcpy(m_instanceData, instances.data(), sizeof(InstanceData) * instanceCount);
 
@@ -124,6 +127,7 @@ std::vector<VkVertexInputAttributeDescription> Model::Vertex::getAttributeDescri
     attributeDescriptions.push_back({8, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices1)});
     attributeDescriptions.push_back({9, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texIndices2)});
     attributeDescriptions.push_back({10, 1, VK_FORMAT_R32G32B32_UINT, offsetof(InstanceData, texTilesPacked)});
+    attributeDescriptions.push_back({11, 1, VK_FORMAT_R32_SFLOAT, offsetof(InstanceData, texTileFactor)});
 
     return attributeDescriptions;
 }

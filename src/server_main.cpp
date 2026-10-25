@@ -8,6 +8,11 @@
 int main(int argc, char* argv[]) {
     core::logger::init();
 
+    core::logger::info(
+        "Nedizblox Server v", PROJECT_VERSION_MAJOR, ".", PROJECT_VERSION_MINOR,
+        ".", PROJECT_VERSION_PATCH
+    );
+
     auto args = core::argsparser::parseArguments(argc, argv);
 
     try {

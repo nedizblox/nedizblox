@@ -8,30 +8,28 @@ layout(location = 3) in vec3 fragScale;
 layout(location = 4) flat in uvec3 fragTexIndices1;
 layout(location = 5) flat in uvec3 fragTexIndices2;
 layout(location = 6) flat in uvec3 fragTexTilesPacked;
-layout(location = 7) in vec3 fragCameraPos;
-layout(location = 8) in vec3 fragWorldPos;
-layout(location = 9) in vec3 fragWorldNormal;
+layout(location = 7) flat in float fragTexTileFactor;
+layout(location = 8) in vec3 fragCameraPos;
+layout(location = 9) in vec3 fragWorldPos;
+layout(location = 10) in vec3 fragWorldNormal;
 
 layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform sampler2D textures[];
 
-const vec3 LIGHT_DIR = normalize(vec3(1.0, 1.5, 2.0));
+layout(set = 1, binding = 0) uniform sampler2DShadow shadowMap;
+layout(set = 1, binding = 1) uniform ShadowUbo {
+    mat4 lightSpace;
+    vec4 params;
+} shadow;
+
+const vec3 LIGHT_DIR = normalize(vec3(0.30, 0.90, 0.40));
 const vec3 LIGHT_COLOR = vec3(1.0);
-const float AMBIENT_FACTOR = 1.0;
-const float DIFFUSE_FACTOR = 0.75;
-const float SPECULAR_FACTOR = 0.2;
-const float SHININESS = 48.0;
-
-float specular(vec3 N, vec3 L, vec3 V) {
-    vec3 H = normalize(L + V);
-    return pow(max(dot(N, H), 0.0), SHININESS);
-}
-
-float rimLight(vec3 N, vec3 V) {
-    float rim = 1.0 - max(dot(N, V), 0.0);
-    return pow(rim, 3.0);
-}
+const float BRIGHTNESS = 1.5;
+const vec3 SKY_AMBIENT = vec3(0.80);
+const vec3 GROUND_AMBIENT = vec3(0.58);
+const float DIFFUSE_FACTOR = 0.45;
+const float SHADOW_AMBIENT_INFLUENCE = 0.5;
 
 struct FaceUV {
     uint layer;
@@ -90,15 +88,47 @@ FaceUV resolveUV(vec3 n, vec3 shiftedPos, vec3 scale, uvec3 packedTiles) {
     } else {
         result.isStretched = false;
 
-        result.uv = (localUV * tileFactor) / 2.0;
+        result.uv = (localUV * tileFactor) / fragTexTileFactor;
     }
 
     return result;
 }
 
+float calcShadow(vec3 worldPos, vec3 N) {
+    float strength = shadow.params.w;
+    if (strength <= 0.0)
+        return 1.0;
+
+    float NdotL = dot(N, LIGHT_DIR);
+    if (NdotL <= 0.0)
+        return 1.0;
+
+    vec3 offsetPos = worldPos + N * (shadow.params.y * shadow.params.z * (1.0 - NdotL * 0.5));
+
+    vec4 sc = shadow.lightSpace * vec4(offsetPos, 1.0);
+    vec3 p = sc.xyz / sc.w;
+    vec2 uv = p.xy * 0.5 + 0.5;
+
+    if (p.z < 0.0 || p.z > 1.0 || any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
+        return 1.0;
+
+    float bias = max(shadow.params.x * (1.0 - NdotL), shadow.params.x * 0.1);
+    float ref = p.z - bias;
+
+    vec2 texel = 1.0 / vec2(textureSize(shadowMap, 0));
+    float sum = 0.0;
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            sum += texture(shadowMap, vec3(uv + vec2(x, y) * texel, ref));
+        }
+    }
+    float visibility = sum / 9.0;
+
+    return mix(1.0 - strength, 1.0, visibility);
+}
+
 void main() {
     vec3 N = normalize(fragWorldNormal);
-    vec3 V = normalize(fragCameraPos - fragWorldPos);
     vec3 L = LIGHT_DIR;
 
     vec3 shiftedPos = fragPos + (fragScale * 0.5);
@@ -138,16 +168,16 @@ void main() {
         finalAlpha = sampled.a * fragColor.a;
     }
 
-    vec3 ambient = AMBIENT_FACTOR * albedo;
+    float up = N.y * 0.5 + 0.5;
+    vec3 ambient = mix(GROUND_AMBIENT, SKY_AMBIENT, up);
+
+    float shadowTerm = calcShadow(fragWorldPos, N);
+    ambient *= mix(1.0, shadowTerm, SHADOW_AMBIENT_INFLUENCE);
 
     float NdotL = max(dot(N, L), 0.0);
-    vec3 diffuse = DIFFUSE_FACTOR * NdotL * albedo * LIGHT_COLOR;
+    vec3 diffuse = DIFFUSE_FACTOR * NdotL * LIGHT_COLOR * shadowTerm;
 
-    float spec = specular(N, L, V) * NdotL;
-    float lum = dot(albedo, vec3(0.299, 0.587, 0.114));
-    vec3 specColor = SPECULAR_FACTOR * spec * LIGHT_COLOR * mix(vec3(1.0), albedo, lum * 0.5);
-
-    vec3 litColor = ambient + diffuse + specColor;
+    vec3 litColor = albedo * (ambient + diffuse) * BRIGHTNESS;
 
     outColor = vec4(litColor, finalAlpha);
 }

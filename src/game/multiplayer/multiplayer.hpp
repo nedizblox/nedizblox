@@ -1,7 +1,7 @@
 #pragma once
 
 // IWYU pragma: begin_exports
-#include "replicator.hpp"
+#include "client_replicator.hpp"
 
-#include "ownership.hpp"
+#include "client_ownership.hpp"
 // IWYU pragma: end_exports

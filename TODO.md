@@ -6,6 +6,8 @@
 # Features
  - Make instance destroy network packet
  - ~~Make own map serialization alghoritm~~
- - Make Communication Server (for text and voice chat) and Asset Server (to deliver assets for the map)
+ - Add communication (text and voice chat) and Asset Server (to deliver assets for the game)
  - Finish up scripting engine
- - Make own maps format and remove .rbxl maps
+ - ~~Make own maps format and remove .rbxl maps~~
+ - Add lz4 compressing for nbx files
+ - Add Nedizblox model (.nbxm) file type

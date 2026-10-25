@@ -18,6 +18,7 @@ public:
         Builder& setMipmaps(VkSamplerMipmapMode mode, float lodBias = 0.0f);
         Builder& setBorderColor(VkBorderColor color);
         Builder& setMaxLod(float lod);
+        Builder& setCompareOp(VkCompareOp op);
 
         std::unique_ptr<Sampler> build() const;
 
@@ -33,7 +34,9 @@ public:
     Sampler(const Sampler&) = delete;
     Sampler& operator=(const Sampler&) = delete;
 
-    VkSampler getSampler() const { return m_sampler; }
+    VkSampler getSampler() const {
+        return m_sampler;
+    }
 
 private:
     Device& m_device;

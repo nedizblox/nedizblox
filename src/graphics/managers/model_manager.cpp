@@ -2,11 +2,15 @@
 
 namespace gfx::mngrs {
 
-ModelManager::ModelManager(vk::Device& device) : m_device(device) {}
+ModelManager::ModelManager(vk::Device& device) : m_device(device) {
+}
 
-ModelManager::~ModelManager() {}
+ModelManager::~ModelManager() {
+}
 
-void ModelManager::loadModel(const std::string& name, const std::string& filePath) {
+void ModelManager::loadModel(
+    const std::string& name, const std::string& filePath
+) {
     if (m_models.contains(name))
         return;
 
@@ -17,18 +21,23 @@ void ModelManager::loadModel(const std::string& name, const std::string& filePat
     m_models[name] = std::move(managed);
 }
 
-void ModelManager::loadModel(const std::string& name, const std::span<const uint8_t>& geometryRaw) {
+void ModelManager::loadModel(
+    const std::string& name, const std::span<const uint8_t>& geometryRaw
+) {
     if (m_models.contains(name))
         return;
 
     Managed<Model> managed;
     managed.opaque = Model::createModelFromGeometryRaw(m_device, geometryRaw);
-    managed.transparent = Model::createModelFromGeometryRaw(m_device, geometryRaw);
+    managed.transparent =
+        Model::createModelFromGeometryRaw(m_device, geometryRaw);
 
     m_models[name] = std::move(managed);
 }
 
-void ModelManager::loadModelOutline(const std::string& name, const std::string& filePath) {
+void ModelManager::loadModelOutline(
+    const std::string& name, const std::string& filePath
+) {
     if (m_modelOutlines.contains(name))
         return;
 
@@ -39,15 +48,38 @@ void ModelManager::loadModelOutline(const std::string& name, const std::string& 
     m_modelOutlines[name] = std::move(managed);
 }
 
-void ModelManager::loadModelOutline(const std::string& name, const std::span<const uint8_t>& geometryRaw) {
+void ModelManager::loadModelOutline(
+    const std::string& name, const std::span<const uint8_t>& geometryRaw
+) {
     if (m_modelOutlines.contains(name))
         return;
 
     Managed<ModelOutline> managed;
-    managed.opaque = ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
-    managed.transparent = ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
+    managed.opaque =
+        ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
+    managed.transparent =
+        ModelOutline::createModelFromGeometryRaw(m_device, geometryRaw);
 
     m_modelOutlines[name] = std::move(managed);
+}
+
+void ModelManager::loadModelShadow(
+    const std::string& name, const std::string& filePath
+) {
+    if (m_shadowModels.contains(name))
+        return;
+
+    m_shadowModels[name] = ModelShadow::createModelFromFile(m_device, filePath);
+}
+
+void ModelManager::loadModelShadow(
+    const std::string& name, const std::span<const uint8_t>& geometryRaw
+) {
+    if (m_shadowModels.contains(name))
+        return;
+
+    m_shadowModels[name] =
+        ModelShadow::createModelFromGeometryRaw(m_device, geometryRaw);
 }
 
 void ModelManager::loadSkybox() {
@@ -59,7 +91,9 @@ void ModelManager::loadSkybox() {
 
 void ModelManager::drawOpaque(
     VkCommandBuffer commandBuffer,
-    const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
+    const std::unordered_map<std::string, std::vector<Model::InstanceData>>&
+        instancesData
+) {
     for (auto& [name, managed] : m_models) {
         std::string bucketName = name + "_opaque";
         auto it = instancesData.find(bucketName);
@@ -76,7 +110,9 @@ void ModelManager::drawOpaque(
 
 void ModelManager::drawTransparent(
     VkCommandBuffer commandBuffer,
-    const std::unordered_map<std::string, std::vector<Model::InstanceData>>& instancesData) {
+    const std::unordered_map<std::string, std::vector<Model::InstanceData>>&
+        instancesData
+) {
     for (auto& [name, managed] : m_models) {
         std::string bucketName = name + "_transparent";
         auto it = instancesData.find(bucketName);
@@ -93,7 +129,9 @@ void ModelManager::drawTransparent(
 
 void ModelManager::drawOutlinesOpaque(
     VkCommandBuffer commandBuffer,
-    const std::unordered_map<std::string, std::vector<ModelOutline::InstanceData>>& instancesData) {
+    const std::unordered_map<
+        std::string, std::vector<ModelOutline::InstanceData>>& instancesData
+) {
     for (auto& [name, managed] : m_modelOutlines) {
         std::string bucketName = name + "_opaque";
         auto it = instancesData.find(bucketName);
@@ -103,14 +141,16 @@ void ModelManager::drawOutlinesOpaque(
         }
 
         if (it != instancesData.end() && !it->second.empty()) {
-            managed.transparent->draw(commandBuffer, it->second);
+            managed.opaque->draw(commandBuffer, it->second);
         }
     }
 }
 
 void ModelManager::drawOutlinesTransparent(
     VkCommandBuffer commandBuffer,
-    const std::unordered_map<std::string, std::vector<ModelOutline::InstanceData>>& instancesData) {
+    const std::unordered_map<
+        std::string, std::vector<ModelOutline::InstanceData>>& instancesData
+) {
     for (auto& [name, managed] : m_modelOutlines) {
         std::string bucketName = name + "_transparent";
         auto it = instancesData.find(bucketName);
@@ -127,6 +167,32 @@ void ModelManager::drawOutlinesTransparent(
 
 void ModelManager::drawSkybox(VkCommandBuffer commandBuffer) {
     m_skybox->draw(commandBuffer);
+}
+
+void ModelManager::drawShadow(
+    VkCommandBuffer commandBuffer,
+    const std::unordered_map<std::string, std::vector<Model::InstanceData>>&
+        instancesData
+) {
+    for (auto& [name, shadowModel] : m_shadowModels) {
+        std::string bucketName = name + "_opaque";
+        auto it = instancesData.find(bucketName);
+
+        if (it == instancesData.end()) {
+            it = instancesData.find(name);
+        }
+
+        if (it == instancesData.end() || it->second.empty())
+            continue;
+
+        m_shadowScratch.clear();
+        m_shadowScratch.reserve(it->second.size());
+        for (const auto& instance : it->second) {
+            m_shadowScratch.push_back({instance.model});
+        }
+
+        shadowModel->draw(commandBuffer, m_shadowScratch);
+    }
 }
 
 } // namespace gfx::mngrs

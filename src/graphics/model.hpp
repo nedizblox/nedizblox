@@ -6,24 +6,29 @@
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
-#include <span>
 
 namespace gfx {
 
 class Model {
 public:
+    static constexpr size_t kMaxInstanceCount = 8000;
+
     struct Vertex {
         glm::vec3 position{};
         glm::vec3 normal{};
         glm::vec2 uv{};
 
-        static std::vector<VkVertexInputBindingDescription> getBindingDescriptions();
-        static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+        static std::vector<VkVertexInputBindingDescription>
+        getBindingDescriptions();
+        static std::vector<VkVertexInputAttributeDescription>
+        getAttributeDescriptions();
 
         bool operator==(const Vertex& other) const {
-            return position == other.position && normal == other.normal && uv == other.uv;
+            return position == other.position && normal == other.normal &&
+                   uv == other.uv;
         }
     };
 
@@ -38,6 +43,7 @@ public:
         glm::uvec3 texIndices1;
         glm::uvec3 texIndices2;
         glm::uvec3 texTilesPacked;
+        float texTileFactor;
     };
 
     struct Builder {
@@ -54,10 +60,16 @@ public:
     Model(const Model&) = delete;
     Model& operator=(const Model&) = delete;
 
-    static std::unique_ptr<Model> createModelFromFile(vk::Device& device, const std::string& filepath);
-    static std::unique_ptr<Model> createModelFromGeometryRaw(vk::Device& device, const std::span<const uint8_t>& geometryRaw);
+    static std::unique_ptr<Model>
+    createModelFromFile(vk::Device& device, const std::string& filepath);
+    static std::unique_ptr<Model> createModelFromGeometryRaw(
+        vk::Device& device, const std::span<const uint8_t>& geometryRaw
+    );
 
-    void draw(VkCommandBuffer commandBuffer, const std::vector<InstanceData>& instances);
+    void draw(
+        VkCommandBuffer commandBuffer,
+        const std::vector<InstanceData>& instances
+    );
 
 private:
     vk::Device& m_device;

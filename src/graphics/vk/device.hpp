@@ -5,6 +5,7 @@
 
 #include <vma/vk_mem_alloc.h>
 
+#include <filesystem>
 #include <vector>
 
 namespace gfx::vk {
@@ -19,15 +20,36 @@ public:
     Device(Device&&) = delete;
     Device& operator=(Device&&) = delete;
 
-    VkDevice getDevice() const { return m_device; }
-    VkPhysicalDevice getPhysicalDevice() const { return m_physicalDevice; }
-    VkPhysicalDeviceProperties getDeviceProperties() const { return m_deviceProperties; }
-    VkInstance getInstance() const { return m_instance; }
-    VmaAllocator getAllocator() const { return m_allocator; }
-    VkSurfaceKHR getSurface() const { return m_surface; }
-    VkQueue getGraphicsQueue() const { return m_graphicsQueue; }
-    VkQueue getPresentQueue() const { return m_presentQueue; }
-    VkCommandPool getCommandPool() const { return m_commandPool; }
+    VkDevice getDevice() const {
+        return m_device;
+    }
+    VkPhysicalDevice getPhysicalDevice() const {
+        return m_physicalDevice;
+    }
+    VkPhysicalDeviceProperties getDeviceProperties() const {
+        return m_deviceProperties;
+    }
+    VkInstance getInstance() const {
+        return m_instance;
+    }
+    VmaAllocator getAllocator() const {
+        return m_allocator;
+    }
+    VkSurfaceKHR getSurface() const {
+        return m_surface;
+    }
+    VkQueue getGraphicsQueue() const {
+        return m_graphicsQueue;
+    }
+    VkQueue getPresentQueue() const {
+        return m_presentQueue;
+    }
+    VkCommandPool getCommandPool() const {
+        return m_commandPool;
+    }
+    VkPipelineCache getPipelineCache() const {
+        return m_pipelineCache;
+    }
 
     base::SwapchainSupportDetails getSwapchainSupport() const {
         return querySwapchainSupport(m_physicalDevice);
@@ -35,7 +57,10 @@ public:
     base::QueueFamilyIndices findPhysicalQueueFamilies() const {
         return findQueueFamilies(m_physicalDevice);
     }
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) const;
+    VkFormat findSupportedFormat(
+        const std::vector<VkFormat>& candidates, VkImageTiling tiling,
+        VkFormatFeatureFlags features
+    ) const;
 
     void waitIdle() const;
 
@@ -43,20 +68,31 @@ public:
     void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
     void createBuffer(
-        VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage, VkBuffer& buffer,
-        VmaAllocation& allocation, VmaAllocationCreateFlags allocFlags = 0);
+        VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage,
+        VkBuffer& buffer, VmaAllocation& allocation,
+        VmaAllocationCreateFlags allocFlags = 0
+    );
     void createImage(
-        const VkImageCreateInfo& createInfo, VmaMemoryUsage memoryUsage, VkImage& image,
-        VmaAllocation& allocation, VmaAllocationCreateFlags allocFlags = 0);
+        const VkImageCreateInfo& createInfo, VmaMemoryUsage memoryUsage,
+        VkImage& image, VmaAllocation& allocation,
+        VmaAllocationCreateFlags allocFlags = 0
+    );
 
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount = 1);
+    void copyBufferToImage(
+        VkBuffer buffer, VkImage image, uint32_t width, uint32_t height,
+        uint32_t layerCount = 1
+    );
 
-    void generateMipmaps(VkImage image, int32_t width, int32_t height, uint32_t mipLevels, uint32_t layerCount = 1);
+    void generateMipmaps(
+        VkImage image, int32_t width, int32_t height, uint32_t mipLevels,
+        uint32_t layerCount = 1
+    );
 
     void transitionImageLayout(
-        VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
-        uint32_t mipLevels = 1, uint32_t layerCount = 1);
+        VkImage image, VkFormat format, VkImageLayout oldLayout,
+        VkImageLayout newLayout, uint32_t mipLevels = 1, uint32_t layerCount = 1
+    );
 
 private:
     win::Window& m_window;
@@ -77,13 +113,22 @@ private:
 
     VkCommandPool m_commandPool;
 
+    VkPipelineCache m_pipelineCache = VK_NULL_HANDLE;
+    std::filesystem::path m_pipelineCachePath;
+
+    bool isPipelineCacheDataValid(const std::vector<char>& data) const;
+
     bool isDeviceSuitable(VkPhysicalDevice physicalDevice) const;
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;
     std::vector<const char*> getRequiredExtensions() const;
     bool checkValidationLayerSupport() const;
-    base::QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physicalDevice) const;
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) const;
-    base::SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice physicalDevice) const;
+    base::QueueFamilyIndices
+    findQueueFamilies(VkPhysicalDevice physicalDevice) const;
+    void populateDebugMessengerCreateInfo(
+        VkDebugUtilsMessengerCreateInfoEXT& createInfo
+    ) const;
+    base::SwapchainSupportDetails
+    querySwapchainSupport(VkPhysicalDevice physicalDevice) const;
 
     void createInstance();
     void setupDebugMessenger();
@@ -92,6 +137,8 @@ private:
     void createLogicalDevice();
     void createAllocator();
     void createCommandPool();
+    void createPipelineCache();
+    void savePipelineCache();
 };
 
 } // namespace gfx::vk

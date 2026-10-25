@@ -1,6 +1,8 @@
 #pragma once
 
+#include "managers/humanoid_manager.hpp"
 #include "managers/managers.hpp"
+#include "multiplayer/server_replicator.hpp"
 #include "network/network.hpp"
 #include "types/types.hpp"
 
@@ -16,7 +18,7 @@ namespace game {
 
 class GameServer {
 public:
-    GameServer(uint16_t port, const std::string& rbxlMapPath);
+    GameServer(uint16_t port, const std::string& nbxlPath);
     ~GameServer();
 
     GameServer(const GameServer&) = delete;
@@ -32,7 +34,18 @@ private:
     std::shared_ptr<types::Workspace> m_workspace;
     // std::shared_ptr<types::CoreGui> m_coreGui;
 
-    std::unique_ptr<mngrs::ServerInstanceManager> m_instanceManager;
+    std::unique_ptr<mngrs::HumanoidManager> m_humanoidManager;
+
+    std::unique_ptr<multiplayer::ServerReplicator> m_replicator;
+
+    struct PlayerEvent {
+        bool joined;
+        uint32_t playerId;
+        std::string nickname;
+    };
+
+    std::mutex m_playerEventsMutex;
+    std::vector<PlayerEvent> m_playerEvents;
 
     std::mutex m_networkPartsMutex;
     std::unordered_map<uint32_t, std::shared_ptr<types::Part>> m_networkParts;
@@ -47,12 +60,13 @@ private:
 
     void createServer(uint16_t port);
 
-    void buildMap(const std::string& rbxlMapPath);
+    void buildMap(const std::string& nbxlPath);
 
     void physicsLoop();
     void broadcastUnownedObjects();
 
     void syncNetworkParts();
+    void processPlayerEvents();
 };
 
 } // namespace game

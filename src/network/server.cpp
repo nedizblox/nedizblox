@@ -7,9 +7,7 @@
 #include "core/crypto.hpp"
 #include "core/logger.hpp"
 
-#include <algorithm>
 #include <cstring>
-#include <format>
 
 // NOLINTBEGIN(bugprone-unused-return-value)
 
@@ -24,13 +22,15 @@ Server::Server(uint16_t port) :
     m_tcpAcceptor.non_blocking(true, ec);
     m_udpSocket.non_blocking(true, ec);
 
-    core::logger::info(std::format("Server initialized on port {}", port));
+    core::logger::info("Server initialized on port ", port);
 
     m_acceptThread = std::thread(&Server::acceptLoop, this);
     m_statsThread = std::thread(&Server::statsLoop, this);
 }
 
-Server::~Server() { stop(); }
+Server::~Server() {
+    stop();
+}
 
 void Server::update() {
     if (!m_running || !m_udpSocket.is_open())
@@ -40,7 +40,9 @@ void Server::update() {
     udp::endpoint remote;
     boost::system::error_code error;
 
-    size_t bytes = m_udpSocket.receive_from(boost::asio::buffer(udpBuffer), remote, 0, error);
+    size_t bytes = m_udpSocket.receive_from(
+        boost::asio::buffer(udpBuffer), remote, 0, error
+    );
 
     if (error == boost::asio::error::operation_aborted)
         return;
@@ -59,7 +61,9 @@ void Server::update() {
             pong.clientTimeUs = ping.clientTimeUs;
 
             boost::system::error_code sendEc;
-            m_udpSocket.send_to(boost::asio::buffer(&pong, sizeof(pong)), remote, 0, sendEc);
+            m_udpSocket.send_to(
+                boost::asio::buffer(&pong, sizeof(pong)), remote, 0, sendEc
+            );
             if (!sendEc) {
                 m_bytesSent += sizeof(pong);
             }
@@ -74,7 +78,8 @@ void Server::update() {
         {
             std::lock_guard<std::mutex> lock(m_tcpClientsMutex);
             auto clientIt = m_tcpClients.find(hello.playerId);
-            if (clientIt == m_tcpClients.end() || clientIt->second.sessionToken != hello.sessionToken) {
+            if (clientIt == m_tcpClients.end() ||
+                clientIt->second.sessionToken != hello.sessionToken) {
                 return;
             }
         }
@@ -103,18 +108,21 @@ void Server::update() {
     }
 
     auto endpointIt = m_udpPlayerIds.find(remote);
-    if (endpointIt == m_udpPlayerIds.end() || endpointIt->second != header.senderPlayerId) {
+    if (endpointIt == m_udpPlayerIds.end() ||
+        endpointIt->second != header.senderPlayerId) {
         return;
     }
 
-    size_t expectedSize
-        = sizeof(packets::PhysicsStepPacket)
-          + (static_cast<size_t>(header.objectCount) * sizeof(packets::PhysicalObjectStateWire));
+    size_t expectedSize = sizeof(packets::PhysicsStepPacket) +
+                          (static_cast<size_t>(header.objectCount) *
+                           sizeof(packets::PhysicalObjectStateWire));
     if (bytes != expectedSize)
         return;
 
-    const packets::PhysicalObjectStateWire* wirePtr
-        = reinterpret_cast<const packets::PhysicalObjectStateWire*>(udpBuffer.data() + sizeof(header));
+    const packets::PhysicalObjectStateWire* wirePtr =
+        reinterpret_cast<const packets::PhysicalObjectStateWire*>(
+            udpBuffer.data() + sizeof(header)
+        );
 
     std::vector<packets::PhysicalObjectState> objects;
     objects.reserve(header.objectCount);
@@ -126,7 +134,8 @@ void Server::update() {
         std::lock_guard<std::mutex> lock(m_objectOwnersMutex);
         auto now = std::chrono::steady_clock::now();
         for (const auto& object : objects) {
-            m_objectOwners[object.networkId] = ObjectOwnership{header.senderPlayerId, now};
+            m_objectOwners[object.networkId] =
+                ObjectOwnership{header.senderPlayerId, now};
         }
     }
 
@@ -141,7 +150,10 @@ void Server::update() {
                 continue;
 
             boost::system::error_code ec;
-            m_udpSocket.send_to(boost::asio::buffer(udpBuffer.data(), bytes), clientEndpoint, 0, ec);
+            m_udpSocket.send_to(
+                boost::asio::buffer(udpBuffer.data(), bytes), clientEndpoint, 0,
+                ec
+            );
             if (!ec) {
                 m_bytesSent += bytes;
             }
@@ -197,12 +209,16 @@ bool Server::isOwned(uint32_t networkId) const {
     if (it == m_objectOwners.end())
         return false;
 
-    return (std::chrono::steady_clock::now() - it->second.lastUpdate) < kOwnershipTimeout;
+    return (std::chrono::steady_clock::now() - it->second.lastUpdate) <
+           kOwnershipTimeout;
 }
 
-void Server::broadcastPhysicsState(const std::vector<packets::PhysicalObjectState>& objects) {
-    constexpr size_t kMaxObjectsPerPacket = (kMaxUdpDatagramSize - sizeof(packets::PhysicsStepPacket))
-                                            / sizeof(packets::PhysicalObjectStateWire);
+void Server::broadcastPhysicsState(
+    const std::vector<packets::PhysicalObjectState>& objects
+) {
+    constexpr size_t kMaxObjectsPerPacket =
+        (kMaxUdpDatagramSize - sizeof(packets::PhysicsStepPacket)) /
+        sizeof(packets::PhysicalObjectStateWire);
 
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     if (m_clients.empty())
@@ -214,20 +230,29 @@ void Server::broadcastPhysicsState(const std::vector<packets::PhysicalObjectStat
         wireObjects.push_back(packets::toWire(object));
     }
 
-    for (size_t offset = 0; offset < wireObjects.size(); offset += kMaxObjectsPerPacket) {
-        size_t count = std::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
+    for (size_t offset = 0; offset < wireObjects.size();
+         offset += kMaxObjectsPerPacket) {
+        size_t count =
+            glm::min(kMaxObjectsPerPacket, wireObjects.size() - offset);
 
         packets::PhysicsStepPacket header{};
         header.senderPlayerId = 0;
         header.objectCount = static_cast<uint32_t>(count);
 
-        std::vector<uint8_t> buffer(sizeof(header) + count * sizeof(packets::PhysicalObjectStateWire));
+        std::vector<uint8_t> buffer(
+            sizeof(header) + count * sizeof(packets::PhysicalObjectStateWire)
+        );
         std::memcpy(buffer.data(), &header, sizeof(header));
-        std::memcpy(buffer.data() + sizeof(header), wireObjects.data() + offset, count * sizeof(packets::PhysicalObjectStateWire));
+        std::memcpy(
+            buffer.data() + sizeof(header), wireObjects.data() + offset,
+            count * sizeof(packets::PhysicalObjectStateWire)
+        );
 
         for (const auto& clientEndpoint : m_clients) {
             boost::system::error_code ec;
-            m_udpSocket.send_to(boost::asio::buffer(buffer), clientEndpoint, 0, ec);
+            m_udpSocket.send_to(
+                boost::asio::buffer(buffer), clientEndpoint, 0, ec
+            );
             if (!ec) {
                 m_bytesSent += buffer.size();
             }
@@ -251,8 +276,10 @@ void Server::handleTcpClient(TcpClient client) {
 
         auto type = static_cast<packets::PacketType>(payload[0]);
 
-        if (type == packets::PacketType::PlayerAccept || type == packets::PacketType::PlayerJoined
-            || type == packets::PacketType::PlayerLeft || type == packets::PacketType::PlayerKick) {
+        if (type == packets::PacketType::PlayerAccept ||
+            type == packets::PacketType::PlayerJoined ||
+            type == packets::PacketType::PlayerLeft ||
+            type == packets::PacketType::PlayerKick) {
             kickClient(*client.socket, "Detected server packet spoofing");
             break;
         }
@@ -260,12 +287,12 @@ void Server::handleTcpClient(TcpClient client) {
         bool isValid = false;
 
         switch (type) {
-        case packets::PacketType::PlayerInfo:
-            if (payload.size() == sizeof(packets::PlayerInfoPacket))
-                isValid = true;
-            break;
-        default:
-            break;
+            case packets::PacketType::PlayerInfo:
+                if (payload.size() == sizeof(packets::PlayerInfoPacket))
+                    isValid = true;
+                break;
+            default:
+                break;
         }
 
         if (!isValid)
@@ -277,12 +304,15 @@ void Server::handleTcpClient(TcpClient client) {
                 continue;
 
             boost::system::error_code sendEc;
-            tcpframing::writeFramed(*other.socket, payload.data(), payload.size(), sendEc);
+            tcpframing::writeFramed(
+                *other.socket, payload.data(), payload.size(), sendEc
+            );
 
             if (sendEc) {
-                core::logger::err("Server TCP relay: " + sendEc.message());
+                core::logger::err("Server TCP relay: ", sendEc.message());
             } else {
-                m_bytesSent += sizeof(packets::TcpMessageHeader) + payload.size();
+                m_bytesSent +=
+                    sizeof(packets::TcpMessageHeader) + payload.size();
             }
         }
     }
@@ -307,11 +337,22 @@ void Server::handleTcpClient(TcpClient client) {
         }
     }
 
-    core::logger::info(std::format("Player \"{}\" (id {}) disconnected", client.nickname, client.playerId));
+    core::logger::info(
+        "Player \"", client.nickname, "\" (id ", client.playerId,
+        ") disconnected"
+    );
 
     packets::PlayerLeftPacket left{};
     left.playerId = client.playerId;
     broadcastReliable(&left, sizeof(left));
+
+    PlayerLeftCallback leftCallback;
+    {
+        std::lock_guard<std::mutex> lock(m_playerCallbacksMutex);
+        leftCallback = m_playerLeftCallback;
+    }
+    if (leftCallback)
+        leftCallback(client.playerId);
 }
 
 void Server::broadcastReliable(const void* data, size_t size) {
@@ -321,7 +362,7 @@ void Server::broadcastReliable(const void* data, size_t size) {
         tcpframing::writeFramed(*client.socket, data, size, ec);
 
         if (ec) {
-            core::logger::err("BroadcastReliable: " + ec.message());
+            core::logger::err("BroadcastReliable: ", ec.message());
         } else {
             m_bytesSent += sizeof(packets::TcpMessageHeader) + size;
         }
@@ -330,7 +371,8 @@ void Server::broadcastReliable(const void* data, size_t size) {
 
 void Server::acceptLoop() {
     while (m_running) {
-        auto socket = std::make_shared<tcp::socket>(m_tcpAcceptor.get_executor());
+        auto socket =
+            std::make_shared<tcp::socket>(m_tcpAcceptor.get_executor());
 
         boost::system::error_code ec;
         m_tcpAcceptor.accept(*socket, ec);
@@ -342,14 +384,15 @@ void Server::acceptLoop() {
 
         if (ec) {
             if (m_running) {
-                core::logger::err("TCP acceptor stopped: " + ec.message());
+                core::logger::err("TCP acceptor stopped: ", ec.message());
             }
             break;
         }
 
         std::vector<uint8_t> payload;
-        if (!tcpframing::readFramed(*socket, payload, ec) || payload.size() != sizeof(packets::PlayerInfoPacket)) {
-            core::logger::err("TCP client failed handshake: " + ec.message());
+        if (!tcpframing::readFramed(*socket, payload, ec) ||
+            payload.size() != sizeof(packets::PlayerInfoPacket)) {
+            core::logger::err("TCP client failed handshake: ", ec.message());
             socket->close(ec);
             continue;
         }
@@ -359,23 +402,32 @@ void Server::acceptLoop() {
         std::memcpy(&info, payload.data(), sizeof(info));
         info.nickname[sizeof(info.nickname) - 1] = '\0';
 
-        auto version = core::crypto::encodeVersion(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
+        auto version = core::crypto::encodeVersion(
+            PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH
+        );
         if (info.clientVersion != version) {
             uint32_t clientMajor, clientMinor, clientPatch = 0;
-            core::crypto::decodeVersion(info.clientVersion, clientMajor, clientMinor, clientPatch);
+            core::crypto::decodeVersion(
+                info.clientVersion, clientMajor, clientMinor, clientPatch
+            );
 
             kickClient(
-                *socket,
-                std::format(
-                    "Your client version doesn't match the server version ({}.{}.{} != {}.{}.{})",
-                    clientMajor, clientMinor, clientPatch, PROJECT_VERSION_MAJOR,
-                    PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH));
+                *socket, std::format(
+                             "Your client version doesn't match the server "
+                             "version ({}.{}.{} != {}.{}.{})",
+                             clientMajor, clientMinor, clientPatch,
+                             PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR,
+                             PROJECT_VERSION_PATCH
+                         )
+            );
             continue;
         }
 
         std::string nicknameStr(info.nickname);
         if (nicknameStr.length() > 12 || nicknameStr.empty()) {
-            kickClient(*socket, "Nickname is too long (maximum 12 symbols) or empty");
+            kickClient(
+                *socket, "Nickname is too long (maximum 12 symbols) or empty"
+            );
             continue;
         } else if (nicknameStr.length() < 5) {
             kickClient(*socket, "Nickname is too small (minimum 5 symbols)");
@@ -405,7 +457,9 @@ void Server::acceptLoop() {
         accept.playerId = playerId;
         accept.sessionToken = sessionToken;
         if (!tcpframing::writeFramed(*socket, &accept, sizeof(accept), ec)) {
-            core::logger::err("Failed to send PlayerAcceptPacket: " + ec.message());
+            core::logger::err(
+                "Failed to send PlayerAcceptPacket: ", ec.message()
+            );
             socket->close(ec);
             continue;
         }
@@ -417,24 +471,36 @@ void Server::acceptLoop() {
         {
             std::lock_guard<std::mutex> lock(m_tcpClientsMutex);
 
-            initialState.playerCount = static_cast<uint32_t>(m_tcpClients.size());
+            initialState.playerCount =
+                static_cast<uint32_t>(m_tcpClients.size());
 
             stateBuffer.resize(
-                sizeof(packets::InitialStatePacket) + (initialState.playerCount * sizeof(packets::OldPlayerInfo)));
-            std::memcpy(stateBuffer.data(), &initialState, sizeof(initialState));
+                sizeof(packets::InitialStatePacket) +
+                (initialState.playerCount * sizeof(packets::OldPlayerInfo))
+            );
+            std::memcpy(
+                stateBuffer.data(), &initialState, sizeof(initialState)
+            );
 
             size_t offset = sizeof(packets::InitialStatePacket);
             for (const auto& [id, oldClient] : m_tcpClients) {
                 packets::OldPlayerInfo oldInfo{};
                 oldInfo.playerId = oldClient.playerId;
-                std::strncpy(oldInfo.nickname, oldClient.nickname.c_str(), sizeof(oldInfo.nickname) - 1);
+                std::strncpy(
+                    oldInfo.nickname, oldClient.nickname.c_str(),
+                    sizeof(oldInfo.nickname) - 1
+                );
 
-                std::memcpy(stateBuffer.data() + offset, &oldInfo, sizeof(oldInfo));
+                std::memcpy(
+                    stateBuffer.data() + offset, &oldInfo, sizeof(oldInfo)
+                );
                 offset += sizeof(oldInfo);
             }
         }
 
-        if (!tcpframing::writeFramed(*socket, stateBuffer.data(), stateBuffer.size(), ec)) {
+        if (!tcpframing::writeFramed(
+                *socket, stateBuffer.data(), stateBuffer.size(), ec
+            )) {
             socket->close(ec);
             continue;
         }
@@ -442,7 +508,9 @@ void Server::acceptLoop() {
 
         {
             std::lock_guard<std::mutex> lock(m_mapDataMutex);
-            if (!tcpframing::writeFramed(*socket, m_mapData.data(), m_mapData.size(), ec)) {
+            if (!tcpframing::writeFramed(
+                    *socket, m_mapData.data(), m_mapData.size(), ec
+                )) {
                 socket->close(ec);
                 continue;
             }
@@ -450,11 +518,14 @@ void Server::acceptLoop() {
         }
 
         core::logger::info(
-            std::format(
-                "Player \"{}\" connected, assigned id {} ({}:{})", info.nickname, playerId,
-                socket->remote_endpoint().address().to_string(), socket->remote_endpoint().port()));
+            "Player \"", info.nickname, "\" connected, assigned id ", playerId,
+            " (", socket->remote_endpoint().address().to_string(), ":",
+            socket->remote_endpoint().port(), ")"
+        );
 
-        TcpClient client{socket, playerId, sessionToken, std::string(info.nickname)};
+        TcpClient client{
+            socket, playerId, sessionToken, std::string(info.nickname)
+        };
         {
             std::lock_guard<std::mutex> lock(m_tcpClientsMutex);
             m_tcpClients.emplace(playerId, client);
@@ -462,8 +533,18 @@ void Server::acceptLoop() {
 
         packets::PlayerJoinedPacket joined{};
         joined.playerId = playerId;
-        std::strncpy(joined.nickname, info.nickname, sizeof(joined.nickname) - 1);
+        std::strncpy(
+            joined.nickname, info.nickname, sizeof(joined.nickname) - 1
+        );
         broadcastReliable(&joined, sizeof(joined));
+
+        PlayerJoinedCallback joinedCallback;
+        {
+            std::lock_guard<std::mutex> lock(m_playerCallbacksMutex);
+            joinedCallback = m_playerJoinedCallback;
+        }
+        if (joinedCallback)
+            joinedCallback(playerId, client.nickname);
 
         std::thread(&Server::handleTcpClient, this, client).detach();
     }
@@ -471,18 +552,20 @@ void Server::acceptLoop() {
 
 void Server::kickClient(tcp::socket& socket, const std::string& reason) {
     core::logger::info(
-        std::format(
-            "Rejecting client ({}:{}): {}", socket.remote_endpoint().address().to_string(),
-            socket.remote_endpoint().port(), reason));
+        "Rejecting client (", socket.remote_endpoint().address().to_string(),
+        ":", socket.remote_endpoint().port(), "): ", reason
+    );
 
     packets::PlayerKickPacket kickPacket{};
-    std::strncpy(kickPacket.reason, reason.c_str(), sizeof(kickPacket.reason) - 1);
+    std::strncpy(
+        kickPacket.reason, reason.c_str(), sizeof(kickPacket.reason) - 1
+    );
 
     boost::system::error_code kickEc;
     tcpframing::writeFramed(socket, &kickPacket, sizeof(kickPacket), kickEc);
 
     if (kickEc) {
-        core::logger::err("Kick: " + kickEc.message());
+        core::logger::err("Kick: ", kickEc.message());
     } else {
         m_bytesSent += sizeof(packets::TcpMessageHeader) + sizeof(kickPacket);
     }
@@ -492,7 +575,9 @@ void Server::kickClient(tcp::socket& socket, const std::string& reason) {
 
 void Server::kickAll(const std::string& reason) {
     packets::PlayerKickPacket kickPacket{};
-    std::strncpy(kickPacket.reason, reason.c_str(), sizeof(kickPacket.reason) - 1);
+    std::strncpy(
+        kickPacket.reason, reason.c_str(), sizeof(kickPacket.reason) - 1
+    );
 
     std::lock_guard<std::mutex> lock(m_tcpClientsMutex);
 
@@ -500,17 +585,21 @@ void Server::kickAll(const std::string& reason) {
         auto socket = client.socket;
 
         core::logger::info(
-            std::format(
-                "Rejecting client ({}:{}): {}", socket->remote_endpoint().address().to_string(),
-                socket->remote_endpoint().port(), reason));
+            "Rejecting client (",
+            socket->remote_endpoint().address().to_string(), ":",
+            socket->remote_endpoint().port(), "): ", reason
+        );
 
         boost::system::error_code kickEc;
-        tcpframing::writeFramed(*client.socket, &kickPacket, sizeof(kickPacket), kickEc);
+        tcpframing::writeFramed(
+            *client.socket, &kickPacket, sizeof(kickPacket), kickEc
+        );
 
         if (kickEc) {
-            core::logger::err("Kick: " + kickEc.message());
+            core::logger::err("Kick: ", kickEc.message());
         } else {
-            m_bytesSent += sizeof(packets::TcpMessageHeader) + sizeof(kickPacket);
+            m_bytesSent +=
+                sizeof(packets::TcpMessageHeader) + sizeof(kickPacket);
         }
 
         client.socket->shutdown(tcp::socket::shutdown_both, kickEc);
@@ -529,15 +618,19 @@ void Server::statsLoop() {
             break;
 
         auto now = std::chrono::steady_clock::now();
-        double elapsedSec = std::chrono::duration<double>(now - lastTime).count();
+        double elapsedSec =
+            std::chrono::duration<double>(now - lastTime).count();
         if (elapsedSec < 1.0)
             continue;
 
         uint64_t sentNow = m_bytesSent.load();
         uint64_t receivedNow = m_bytesReceived.load();
 
-        m_sentKBps = (static_cast<double>(sentNow - lastSent) / 1024.0) / elapsedSec;
-        m_recvKBps = (static_cast<double>(receivedNow - lastReceived) / 1024.0) / elapsedSec;
+        m_sentKBps =
+            (static_cast<double>(sentNow - lastSent) / 1024.0) / elapsedSec;
+        m_recvKBps =
+            (static_cast<double>(receivedNow - lastReceived) / 1024.0) /
+            elapsedSec;
 
         lastSent = sentNow;
         lastReceived = receivedNow;

@@ -37,6 +37,9 @@ public:
     void waitEvents() { SDL_WaitEvent(nullptr); }
 
     const std::vector<unsigned int>& getInputCodepoints() const { return m_inputCodepoints; }
+    const std::vector<SDL_Event>& getPollEvents() const {
+        return m_pollEvents;
+    }
 
     glm::vec2 getMousePos() const { return m_mousePos; }
     glm::vec2 getMousePosFb() const {
@@ -89,6 +92,7 @@ private:
     std::array<bool, 8> m_mouseButtons = {false};
 
     std::vector<unsigned int> m_inputCodepoints;
+    std::vector<SDL_Event> m_pollEvents;
 
     glm::vec2 m_mousePos{0.0f};
     glm::vec2 m_mouseDelta{0.0f};

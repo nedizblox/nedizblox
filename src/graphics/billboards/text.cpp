@@ -68,7 +68,7 @@ void Text::createIndexBuffer() {
 }
 
 void Text::createInstanceBuffer() {
-    VkDeviceSize bufferSize = sizeof(glm::mat4) * 10000;
+    VkDeviceSize bufferSize = sizeof(InstanceData) * kMaxInstanceCount;
 
     m_instanceBuffer = std::make_unique<vk::Buffer>(
         m_device, bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -216,6 +216,9 @@ void Text::draw(VkCommandBuffer commandBuffer, const std::vector<InstanceContent
     uint32_t letterCount = static_cast<uint32_t>(outInstances.size());
     if (letterCount == 0)
         return;
+
+    if (letterCount > kMaxInstanceCount)
+        letterCount = kMaxInstanceCount;
 
     std::memcpy(m_instanceData, outInstances.data(), sizeof(InstanceData) * letterCount);
 

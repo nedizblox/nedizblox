@@ -4,9 +4,11 @@
 #include "../vk/pipeline.hpp"
 #include "../vk/renderer.hpp"
 
+#include "../shadow_map.hpp"
+
+#include "billboard_manager.hpp"
 #include "bindless_manager.hpp"
 #include "model_manager.hpp"
-#include "billboard_manager.hpp"
 #include "ui_manager.hpp"
 
 #include <string>
@@ -18,8 +20,11 @@ class PipelineManager {
 public:
     PipelineManager(
         gfx::vk::Device& device, gfx::vk::Renderer& renderer,
-        gfx::mngrs::BindlessManager& bindlessManager, gfx::mngrs::ModelManager& modelManager,
-        gfx::mngrs::BillboardManager& billboardManager, gfx::mngrs::UiManager& uiManager);
+        gfx::mngrs::BindlessManager& bindlessManager,
+        gfx::mngrs::ModelManager& modelManager,
+        gfx::mngrs::BillboardManager& billboardManager,
+        gfx::mngrs::UiManager& uiManager
+    );
     ~PipelineManager();
 
     PipelineManager(const PipelineManager&) = delete;
@@ -27,31 +32,67 @@ public:
 
     void initPipelines(VkDescriptorSetLayout setLayout);
 
+    void renderShadowPass(
+        VkCommandBuffer commandBuffer, const glm::mat4& lightSpace,
+        float orthoRadius,
+        const std::unordered_map<
+            std::string, std::vector<gfx::Model::InstanceData>>& instancesData,
+        const gfx::ShadowMap::Settings& settings = {}
+    );
+
+    uint32_t getShadowMapSize() const {
+        return m_shadowMap->getSize();
+    }
+
     void renderModelsOpaque(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<
+            std::string, std::vector<gfx::Model::InstanceData>>& instancesData
+    );
 
     void renderModelOutlinesOpaque(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<
+            std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+            instancesData
+    );
 
-    void renderSkybox(VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, uint32_t skyboxCubId);
+    void renderSkybox(
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view, uint32_t skyboxCubId
+    );
 
     void renderModelsTransparent(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::Model::InstanceData>>& instancesData);
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<
+            std::string, std::vector<gfx::Model::InstanceData>>& instancesData
+    );
 
     void renderModelOutlinesTransparent(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view, const glm::vec3& pos,
-        const std::unordered_map<std::string, std::vector<gfx::ModelOutline::InstanceData>>& instancesData);
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view, const glm::vec3& pos,
+        const std::unordered_map<
+            std::string, std::vector<gfx::ModelOutline::InstanceData>>&
+            instancesData
+    );
 
     void renderBillboardTexts(
-        VkCommandBuffer commandBuffer, const glm::mat4& proj, const glm::mat4& view,
-        const std::unordered_map<std::string, std::vector<gfx::billb::Text::InstanceContent>>& instancesData);
+        VkCommandBuffer commandBuffer, const glm::mat4& proj,
+        const glm::mat4& view,
+        const std::unordered_map<
+            std::string, std::vector<gfx::billb::Text::InstanceContent>>&
+            instancesData
+    );
 
     void renderTexts(
         VkCommandBuffer commandBuffer, win::Window& window,
-        const std::unordered_map<std::string, std::vector<gfx::ui::Text::InstanceContent>>& instancesData);
+        const std::unordered_map<
+            std::string, std::vector<gfx::ui::Text::InstanceContent>>&
+            instancesData
+    );
 
     void renderImgui(VkCommandBuffer commandBuffer, win::Window& window);
 
@@ -64,7 +105,10 @@ private:
     gfx::mngrs::BillboardManager& m_billboardManager;
     gfx::mngrs::UiManager& m_uiManager;
 
-    std::unordered_map<std::string, std::unique_ptr<gfx::vk::Pipeline>> m_pipelines;
+    std::unique_ptr<gfx::ShadowMap> m_shadowMap;
+
+    std::unordered_map<std::string, std::unique_ptr<gfx::vk::Pipeline>>
+        m_pipelines;
 };
 
 } // namespace gfx::mngrs

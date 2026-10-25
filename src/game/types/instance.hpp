@@ -32,24 +32,40 @@ public:
         std::vector<std::string> enumOptions;
     };
 
-    Instance(enums::InstanceType type, const std::string& name) : m_type(type), m_name(name) {}
+    Instance(enums::InstanceType type, const std::string& name) :
+        m_name(name), m_type(type) {
+    }
     virtual ~Instance() = default;
 
-    std::string getName() const { return m_name; }
+    std::string getName() const {
+        return m_name;
+    }
 
     void setName(const std::string& name) {
         m_name = name;
     }
 
-    enums::InstanceType getType() const { return m_type; }
+    enums::InstanceType getType() const {
+        return m_type;
+    }
 
-    uint32_t getId() const { return m_id; }
-    void setId(uint32_t id) { m_id = id; }
+    uint32_t getId() const {
+        return m_id;
+    }
+    void setId(uint32_t id) {
+        m_id = id;
+    }
 
-    uint32_t getNetworkId() const { return m_networkId; }
-    void setNetworkId(uint32_t networkId) { m_networkId = networkId; }
+    uint32_t getNetworkId() const {
+        return m_networkId;
+    }
+    void setNetworkId(uint32_t networkId) {
+        m_networkId = networkId;
+    }
 
-    uint32_t getParentId() const { return m_parentId; }
+    uint32_t getParentId() const {
+        return m_parentId;
+    }
 
     virtual std::vector<PropertyDescriptor> getProperties() {
         auto self = weak_from_this();
@@ -61,7 +77,8 @@ public:
                 enums::PropertyType::String,
                 static_cast<void*>(&m_name),
                 false,
-                [self]() {
+                [self]()
+                {
                     if (auto instance = self.lock())
                         instance->propertyChanged();
                 },
@@ -89,16 +106,19 @@ public:
                 nullptr,
                 false,
                 nullptr,
-                [self]() -> std::shared_ptr<Instance> {
+                [self]() -> std::shared_ptr<Instance>
+                {
                     if (auto instance = self.lock())
                         return instance->getParent();
                     return nullptr;
                 },
-                [self](const std::shared_ptr<Instance>& newParent) {
+                [self](const std::shared_ptr<Instance>& newParent)
+                {
                     if (auto instance = self.lock())
                         instance->setParent(newParent);
                 },
-            }};
+            }
+        };
     }
 
     virtual void serialize(net::serializer::BinaryWriter& writer) const {
@@ -122,7 +142,7 @@ public:
         m_name = reader.readString();
     }
 
-    template <typename T = Instance>
+    template<typename T = Instance>
     std::shared_ptr<T> getParent() const {
         return std::dynamic_pointer_cast<T>(m_parent.lock());
     }
@@ -147,8 +167,11 @@ public:
             siblings.erase(
                 std::remove_if(
                     siblings.begin(), siblings.end(),
-                    [this](const std::shared_ptr<Instance>& child) { return child.get() == this; }),
-                siblings.end());
+                    [this](const std::shared_ptr<Instance>& child)
+                    { return child.get() == this; }
+                ),
+                siblings.end()
+            );
 
             oldParent->childrenChanged();
         }
@@ -158,12 +181,15 @@ public:
             newParent->m_children.push_back(self);
 
             newParent->childrenChanged();
+            newParent->childAdded(self);
         } else {
             m_parent.reset();
         }
     }
 
-    std::vector<std::shared_ptr<Instance>> getChildren() const { return m_children; }
+    std::vector<std::shared_ptr<Instance>> getChildren() const {
+        return m_children;
+    }
 
     std::vector<std::shared_ptr<Instance>> getDescendants() const {
         std::vector<std::shared_ptr<Instance>> descendants;
@@ -171,7 +197,7 @@ public:
         return descendants;
     }
 
-    template <typename T = Instance>
+    template<typename T = Instance>
     std::shared_ptr<T> findFirstChild(const std::string& childName) const {
         auto childrenCopy = getChildren();
         for (const auto& child : childrenCopy) {
@@ -182,7 +208,7 @@ public:
         return nullptr;
     }
 
-    template <typename T>
+    template<typename T>
     std::shared_ptr<T> findFirstChildOfClass() const {
         auto childrenCopy = getChildren();
         for (const auto& child : childrenCopy) {
@@ -232,35 +258,77 @@ public:
     }
 
     void removeChildrenChangedCallback(CallbackId id) {
-        std::erase_if(m_childrenChangedCallbacks, [id](const auto& item) { return item.id == id; });
+        std::erase_if(
+            m_childrenChangedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
     }
 
     void removeDescendantChildrenChangedCallback(CallbackId id) {
         std::erase_if(
-            m_descendantChildrenChangedCallbacks, [id](const auto& item) { return item.id == id; });
+            m_descendantChildrenChangedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
     }
 
     void removePropertyChangedCallback(CallbackId id) {
-        std::erase_if(m_propertyChangedCallbacks, [id](const auto& item) { return item.id == id; });
+        std::erase_if(
+            m_propertyChangedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
     }
 
     void removeDescendantPropertyChangedCallback(CallbackId id) {
         std::erase_if(
-            m_descendantPropertyChangedCallbacks, [id](const auto& item) { return item.id == id; });
+            m_descendantPropertyChangedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
     }
 
     void removeDestroyCallback(CallbackId id) {
-        std::erase_if(m_destroyCallbacks, [id](const auto& item) { return item.id == id; });
+        std::erase_if(
+            m_destroyCallbacks, [id](const auto& item) { return item.id == id; }
+        );
     }
 
     void removeDescendantDestroyCallback(CallbackId id) {
-        std::erase_if(m_descendantDestroyCallbacks, [id](const auto& item) { return item.id == id; });
+        std::erase_if(
+            m_descendantDestroyCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
     }
 
-    void destroy() {
+    CallbackId onChildAdded(Callback callback) {
+        CallbackId id = m_nextCallbackId++;
+        m_childAddedCallbacks.push_back({id, std::move(callback)});
+        return id;
+    }
+
+    CallbackId onDescendantAdded(Callback callback) {
+        CallbackId id = m_nextCallbackId++;
+        m_descendantAddedCallbacks.push_back({id, std::move(callback)});
+        return id;
+    }
+
+    void removeChildAddedCallback(CallbackId id) {
+        std::erase_if(
+            m_childAddedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
+    }
+
+    void removeDescendantAddedCallback(CallbackId id) {
+        std::erase_if(
+            m_descendantAddedCallbacks,
+            [id](const auto& item) { return item.id == id; }
+        );
+    }
+
+    virtual void destroy() {
         auto self = shared_from_this();
 
-        for (const auto& callback : m_destroyCallbacks) {
+        auto destroyCallbacks = m_destroyCallbacks;
+        for (const auto& callback : destroyCallbacks) {
             if (callback.callback) {
                 callback.callback(self);
             }
@@ -270,7 +338,8 @@ public:
             parent->descendantDestroy(self);
         }
 
-        for (auto& child : m_children) {
+        auto children = m_children;
+        for (auto& child : children) {
             if (child) {
                 child->destroy();
             }
@@ -303,7 +372,9 @@ protected:
         }
     }
 
-    void descendantPropertyChanged(const std::shared_ptr<Instance>& changedInstance) {
+    void descendantPropertyChanged(
+        const std::shared_ptr<Instance>& changedInstance
+    ) {
         for (const auto& entry : m_descendantPropertyChangedCallbacks) {
             if (entry.callback) {
                 entry.callback(changedInstance);
@@ -328,7 +399,9 @@ protected:
         }
     }
 
-    void descendantChildrenChanged(const std::shared_ptr<Instance>& changedInstance) {
+    void descendantChildrenChanged(
+        const std::shared_ptr<Instance>& changedInstance
+    ) {
         for (const auto& entry : m_descendantChildrenChangedCallbacks) {
             if (entry.callback) {
                 entry.callback(changedInstance);
@@ -337,6 +410,30 @@ protected:
 
         if (auto parent = m_parent.lock()) {
             parent->descendantChildrenChanged(changedInstance);
+        }
+    }
+
+    void childAdded(const std::shared_ptr<Instance>& child) {
+        auto callbacks = m_childAddedCallbacks;
+        for (const auto& entry : callbacks) {
+            if (entry.callback) {
+                entry.callback(child);
+            }
+        }
+
+        descendantAdded(child);
+    }
+
+    void descendantAdded(const std::shared_ptr<Instance>& added) {
+        auto callbacks = m_descendantAddedCallbacks;
+        for (const auto& entry : callbacks) {
+            if (entry.callback) {
+                entry.callback(added);
+            }
+        }
+
+        if (auto parent = m_parent.lock()) {
+            parent->descendantAdded(added);
         }
     }
 
@@ -373,10 +470,13 @@ private:
     std::vector<CallbackEntry> m_descendantPropertyChangedCallbacks;
     std::vector<CallbackEntry> m_destroyCallbacks;
     std::vector<CallbackEntry> m_descendantDestroyCallbacks;
+    std::vector<CallbackEntry> m_childAddedCallbacks;
+    std::vector<CallbackEntry> m_descendantAddedCallbacks;
 
     inline static CallbackId m_nextCallbackId = 0;
 
-    void collectDescendants(std::vector<std::shared_ptr<Instance>>& result) const {
+    void
+    collectDescendants(std::vector<std::shared_ptr<Instance>>& result) const {
         for (const auto& child : m_children) {
             if (child) {
                 result.push_back(child);
@@ -386,7 +486,7 @@ private:
     }
 };
 
-template <typename Derived>
+template<typename Derived>
 class TypedInstance : public Instance {
 public:
     using Instance::Instance;
@@ -416,7 +516,10 @@ public:
 
 private:
     static Instance::Callback wrap(Callback callback) {
-        return [callback = std::move(callback)](const std::shared_ptr<Instance>& instance) {
+        return
+            [callback =
+                 std::move(callback)](const std::shared_ptr<Instance>& instance)
+        {
             if (auto casted = std::static_pointer_cast<Derived>(instance)) {
                 callback(casted);
             }
