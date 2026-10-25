@@ -8,14 +8,15 @@ const glm::vec3 SHADOW_LIGHT_DIR =
     glm::normalize(glm::vec3(0.30f, 0.90f, 0.40f));
 
 constexpr float SHADOW_RADIUS = 60.0f;
-constexpr float SHADOW_DEPTH = 500.0f;
+constexpr float SHADOW_DEPTH = 1000.0f;
 
 } // namespace
 
 namespace game {
 
 GameClient::GameClient(
-    const std::string& server, uint16_t port, const std::string& nickname
+    const std::string& server, uint16_t port, const std::string& nickname,
+    bool debugTools
 ) {
     core::sighandler::listen();
 
@@ -32,10 +33,14 @@ GameClient::GameClient(
     createLocalRig(nickname);
 
     createController();
-    // createTools();
+
+    if (debugTools)
+        createDebugTools();
+
+    createGameInterface();
 }
 
-GameClient::GameClient() {
+GameClient::GameClient(bool debugTools) {
     core::sighandler::listen();
 
     m_studioMode = true;
@@ -51,7 +56,11 @@ GameClient::GameClient() {
     createClient();
 
     createController();
-    createTools();
+
+    createDevTools();
+
+    if (debugTools)
+        createDebugTools();
 }
 
 GameClient::~GameClient() {
@@ -135,14 +144,21 @@ void GameClient::createServices() {
         std::make_unique<mngrs::HumanoidManager>(*m_physics, m_workspace);
 }
 
-void GameClient::createTools() {
-    m_devTools = std::make_unique<ui::DevTools>(
-        *m_uiManager, m_game, *m_controller, *m_physics, *m_humanoidManager
-    );
-
+void GameClient::createDebugTools() {
     m_debugTools = std::make_unique<ui::DebugTools>(
         *m_uiManager, *m_renderManager, *m_ownership, *m_replicator
     );
+}
+
+void GameClient::createDevTools() {
+    m_devTools = std::make_unique<ui::DevTools>(
+        *m_uiManager, m_game, *m_controller, *m_physics, *m_humanoidManager
+    );
+}
+
+void GameClient::createGameInterface() {
+    m_gameInterface =
+        std::make_unique<ui::GameInterface>(*m_uiManager, *m_replicator);
 }
 
 void GameClient::createLocalRig(const std::string& nickname) {

@@ -1,5 +1,8 @@
 #include "imgui.hpp"
 
+#include <imgui/IconsFontAwesome6.h>
+#include <imgui/fa-solid-900.h>
+
 namespace {
 
 static ImGuiKey SDLKeyToImGuiKey(SDL_Keycode key) {
@@ -236,6 +239,24 @@ void Imgui::createIndexBuffer() {
 
 void Imgui::createFontTexture(vk::Sampler& sampler) {
     ImGuiIO& io = ImGui::GetIO();
+
+    float baseFontSize = 13.0f;
+
+    ImFontConfig defaultFontConfig;
+    defaultFontConfig.SizePixels = baseFontSize;
+    io.Fonts->AddFontDefault(&defaultFontConfig);
+
+    float iconFontSize = baseFontSize * 2.0f / 3.0f;
+
+    static constexpr ImWchar iconsRanges[] = {ICON_MIN_FA, ICON_MAX_16_FA, 0};
+    ImFontConfig iconsConfig;
+    iconsConfig.MergeMode = true;
+    iconsConfig.PixelSnapH = true;
+    iconsConfig.GlyphMinAdvanceX = iconFontSize;
+    io.Fonts->AddFontFromMemoryCompressedTTF(
+        fa_solid_900_compressed_data, fa_solid_900_compressed_size,
+        iconFontSize, &iconsConfig, iconsRanges
+    );
 
     unsigned char* pixels;
     int width, height;

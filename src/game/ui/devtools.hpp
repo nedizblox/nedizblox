@@ -70,6 +70,7 @@ private:
     bool m_gizmoWasUsing = false;
     bool m_gizmoHasPendingCommit = false;
     ImGuizmo::OPERATION m_gizmoActiveOperation = ImGuizmo::TRANSLATE;
+    glm::vec3 m_gizmoStartSize{1.0f};
 
     std::unordered_map<ImGuiID, PropertyDraft> m_propertyDrafts;
     types::Instance* m_propertyDraftsOwner = nullptr;

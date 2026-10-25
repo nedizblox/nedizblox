@@ -39,6 +39,8 @@ public:
         return m_window.isKeyPressed(key);
     }
 
+    void windowShouldClose() { m_window.shouldClose(); }
+
     void setLocalRig(const std::shared_ptr<types::Rig>& rig) {
         m_localRig = rig;
     }

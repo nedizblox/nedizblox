@@ -60,7 +60,11 @@ std::string logger::getTime() {
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
     std::tm ltime;
+#if defined(_MSC_VER)
+    localtime_s(&ltime, &t);
+#else
     localtime_r(&t, &ltime);
+#endif
 
     std::stringstream ss;
     ss << std::put_time(&ltime, "%H:%M:%S");

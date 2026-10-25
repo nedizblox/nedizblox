@@ -19,6 +19,8 @@ constexpr const char* kSaveDialogKey = "DevToolsSaveMap";
 constexpr const char* kMapExtension = ".nbxl";
 
 constexpr float kGizmoTranslateSnap = 1.0f;
+constexpr float kGizmoRotateSnapDegrees = 45.0f;
+constexpr float kGizmoScaleSnap = 1.0f;
 
 void mergeInto(
     const std::shared_ptr<types::Instance>& target,
@@ -467,7 +469,7 @@ void DevTools::drawMenuBar() {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Exit", "Alt+F4")) {
-            // TODO
+            m_controller.windowShouldClose();
         }
 
         ImGui::EndMenu();
@@ -925,8 +927,16 @@ bool DevTools::manipulate(glm::mat4& transform, ImGuizmo::OPERATION operation) {
     const float translateSnap[3] = {
         kGizmoTranslateSnap, kGizmoTranslateSnap, kGizmoTranslateSnap
     };
-    const float* snap =
-        (operation == ImGuizmo::TRANSLATE) ? translateSnap : nullptr;
+    const float rotateSnap[3] = {
+        kGizmoRotateSnapDegrees, kGizmoRotateSnapDegrees,
+        kGizmoRotateSnapDegrees
+    };
+
+    const float* snap = nullptr;
+    if (operation == ImGuizmo::TRANSLATE)
+        snap = translateSnap;
+    else if (operation == ImGuizmo::ROTATE)
+        snap = rotateSnap;
 
     return ImGuizmo::Manipulate(
         glm::value_ptr(view), glm::value_ptr(projection), operation,
@@ -957,6 +967,9 @@ void DevTools::drawGizmo() {
 void DevTools::drawPartGizmo(const std::shared_ptr<types::Part>& part) {
     glm::mat4 transform = part->getModelMatrix();
 
+    if (!m_gizmoWasUsing)
+        m_gizmoStartSize = part->getSize();
+
     bool manipulated = manipulate(transform, m_gizmoOperation);
 
     if (manipulated) {
@@ -981,6 +994,18 @@ void DevTools::drawPartGizmo(const std::shared_ptr<types::Part>& part) {
         part->setOrientation(newOrientation, true);
 
         if (m_gizmoOperation == ImGuizmo::SCALE) {
+            for (int axis = 0; axis < 3; axis++) {
+                if (glm::abs(newSize[axis] - m_gizmoStartSize[axis]) < 1e-4f) {
+                    newSize[axis] = m_gizmoStartSize[axis];
+                } else {
+                    newSize[axis] = glm::max(
+                        glm::round(newSize[axis] / kGizmoScaleSnap) *
+                            kGizmoScaleSnap,
+                        kGizmoScaleSnap
+                    );
+                }
+            }
+
             part->setSize(newSize, true);
         }
 

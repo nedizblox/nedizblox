@@ -18,6 +18,10 @@ int main(int argc, char* argv[]) {
     try {
         std::unique_ptr<game::GameClient> game;
 
+        bool debugTools = false;
+        if (args.contains("debug-tools"))
+            debugTools = true;
+
         if (!args.contains("studio")) {
             if (args.contains("address") && args.contains("port") &&
                 args.contains("nickname")) {
@@ -40,7 +44,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 game =
-                    std::make_unique<game::GameClient>(address, port, nickname);
+                    std::make_unique<game::GameClient>(address, port, nickname, debugTools);
             } else {
                 throw std::runtime_error(
                     "Please specify the server address, port and your nickname "
@@ -48,7 +52,7 @@ int main(int argc, char* argv[]) {
                 );
             }
         } else {
-            game = std::make_unique<game::GameClient>();
+            game = std::make_unique<game::GameClient>(debugTools);
 
             if (args.contains("map"))
                 game->buildMap(args["map"]);

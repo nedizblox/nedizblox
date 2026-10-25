@@ -20,9 +20,10 @@ namespace game {
 class GameClient {
 public:
     GameClient(
-        const std::string& server, uint16_t port, const std::string& nickname
-    );            // client mode
-    GameClient(); // studio mode
+        const std::string& server, uint16_t port, const std::string& nickname,
+        bool debugTools = false
+    );                                   // client mode
+    GameClient(bool debugTools = false); // studio mode
     ~GameClient();
 
     GameClient(const GameClient&) = delete;
@@ -50,6 +51,7 @@ private:
 
     std::unique_ptr<ui::DevTools> m_devTools;
     std::unique_ptr<ui::DebugTools> m_debugTools;
+    std::unique_ptr<ui::GameInterface> m_gameInterface;
 
     std::unique_ptr<utils::Controller> m_controller;
 
@@ -73,7 +75,10 @@ private:
     void createController();
 
     void createServices();
-    void createTools();
+    
+    void createDebugTools();
+    void createDevTools();
+    void createGameInterface();
 
     void createLocalRig(const std::string& nickname);
 

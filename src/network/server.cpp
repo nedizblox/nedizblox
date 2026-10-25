@@ -80,8 +80,19 @@ void Server::update() {
             auto clientIt = m_tcpClients.find(hello.playerId);
             if (clientIt == m_tcpClients.end() ||
                 clientIt->second.sessionToken != hello.sessionToken) {
+                core::logger::info(
+                    "UDP hello rejected (player id ", hello.playerId, ", from ",
+                    remote.address().to_string(), ":", remote.port(), ")"
+                );
                 return;
             }
+        }
+
+        if (m_udpPlayerIds.find(remote) == m_udpPlayerIds.end()) {
+            core::logger::info(
+                "UDP registered: player id ", hello.playerId, " from ",
+                remote.address().to_string(), ":", remote.port()
+            );
         }
 
         m_udpPlayerIds[remote] = hello.playerId;
@@ -90,6 +101,13 @@ void Server::update() {
             std::lock_guard<std::mutex> lock(m_clientsMutex);
             m_clients.insert(remote);
         }
+
+        boost::system::error_code ackEc;
+        m_udpSocket.send_to(
+            boost::asio::buffer(&hello, sizeof(hello)), remote, 0, ackEc
+        );
+        if (!ackEc)
+            m_bytesSent += sizeof(hello);
 
         return;
     }

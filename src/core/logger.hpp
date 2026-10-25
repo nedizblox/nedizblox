@@ -25,7 +25,7 @@ void info(Args... args) {
     } else {
         std::cout << "[" << getTime() << "] " << "[INFO]: ";
     }
-    (std::cout << ... << args) << '\n';
+    (std::cout << ... << args) << std::endl;
 }
 
 template<typename... Args>
@@ -36,7 +36,7 @@ void warn(Args... args) {
     } else {
         std::cout << "[" << getTime() << "] " << "[WARN]: ";
     }
-    (std::cout << ... << args) << '\n';
+    (std::cout << ... << args) << std::endl;
 }
 
 template<typename... Args>
@@ -47,7 +47,7 @@ void err(Args... args) {
     } else {
         std::cout << "[" << getTime() << "] " << "[ERROR]: ";
     }
-    (std::cout << ... << args) << '\n';
+    (std::cout << ... << args) << std::endl;
 }
 
 template<typename... Args>
@@ -58,7 +58,7 @@ void debug(Args... args) {
     } else {
         std::cout << "[" << getTime() << "] " << "[DEBUG]: ";
     }
-    (std::cout << ... << args) << '\n';
+    (std::cout << ... << args) << std::endl;
 }
 
 } // namespace core::logger

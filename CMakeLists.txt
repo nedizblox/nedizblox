@@ -38,9 +38,6 @@ if(NOT SERVER_BUILD)
     set(SDL2_TEST_ENABLED_BY_DEFAULT OFF CACHE BOOL "" FORCE)
     set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
     set(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
-    set(SDL2_DISABLE_SDL2MAIN ON CACHE BOOL "" FORCE)
-    set(SDL_SHARED_ENABLED_BY_DEFAULT OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC_ENABLED_BY_DEFAULT ON CACHE BOOL "" FORCE)
     add_subdirectory(extern/sdl)
 
     set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -171,6 +168,7 @@ set(CLIENT_MAIN_SOURCES
     src/game/utils/basic_resource_loader.cpp
     src/game/ui/devtools.cpp
     src/game/ui/debug_tools.cpp
+    src/game/ui/game_interface.cpp
     src/game/multiplayer/client_replicator.cpp
     src/game/multiplayer/client_ownership.cpp
     src/game/managers/render_manager.cpp
@@ -245,11 +243,9 @@ if(WIN32)
         set_target_properties(${EXECUTABLE_NAME} PROPERTIES
             WIN32_EXECUTABLE TRUE
         )
-
-        if(MSVC)
-            target_link_options(${EXECUTABLE_NAME} PRIVATE "/ENTRY:mainCRTStartup")
-        endif()
     endif()
+
+    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC _WIN32_WINNT=0x0A00) # Windows 10
 elseif(UNIX)
     target_compile_definitions(${EXECUTABLE_NAME} PUBLIC PLATFORM_UNIX)
 endif()
@@ -266,6 +262,7 @@ set(BASIC_LIBRARIES
 set(CLIENT_LIBRARIES
     ${BASIC_LIBRARIES}
     Vulkan::Vulkan
+    SDL2::SDL2main
     SDL2::SDL2
     Freetype::Freetype
     OpenAL

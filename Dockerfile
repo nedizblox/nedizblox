@@ -25,6 +25,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 COPY --from=builder /app/build/nedizblox-server /app/nedizblox-server
 
-ENTRYPOINT [ "./nedizblox-server" ]
+COPY ./shared/maps /app/shared/maps
 
+ENTRYPOINT [ "./nedizblox-server" ]
 CMD [ "--port", "8080", "--map", "testplace.nbxl" ]

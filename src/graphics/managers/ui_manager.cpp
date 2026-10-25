@@ -2,6 +2,8 @@
 
 #include <imgui/imgui_internal.h>
 
+#include <imgui/ImGuiNotify.hpp>
+
 namespace gfx::mngrs {
 
 namespace {
@@ -183,6 +185,8 @@ void UiManager::drawImgui(VkCommandBuffer commandBuffer) {
 
     if (m_imguiOverlay)
         m_imguiOverlay();
+
+    ImGui::RenderNotifications();
 
     m_imgui->draw(commandBuffer);
 }

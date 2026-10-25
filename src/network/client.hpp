@@ -19,16 +19,21 @@ namespace net {
 
 class Client {
 public:
-    using OldPlayersCallback = std::function<void(uint32_t, const std::string&)>;
-    using PlayerJoinedCallback = std::function<void(uint32_t, const std::string&)>;
+    using OldPlayersCallback =
+        std::function<void(uint32_t, const std::string&)>;
+    using PlayerJoinedCallback =
+        std::function<void(uint32_t, const std::string&)>;
     using PlayerLeftCallback = std::function<void(uint32_t)>;
 
-    using PhysicsUpdateCallback
-        = std::function<void(uint32_t, const std::vector<packets::PhysicalObjectState>&)>;
+    using NetworkMessageCallback = std::function<void(const std::string&)>;
+
+    using PhysicsUpdateCallback = std::function<
+        void(uint32_t, const std::vector<packets::PhysicalObjectState>&)>;
 
     using MapCallback = std::function<void(const std::vector<uint8_t>&)>;
 
-    using ReliableMessageCallback = std::function<void(const std::vector<uint8_t>&)>;
+    using ReliableMessageCallback =
+        std::function<void(const std::vector<uint8_t>&)>;
 
     Client(const std::string& host, uint16_t port, const std::string& nickname);
     ~Client();
@@ -36,40 +41,69 @@ public:
     Client(const Client&) = delete;
     Client& operator=(const Client&) = delete;
 
-    void setOldPlayersCallback(OldPlayersCallback callback) { m_oldPlayersCallback = callback; }
+    void setOldPlayersCallback(OldPlayersCallback callback) {
+        m_oldPlayersCallback = callback;
+    }
     void setPlayerJoinedCallback(PlayerJoinedCallback callback) {
         m_playerJoinedCallback = callback;
     }
-    void setPlayerLeftCallback(PlayerLeftCallback callback) { m_playerLeftCallback = callback; }
+    void setPlayerLeftCallback(PlayerLeftCallback callback) {
+        m_playerLeftCallback = callback;
+    }
+
+    void setNetworkMessageCallback(NetworkMessageCallback callback) {
+        m_networkMessageCallback = callback;
+    }
 
     void setPhysicsUpdateCallback(PhysicsUpdateCallback callback) {
         m_physicsUpdateCallback = callback;
     }
-    void setMapCallback(MapCallback callback) { m_mapCallback = callback; }
+    void setMapCallback(MapCallback callback) {
+        m_mapCallback = callback;
+    }
 
     void setReliableMessageCallback(ReliableMessageCallback callback) {
         m_reliableMessageCallback = callback;
     }
 
-    std::string getServerAddress() const { return m_serverAddress; }
-    uint16_t getServerPort() const { return m_serverPort; }
+    std::string getServerAddress() const {
+        return m_serverAddress;
+    }
+    uint16_t getServerPort() const {
+        return m_serverPort;
+    }
 
-    uint32_t getPlayerId() const { return m_playerId; }
-    std::string getPlayerNickname() const { return m_playerNickname; }
+    uint32_t getPlayerId() const {
+        return m_playerId;
+    }
+    std::string getPlayerNickname() const {
+        return m_playerNickname;
+    }
 
-    void sendPhysicsState(const std::vector<packets::PhysicalObjectState>& objects);
+    void
+    sendPhysicsState(const std::vector<packets::PhysicalObjectState>& objects);
 
     void sendReliable(const void* data, size_t size);
 
     void sendPing();
 
-    uint32_t getPingMs() const { return m_pingMs.load(); }
+    uint32_t getPingMs() const {
+        return m_pingMs.load();
+    }
 
-    double getSentKB() const { return static_cast<double>(m_bytesSent.load()) / 1024.0; }
-    double getRecvKB() const { return static_cast<double>(m_bytesReceived.load()) / 1024.0; }
+    double getSentKB() const {
+        return static_cast<double>(m_bytesSent.load()) / 1024.0;
+    }
+    double getRecvKB() const {
+        return static_cast<double>(m_bytesReceived.load()) / 1024.0;
+    }
 
-    double getSentKBps() const { return m_sentKBps.load(); }
-    double getRecvKBps() const { return m_recvKBps.load(); }
+    double getSentKBps() const {
+        return m_sentKBps.load();
+    }
+    double getRecvKBps() const {
+        return m_recvKBps.load();
+    }
 
     void start();
     void stop();
@@ -96,6 +130,9 @@ private:
     std::thread m_udpReceiveThread;
     std::thread m_statsThread;
     std::atomic<bool> m_running{false};
+    std::atomic<bool> m_udpConfirmed{
+        false
+    };
 
     std::unordered_map<uint32_t, packets::PhysicalObjectState> m_objectStates;
     std::vector<packets::OldPlayerInfo> m_cachedOldPlayers;
@@ -104,6 +141,7 @@ private:
     OldPlayersCallback m_oldPlayersCallback;
     PlayerJoinedCallback m_playerJoinedCallback;
     PlayerLeftCallback m_playerLeftCallback;
+    NetworkMessageCallback m_networkMessageCallback;
     PhysicsUpdateCallback m_physicsUpdateCallback;
     MapCallback m_mapCallback;
 
@@ -114,6 +152,8 @@ private:
     std::atomic<uint64_t> m_bytesReceived{0};
     std::atomic<double> m_sentKBps{0.0};
     std::atomic<double> m_recvKBps{0.0};
+
+    bool sendUdpHello();
 
     void tcpUpdateLoop();
     void udpUpdateLoop();
